@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TRACK-01",
+    "genre": "Dream Pop",
+    "title": "Midnight Echo",
+    "artist": "Lucid",
+    "file_path": "samples/dream_pop_01.mp3",
+    "expected_bpm": 118,
+    "mood_keywords": ["Melancholic", "Vintage Reverb", "Late Night"],
+    "rights_status": "Royalty-Free / Original"
+  },
+  {
+    "id": "TRACK-02",
+    "genre": "Lo-Fi Hip-Hop",
+    "title": "Rainy Cafe Alley",
+    "artist": "Cloud Nine",
+    "file_path": "samples/lofi_02.mp3",
+    "expected_bpm": 85,
+    "mood_keywords": ["Chill", "Vinyl Crackle", "Warm Nostalgia"],
+    "rights_status": "Royalty-Free"
+  },
+  {
+    "id": "TRACK-03",
+    "genre": "Synthwave / Cyberpunk",
+    "title": "Neon Highway 1988",
+    "artist": "Vector Drive",
+    "file_path": "samples/synthwave_03.mp3",
+    "expected_bpm": 132,
+    "mood_keywords": ["Fast", "Retro Synth", "High Energy"],
+    "rights_status": "Royalty-Free"
+  },
+  {
+    "id": "TRACK-04",
+    "genre": "Indie Acoustic",
+    "title": "Autumn Breeze",
+    "artist": "Siwoo",
+    "file_path": "samples/acoustic_04.mp3",
+    "expected_bpm": 92,
+    "mood_keywords": ["Calm", "Fingerstyle Guitar", "Organic"],
+    "rights_status": "Original"
+  },
+  {
+    "id": "TRACK-05",
+    "genre": "Alternative Rock",
+    "title": "Broken Horizon",
+    "artist": "The Crashers",
+    "file_path": "samples/alt_rock_05.mp3",
+    "expected_bpm": 145,
+    "mood_keywords": ["Distortion", "Heavy Drums", "Rebellious"],
+    "rights_status": "Royalty-Free"
+  }
+]
