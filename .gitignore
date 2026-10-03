@@ -21,3 +21,13 @@ venv.bak/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Indie Album Studio backend (woniri)
+.env.*
+!.env.example
+data/
+samples/
+*.mp3
+*.wav
+*.m4a
+.pytest_cache/
