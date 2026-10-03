@@ -157,6 +157,15 @@ def _highlights(energy: np.ndarray, repetition: np.ndarray, beats: np.ndarray,
     return out
 
 
+def _summary(bpm: float, duration: float, change: str, peak: str) -> str:
+    """진행 화면에 먼저 보여줄 한 줄 (사용자용 — 전문 용어·신뢰도 낮은 키는 뺀다)."""
+    parts = [f"{round(bpm)} BPM", fmt_time(duration)]
+    if "이후" in change:
+        parts.append(change.replace("RMS", "에너지"))
+    parts.append(peak.replace(" 구간이 곡에서 에너지가 가장 높음", " 에너지 최고"))
+    return " · ".join(parts)
+
+
 def analyze_file(path: str, highlight_sec: float = 15.0) -> dict:
     y, _ = librosa.load(path, sr=SR, mono=True)
     duration = float(len(y) / SR)
@@ -196,5 +205,5 @@ def analyze_file(path: str, highlight_sec: float = 15.0) -> dict:
         sections=_sections(chroma_s, energy, duration),
         waveform=_waveform_peaks(y, WAVEFORM_POINTS),
         highlight_candidates=candidates,
-        summary=f"{round(bpm)} BPM, {key}, {fmt_time(duration)} — {change}, {peak}",
+        summary=_summary(bpm, duration, change, peak),
     ).model_dump()
