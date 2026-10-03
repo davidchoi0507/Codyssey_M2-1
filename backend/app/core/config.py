@@ -1,0 +1,73 @@
+"""환경변수 → 설정. 모델명·한도·경로는 전부 여기서만 읽는다."""
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 종료(예정)된 모델 — 실수로 넣어도 바로 막는다.
+FORBIDDEN_MODELS = {"gemini-2.5-flash", "dall-e-3"}
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    # 코디세이 (OpenAI 호환)
+    codyssey_api_key: str
+    codyssey_base_url: str
+    codyssey_llm_model: str
+    codyssey_llm_model_fast: str | None = None
+    codyssey_image_model: str | None = None
+
+    # Gemini (오디오 듣기)
+    gemini_api_key: str
+    gemini_model: str
+    gemini_tier: str = "free"
+    gemini_inline_max_mb: float = 15.0  # 이보다 크면 Files API로 업로드
+
+    # 서버
+    app_env: str = "dev"
+    public_base_url: str = "http://localhost:8000"
+    cors_origins: str = "http://localhost:3000"
+    data_dir: Path = Path("./data")
+    db_path: Path = Path("./data/app.db")
+    download_token_secret: str = ""
+    download_token_ttl_sec: int = 86400
+
+    # 한도
+    max_upload_mb: int = 50
+    max_duration_sec: int = 600
+    cpu_workers: int = 2
+    daily_jobs_per_client: int = 3
+    daily_jobs_global: int = 60
+    note_edits_per_job: int = 5
+    cover_regen_per_job: int = 3
+    retention_days: int = 7
+
+    # 미디어
+    font_path: Path = Path("./app/fonts/NotoSansKR-Bold.ttf")
+    highlight_sec: float = 15.0
+    canvas_sec: float = 8.0
+
+    # 외부 API 재시도
+    api_max_retries: int = Field(default=4, ge=0)
+
+    @field_validator("gemini_model", "codyssey_llm_model", "codyssey_llm_model_fast", "codyssey_image_model")
+    @classmethod
+    def _not_forbidden(cls, v: str | None) -> str | None:
+        if v and v.strip() in FORBIDDEN_MODELS:
+            raise ValueError(f"'{v}' 모델은 종료(예정)되어 사용할 수 없어요. .env의 모델명을 바꿔 주세요.")
+        return v.strip() if v else v
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def jobs_dir(self) -> Path:
+        return self.data_dir / "jobs"
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

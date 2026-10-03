@@ -1,0 +1,19 @@
+# 웹·설정
+fastapi
+uvicorn[standard]
+pydantic>=2
+pydantic-settings>=2
+python-multipart
+python-ulid
+
+# 분석
+librosa
+soundfile
+numpy
+scipy
+
+# 외부 API
+google-genai
+langchain-core
+langchain-openai
+httpx
