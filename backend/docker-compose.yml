@@ -7,4 +7,4 @@ services:
     volumes:
       - .:/app              # 개발용: 코드 수정 즉시 반영
       - ../samples:/samples:ro
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app --reload-dir scripts

@@ -19,8 +19,8 @@ def fmt(sec: float) -> str:
 
 
 def latest_note(jf: JobFiles) -> dict | None:
-    notes = sorted((jf.root / "note").glob("note_v*.json"), key=lambda p: int(p.stem.split("_v")[1]))
-    return jf.read_json(notes[-1]) if notes else None
+    v = jf.latest_note_version()
+    return jf.read_json(jf.note(v)) if v else None
 
 
 def list_jobs(settings) -> None:

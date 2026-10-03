@@ -82,13 +82,13 @@ async def run_analysis(settings: Settings, jf: JobFiles, pool: ProcessPoolExecut
                 jf.event("note_meta", version=1, **llm_meta)
             timings["note"] = t.sec
     except AppError as e:
-        jf.set_status(Stage.FAILED, error=e.to_dict())
+        jf.fail(e.to_dict())
         jf.event("failed", code=e.code, message=e.message)
         raise
     except Exception as e:
         log.exception("분석 중 예상하지 못한 오류")
         err = AppError("INTERNAL", "처리 중 문제가 생겼어요. 다시 시도해 주세요.", True)
-        jf.set_status(Stage.FAILED, error=err.to_dict())
+        jf.fail(err.to_dict())
         jf.event("failed", code=err.code, message=repr(e))
         raise err from e
 

@@ -18,13 +18,13 @@ def probe_duration(path: Path) -> float:
         raise AppError("AUDIO_UNREADABLE", "음원 파일을 읽을 수 없어요. mp3나 wav 파일인지 확인해 주세요.", False) from e
 
 
-def store_original(src: Path, input_dir: Path) -> Path:
+def store_original(src: Path, input_dir: Path, *, ext: str | None = None) -> Path:
     """원본 보관: WAV는 FLAC(무손실, 용량 약 절반)으로 바꿔 저장하고, mp3는 그대로 복사한다.
 
     숏폼 영상은 이 파일로 만들므로 음질을 떨어뜨리지 않는다.
     """
     input_dir.mkdir(parents=True, exist_ok=True)
-    ext = src.suffix.lower()
+    ext = (ext or src.suffix).lower()
     if ext == ".wav":
         dst = input_dir / "original.flac"
         try:

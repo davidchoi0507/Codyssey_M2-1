@@ -12,6 +12,9 @@ soundfile
 numpy
 scipy
 
+# 이미지·영상
+pillow
+
 # 외부 API
 google-genai
 langchain-core

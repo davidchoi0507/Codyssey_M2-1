@@ -7,8 +7,11 @@
       status_2_listening.json        GET /jobs/{id}  곡 듣는 중 (BPM·파형 먼저 나옴)
       status_3_note_ready.json       GET /jobs/{id}  노트 완료
       status_x_failed.json           GET /jobs/{id}  실패 예시 (재시도 가능)
+      package.json                   GET /jobs/{id}/package  (생성까지 끝난 작업만, 파일 링크는 같은 폴더 파일명)
+      cover_*.png                    package.json이 가리키는 커버 이미지
       song.mp3                       하이라이트 미리 듣기용 음원 (브라우저 재생)
 """
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -16,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 from app.core.config import get_settings
 from app.core.stages import ANALYSIS_STEPS, STAGE_LABELS, Stage
 from app.pipeline.jobfiles import JobFiles
+from app.pipeline.views import build_package
 from app.schemas.job import EarlyResult, JobStatus, StepStatus
 from app.schemas.common import ErrorInfo
 from app.schemas.note import ARNote
@@ -33,8 +37,7 @@ def export(jf: JobFiles, out_root) -> None:
     out = out_root / jf.job_id
     out.mkdir(parents=True, exist_ok=True)
     feats = jf.read_json(jf.features)
-    notes = sorted((jf.root / "note").glob("note_v*.json"), key=lambda p: int(p.stem.split("_v")[1]))
-    note = ARNote.model_validate(jf.read_json(notes[-1]))
+    note = ARNote.model_validate(jf.read_json(jf.note(jf.latest_note_version())))
     early = EarlyResult(bpm=feats["bpm"], duration_sec=feats["duration_sec"],
                         waveform=feats["waveform"], summary=feats["summary"])
     t0 = datetime.now(timezone.utc).replace(microsecond=0)
@@ -53,6 +56,13 @@ def export(jf: JobFiles, out_root) -> None:
            error=ErrorInfo(code="GEMINI_RATE_LIMIT", message="AI가 잠시 바빠요. 잠시 뒤 다시 시도해 주세요.",
                            retryable=True))
     (out / "note.json").write_text(note.model_dump_json(indent=1), encoding="utf-8")
+
+    if jf.cover(1, 1).exists():
+        def local(p):  # 실서비스는 /files/<token> — 샘플은 같은 폴더에 복사한 파일명
+            shutil.copy2(p, out / p.name)
+            return p.name
+        pkg = build_package(jf, get_settings(), local)
+        (out / "package.json").write_text(pkg.model_dump_json(indent=1), encoding="utf-8")
 
     # 미리 듣기용 mp3 (실서비스에서는 사용자가 올린 원본을 브라우저가 직접 재생)
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(jf.find_original()), "-b:a", "192k",

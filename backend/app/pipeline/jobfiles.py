@@ -43,6 +43,26 @@ class JobFiles:
     def note(self, version: int) -> Path:
         return self.root / "note" / f"note_v{version}.json"
 
+    def latest_note_version(self) -> int | None:
+        vs = [int(p.stem.split("_v")[1]) for p in (self.root / "note").glob("note_v*.json")]
+        return max(vs) if vs else None
+
+    @property
+    def accepted(self) -> Path:
+        """수락한 노트 버전 (생성은 이 버전 기준)."""
+        return self.root / "note" / "accepted.json"
+
+    # 생성 결과
+    def cover_prompts(self, version: int) -> Path:
+        return self.root / "covers" / f"prompts_v{version}.json"
+
+    def cover(self, idx: int, version: int, suffix: str = "") -> Path:
+        """cover_{1..3}_v{n}.png / suffix "_3000" 업스케일 / "_title" 제목 오버레이."""
+        return self.root / "covers" / f"cover_{idx}_v{version}{suffix}.png"
+
+    def channel_copy(self, channel: str, version: int) -> Path:
+        return self.root / "channels" / channel / f"copy_v{version}.json"
+
     @property
     def song(self) -> Path:
         return self.root / "song.json"
@@ -66,6 +86,18 @@ class JobFiles:
         self.root.mkdir(parents=True, exist_ok=True)
         with (self.root / "events.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps({"ts": now_iso(), "event": event, **payload}, ensure_ascii=False) + "\n")
+
+    def events(self) -> list[dict]:
+        p = self.root / "events.jsonl"
+        if not p.exists():
+            return []
+        return [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    def fail(self, error: dict) -> None:
+        """실패 기록 — 진행 중이던 단계(step)를 남겨서 화면이 어느 단계에서 멈췄는지 보여줄 수 있게."""
+        p = self.root / "status.json"
+        step = self.read_json(p).get("step") if p.exists() else None
+        self.set_status("failed", step=step, error=error)
 
     def set_status(self, stage: str, *, step: str | None = None, error: dict | None = None) -> None:
         self.write_json(self.root / "status.json",
