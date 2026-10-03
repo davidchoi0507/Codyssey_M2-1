@@ -10,13 +10,12 @@ import argparse
 import asyncio
 import json
 import logging
-import shutil
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from app.analysis.audio_io import probe_duration
+from app.analysis.audio_io import probe_duration, store_original
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.stages import Stage
@@ -46,9 +45,7 @@ def create_job(args, settings) -> JobFiles:
         print(f"[경고] {size_mb:.0f}MB — 업로드 한도({settings.max_upload_mb}MB)를 넘는 파일이에요.", file=sys.stderr)
 
     jf = JobFiles(settings.jobs_dir, new_job_id())
-    dst = jf.original(src.suffix.lower())
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
+    stored = store_original(src, jf.root / "input")
 
     lyrics = Path(args.lyrics_file).read_text(encoding="utf-8") if args.lyrics_file else None
     jf.write_json(jf.song, {"title": args.title, "artist": args.artist, "genre": args.genre,
@@ -59,7 +56,8 @@ def create_job(args, settings) -> JobFiles:
         "consent_showcase": args.consent_showcase, "gemini_tier": settings.gemini_tier,
     })
     jf.set_status(Stage.UPLOADED)
-    jf.event("uploaded", size_mb=round(size_mb, 1), duration_sec=round(duration, 1), source="cli")
+    jf.event("uploaded", size_mb=round(size_mb, 1), stored=stored.name,
+             stored_mb=round(stored.stat().st_size / 1024 / 1024, 1), duration_sec=round(duration, 1), source="cli")
     return jf
 
 

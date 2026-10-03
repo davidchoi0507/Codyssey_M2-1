@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     download_token_ttl_sec: int = 86400
 
     # 한도
-    max_upload_mb: int = 50
+    max_upload_mb: int = 200  # 10분 24bit/48kHz WAV(약 173MB)까지. 실제 기준은 max_duration_sec
     max_duration_sec: int = 600
     cpu_workers: int = 2
     daily_jobs_per_client: int = 3

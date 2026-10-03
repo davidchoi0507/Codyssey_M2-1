@@ -23,9 +23,6 @@ class JobFiles:
         self.root = jobs_dir / job_id
 
     # 입력
-    def original(self, ext: str) -> Path:
-        return self.root / "input" / f"original{ext}"
-
     def find_original(self) -> Path | None:
         found = sorted((self.root / "input").glob("original.*"))
         return found[0] if found else None
