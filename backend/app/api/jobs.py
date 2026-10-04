@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
-from app.api.deps import job_files, runner, settings
+from app.api.deps import file_url, job_files, runner, settings
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.pipeline.intake import create_job
@@ -58,7 +58,7 @@ async def create(
 
 @router.get("/{job_id}", response_model=JobStatus, summary="진행 상태 (2~3초마다 폴링)")
 def status(jf: JobFiles = Depends(job_files), r: JobRunner = Depends(runner)) -> JobStatus:
-    return job_status(jf, r.queue_position(jf.job_id))
+    return job_status(jf, r.queue_position(jf.job_id), lambda p: file_url(jf, p))
 
 
 @router.patch("/{job_id}/info", response_model=dict, summary="기다리는 동안 추가 입력 (가사·채널·발매일)")
@@ -84,4 +84,4 @@ async def retry(jf: JobFiles = Depends(job_files), r: JobRunner = Depends(runner
     else:
         r.start_analysis(jf)
     jf.event("retry", step=st.get("step"))
-    return job_status(jf, r.queue_position(jf.job_id))
+    return job_status(jf, r.queue_position(jf.job_id), lambda p: file_url(jf, p))

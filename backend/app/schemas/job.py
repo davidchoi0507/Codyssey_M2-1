@@ -34,5 +34,6 @@ class JobStatus(BaseModel):
     queue_position: int | None = None
     steps: list[StepStatus]
     early: EarlyResult | None = None
+    audio_url: str | None = None  # 하이라이트 미리 듣기·구간 다시 고르기용 (압축본 64kbps 모노). 떠났다 돌아와도 들을 수 있게
     error: ErrorInfo | None = None
     updated_at: datetime

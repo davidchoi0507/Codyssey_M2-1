@@ -38,6 +38,7 @@ class ChannelOut(BaseModel):
     hashtags: list[str] | None = None
     hook: str | None = None
     images: dict[str, str] | None = Field(default=None, description="비율 → 이미지 링크 (커버 선택 후 렌더링되면 생김)")
+    video: str | None = Field(default=None, description="(tiktok·instagram) 이 채널에 올릴 숏폼 영상 링크 = videos의 short (릴스·틱톡)")
     v: int = 1
     regenerate_remaining: int | None = None
 

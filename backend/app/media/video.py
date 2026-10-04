@@ -12,13 +12,18 @@ from app.core.errors import AppError
 log = logging.getLogger(__name__)
 
 
-async def _ffmpeg(args: list[str], what: str) -> None:
-    proc = await asyncio.create_subprocess_exec("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *args,
+async def _ffmpeg(args: list[str], out: Path, what: str) -> None:
+    """임시 파일에 쓰고 성공하면 바꿔 끼운다 — 실패해도 반쯤 쓴 영상이 '완성본'으로 남지 않게."""
+    tmp = out.with_name(out.stem + ".part.mp4")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    proc = await asyncio.create_subprocess_exec("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *args, str(tmp),
                                                 stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
     _, err = await proc.communicate()
     if proc.returncode != 0:
+        tmp.unlink(missing_ok=True)
         log.error("ffmpeg %s 실패: %s", what, err.decode(errors="replace")[-1500:])
         raise AppError("RENDER_ERROR", f"{what}을 만들지 못했어요. 다시 시도해 주세요.", True)
+    tmp.replace(out)
 
 
 def _zoom(frames: int, expr: str, size: int) -> str:
@@ -43,7 +48,6 @@ async def render_short(*, bg: Path, cover: Path, overlay: Path, audio: Path, sta
         f"[b2][2:v]overlay=0:0,format=yuv420p,fade=t=in:d={fd['in']},fade=t=out:st={duration - fd['out']}:d={fd['out']}[vout]",
         f"[a2]afade=t=in:d={fd['in']},afade=t=out:st={duration - fd['out']}:d={fd['out']}[aout]",
     ])
-    out.parent.mkdir(parents=True, exist_ok=True)
     await _ffmpeg([
         "-loop", "1", "-framerate", str(fps), "-i", str(bg),
         "-i", str(cover),
@@ -52,8 +56,8 @@ async def render_short(*, bg: Path, cover: Path, overlay: Path, audio: Path, sta
         "-filter_complex", graph, "-map", "[vout]", "-map", "[aout]",
         "-t", f"{duration:.2f}", "-r", str(fps),
         "-c:v", "libx264", "-preset", v["preset"], "-crf", str(v["crf"]), "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", v["audio_bitrate"], "-movflags", "+faststart", str(out),
-    ], "숏폼 영상")
+        "-c:a", "aac", "-b:a", v["audio_bitrate"], "-movflags", "+faststart",
+    ], out, "숏폼 영상")
 
 
 async def render_canvas(*, bg: Path, cover: Path, tpl: dict, out: Path) -> None:
@@ -63,10 +67,9 @@ async def render_canvas(*, bg: Path, cover: Path, tpl: dict, out: Path) -> None:
     zoom = f"1+{c['zoom_peak'] - 1:.4f}*sin(PI*on/{frames})"  # 처음·끝이 1.0 → 반복해도 이음매 없음
     graph = (f"[1:v]{_zoom(frames, zoom, c['size'])}[cv];"
              f"[0:v][cv]overlay=x={(w - c['size']) // 2}:y={(h - c['size']) // 2},format=yuv420p[vout]")
-    out.parent.mkdir(parents=True, exist_ok=True)
     await _ffmpeg([
         "-loop", "1", "-framerate", str(tpl["fps"]), "-i", str(bg), "-i", str(cover),
         "-filter_complex", graph, "-map", "[vout]", "-frames:v", str(frames), "-r", str(tpl["fps"]), "-an",
         "-c:v", "libx264", "-preset", v["preset"], "-crf", str(v["crf"]), "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart", str(out),
-    ], "Canvas 영상")
+        "-movflags", "+faststart",
+    ], out, "Canvas 영상")

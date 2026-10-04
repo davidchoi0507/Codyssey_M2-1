@@ -3,7 +3,7 @@
   python -m scripts.cleanup            # 삭제
   python -m scripts.cleanup --dry-run  # 지울 대상만 보기
 
-음원·결과물·곡 정보·동의 기록·DB 레코드를 지운다. 결과보고서용 지표는 개인정보와 자유 입력(수정 문장, 요청,
+KEEP_JOB_IDS(쉼표 구분)에 적은 작업은 남긴다 (팀 공유 샘플). 음원·결과물·곡 정보·동의 기록·DB 레코드를 지운다. 결과보고서용 지표는 개인정보와 자유 입력(수정 문장, 요청,
 에러 원문)을 빼고 data/metrics_archive.jsonl 에 한 줄씩 남긴다.
 """
 import argparse
@@ -25,8 +25,10 @@ def main() -> int:
     args = p.parse_args()
     s = get_settings()
     cutoff = (datetime.now(timezone.utc) - timedelta(days=s.retention_days)).isoformat(timespec="seconds")
+    keep = {j.strip() for j in s.keep_job_ids.split(",") if j.strip()}
     with db.connect() as conn:
-        old = [r["job_id"] for r in conn.execute("SELECT job_id FROM jobs WHERE created_at < ?", (cutoff,))]
+        old = [r["job_id"] for r in conn.execute("SELECT job_id FROM jobs WHERE created_at < ?", (cutoff,))
+               if r["job_id"] not in keep]
     # DB에 없는 오래된 폴더(가져오기 전 실패 등)도 정리
     orphans = []
     if s.jobs_dir.exists():
@@ -34,7 +36,7 @@ def main() -> int:
             known = {r["job_id"] for r in conn.execute("SELECT job_id FROM jobs")}
         limit = datetime.now().timestamp() - s.retention_days * 86400
         orphans = [d.name for d in s.jobs_dir.iterdir()
-                   if d.is_dir() and d.name not in known and d.stat().st_mtime < limit]
+                   if d.is_dir() and d.name not in known and d.name not in keep and d.stat().st_mtime < limit]
 
     print(f"보관 {s.retention_days}일 지난 작업 {len(old)}건, DB에 없는 오래된 폴더 {len(orphans)}건")
     if args.dry_run:

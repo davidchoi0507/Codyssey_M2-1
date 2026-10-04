@@ -1,7 +1,9 @@
 """렌더링 파이프라인 (커버 선택 후): 숏폼·Canvas·채널별 이미지·제목 얹은 커버 → done.
 
 - CPU를 많이 쓰므로 분석과 같은 대기열 자리(CPU_WORKERS)를 쓴다 (runner.start_render).
-- 다른 커버를 다시 고르면 이전 렌더링 결과를 지우고 새로 만든다. 같은 선택으로 다시 실행하면 있는 파일은 건너뛴다.
+- 다른 커버를 고르면 지금 결과(영상·채널 이미지)를 renders/<커버>_v<버전>/ 에 보관하고, 고른 커버의 보관본이 있으면
+  꺼내 온다 → 1번→2번→1번처럼 다시 고르면 바로 끝난다. 있는 파일은 건너뛰므로 없는 것만 새로 만든다.
+- AI는 쓰지 않는다 (Pillow·ffmpeg만). 글(채널 글·피칭)은 커버와 무관해서 어떤 커버를 골라도 같다.
 """
 import asyncio
 import logging
@@ -44,7 +46,7 @@ def cover_file(jf: JobFiles, item_id: str, v: int, suffix: str = "_3000") -> Pat
 
 
 def select_cover(jf: JobFiles, item_id: str, v: int | None) -> dict:
-    """선택을 기록하고 (다른 커버면) 이전 렌더링 결과를 지운다. 렌더링 시작은 runner가."""
+    """선택을 기록하고 (다른 커버면) 렌더링 결과를 바꿔 끼운다. 렌더링 시작은 runner가."""
     st = jf.status()["stage"]
     if st not in (Stage.AWAITING_COVER, Stage.DONE, Stage.FAILED) or not jf.accepted.exists():
         raise AppError("NOT_READY_TO_SELECT", "커버 3종이 만들어진 뒤에 고를 수 있어요.", True, http_status=409)
@@ -53,8 +55,8 @@ def select_cover(jf: JobFiles, item_id: str, v: int | None) -> dict:
     cover_file(jf, item_id, v or 0)  # 존재 확인
     sel = {"item_id": item_id, "v": v, "at": now_iso()}
     prev = jf.read_json(jf.selected_cover) if jf.selected_cover.exists() else None
-    if not prev or (prev["item_id"], prev["v"]) != (item_id, v):
-        _clear_renders(jf)
+    if prev and (prev["item_id"], prev["v"]) != (item_id, v):
+        _swap_renders(jf, _key(prev), _key(sel))
     jf.write_json(jf.selected_cover, sel)
     jf.event("cover_selected", item=item_id, v=v)
     return sel
@@ -67,12 +69,28 @@ def cover_file_or_none(jf: JobFiles, item_id: str, v: int) -> Path | None:
         return None
 
 
-def _clear_renders(jf: JobFiles) -> None:
-    shutil.rmtree(jf.root / "video", ignore_errors=True)
-    for p in (jf.root / "channels").glob("*/image_*.png"):
-        p.unlink()
-    for p in (jf.root / "covers").glob("*_title.png"):
-        p.unlink()
+def _key(sel: dict) -> str:
+    return f"{sel['item_id']}_v{sel['v']}"
+
+
+def _render_outputs(root: Path) -> list[Path]:
+    """커버마다 달라지는 결과 (제목 커버는 커버 파일별로 이름이 달라서 제외)."""
+    return [*(root / "video").glob("*.mp4"), *(root / "channels").glob("*/image_*.png")]
+
+
+def _swap_renders(jf: JobFiles, prev_key: str, new_key: str) -> None:
+    stash = jf.root / "renders"
+    for p in _render_outputs(jf.root):
+        dest = stash / prev_key / p.relative_to(jf.root)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        p.replace(dest)
+    cached = stash / new_key
+    if cached.exists():
+        for p in _render_outputs(cached):
+            dest = jf.root / p.relative_to(cached)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            p.replace(dest)
+        shutil.rmtree(cached, ignore_errors=True)
 
 
 async def run_render(settings: Settings, jf: JobFiles) -> None:

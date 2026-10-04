@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     note_edits_per_job: int = 5
     cover_regen_per_job: int = 3
     retention_days: int = 7
+    keep_job_ids: str = ""  # 쉼표 구분 — 7일 삭제에서 빼는 작업 (팀 공유 샘플 등)
 
     # 미디어
     font_path: Path = Path("./app/fonts/NotoSansKR-Bold.ttf")

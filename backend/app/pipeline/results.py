@@ -125,6 +125,8 @@ def build_zip(jf: JobFiles, package, models: list[str]) -> Path:
             text = c.text + ("\n\n" + " ".join(c.hashtags) if c.hashtags else "")
             if c.hook:
                 text = f"[영상 위 훅 문구] {c.hook}\n\n" + text
+            if c.video:
+                text = "[올릴 영상] video/short_15s.mp4\n\n" + text
             z.writestr(f"{prefix}/{ch}/post.txt", text)
             for p in sorted((jf.root / "channels" / ch).glob("image_*.png")):
                 add(z, p, f"{ch}/{p.name}")

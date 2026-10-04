@@ -14,9 +14,11 @@ from app.schemas.job import EarlyResult, JobStatus, StepStatus
 from app.schemas.package import CHANNELS, ChannelOut, CoverItem, CoverVersion, Package, PitchOut, VideoItem
 
 _STEP_PROGRESS = {"measure": 0.15, "listen": 0.45, "note": 0.8}
+VIDEO_CHANNELS = ("tiktok", "instagram")  # 숏폼(9:16)을 올리는 채널 — 틱톡, 인스타 릴스
 
 
-def job_status(jf: JobFiles, queue_position: int | None = None) -> JobStatus:
+def job_status(jf: JobFiles, queue_position: int | None = None,
+               url_for: Callable[[Path], str] | None = None) -> JobStatus:
     """queue_position: 분석 자리를 기다리는 순번 (JobRunner.queue_position). CLI 내보내기는 None."""
     st = jf.status()
     stage, step = Stage(st["stage"]), st.get("step")
@@ -52,6 +54,7 @@ def job_status(jf: JobFiles, queue_position: int | None = None) -> JobStatus:
         label = QUEUED_LABEL.format(n=queue_position)
     return JobStatus(job_id=jf.job_id, stage=stage, stage_label=label or STAGE_LABELS[stage], progress=progress,
                      queue_position=queue_position, steps=steps, early=early,
+                     audio_url=url_for(jf.analysis_mp3) if url_for and jf.analysis_mp3.exists() else None,
                      error=ErrorInfo(**st["error"]) if st.get("error") else None,
                      updated_at=datetime.fromisoformat(st["updated_at"]))
 
@@ -90,6 +93,7 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
                                     regenerate_remaining=0 if item_id == "cover-own"
                                     else regen_remaining(settings, jf, item_id, events)))
 
+    short = jf.video(f"short_{SHORT_TEMPLATE}")
     image_specs = yaml.safe_load((TEMPLATES / "channel_images.yaml").read_text(encoding="utf-8"))
     channels = {}
     for ch in CHANNELS:
@@ -100,6 +104,7 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
                       if jf.channel_image(ch, ratio).exists()}
             channels[ch] = ChannelOut(item_id=f"copy-{ch}", text=d["text"], hashtags=d.get("hashtags") or None,
                                       hook=d.get("hook"), images=images or None, v=v,
+                                      video=url_for(short) if ch in VIDEO_CHANNELS and short.exists() else None,
                                       regenerate_remaining=regen_remaining(settings, jf, f"copy-{ch}", events))
 
     pitch = {}

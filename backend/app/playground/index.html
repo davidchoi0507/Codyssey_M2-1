@@ -35,6 +35,10 @@
   canvas { width:100%; height:60px; display:block; }
   .log { font:12px/1.5 ui-monospace, Consolas, monospace; color:var(--mute); max-height:160px; overflow:auto; white-space:pre-wrap; }
   .hide { display:none; }
+  .guide summary { cursor:pointer; font-size:15px; }
+  .guide .gbody { margin-top:10px; font-size:14px; }
+  .guide h3 { font-size:14px; margin:14px 0 4px; }
+  .guide ul, .guide ol { margin:4px 0; padding-left:20px; } .guide li { margin:3px 0; }
   @media (max-width: 640px) { .covers { grid-template-columns:1fr; } }
 </style>
 </head>
@@ -42,6 +46,93 @@
 <main>
   <h1>인디 앨범 스튜디오 — 백엔드 흐름 테스트</h1>
   <div class="sub">이 서버의 API를 그대로 호출하는 <b>백엔드 흐름 확인용</b> 페이지입니다. 실제 화면(디자인)은 프론트에서 만듭니다.</div>
+
+  <!-- 테스트 가이드 · 확인 요청 (팀 공유용) -->
+  <section class="card guide">
+    <details>
+      <summary><b>📋 테스트 방법</b> — 처음이면 꼭 읽어 주세요</summary>
+      <div class="gbody">
+        <p class="hint">이 페이지는 <b>백엔드가 실제로 어떻게 동작하는지</b> 확인하는 페이지예요. 버튼 배치·색·글꼴 같은 화면 디자인은 팀장님이 만드는 실제 화면에서 정해집니다.
+          AI를 쓰는 버튼에는 횟수가 표시돼 있어요.</p>
+
+        <h3>빠르게 둘러보기 (AI 사용 없음)</h3>
+        <ul>
+          <li>1번 칸 아래 <b>샘플곡 1~3</b>: 결과물까지 만들어진 작업이에요. 커버·영상·채널 글·피칭 메일·ZIP을 바로 볼 수 있어요.</li>
+          <li><b>노트 수정 테스트용 (수락 전)</b>: A&R 노트 단계에 멈춰 있는 작업이에요. 노트 수정·다시 듣기를 해 볼 수 있어요.</li>
+          <li>샘플은 여러 사람이 같이 쓰는 작업이라, 누군가 고치면 다른 사람에게도 바뀐 채로 보여요. 마음껏 고치려면 직접 곡을 올려 주세요.</li>
+        </ul>
+
+        <h3>전체 흐름 (직접 곡 올리기)</h3>
+        <ol>
+          <li><b>곡 올리기</b> — mp3/wav(10분·200MB 이하), 곡 제목·아티스트 필수. 가사·곡 소개는 선택(넣으면 해석·피칭 메일에 반영). 동의 3개는 필수.
+            하루에 한 사람(같은 인터넷) 10곡까지예요(밴드 테스트 때는 3곡으로 줄여요).</li>
+          <li><b>진행 상태</b> — 업로드 → 수치 재는 중(BPM·키·에너지, 수 초) → 곡을 듣는 중(AI가 실제로 들음, 20~70초) → 해석 쓰는 중.
+            수치를 재면 BPM·파형이 먼저 보여요. 다른 곡이 처리 중이면 "차례를 기다리는 중 (n번째)"이 떠요.</li>
+          <li><b>A&R 노트 확인</b> — AI가 곡을 듣고 쓴 해석이에요. 아래 방법으로 고칠 수 있어요.
+            <ul>
+              <li><b>한 줄 수정</b>: "이게 아니라 이거야"를 한 줄로 쓰면 AI가 해석·키워드·색·커버 방향을 그 방향으로 다시 써요(약 7초). 예: "터지는 게 아니라 체념이야"</li>
+              <li><b>다시 듣기</b>: AI가 곡을 처음부터 다시 듣고 해석을 새로 써요(20~70초). 가사를 나중에 추가했거나, 해석이 곡과 많이 다를 때 써요. 밴드가 한 줄 수정한 방향은 다시 들어도 유지돼요.</li>
+              <li><b>AI 다시 쓰기·다시 듣기 남은 횟수</b>: 한 줄 수정 + 다시 듣기를 <b>합쳐서 작업당 5회</b>예요. 다시 듣기가 실패하면 횟수는 돌려줘요.</li>
+              <li><b>직접 편집 (횟수 제한 없음)</b>: 아래 값을 고친 뒤 <b>"직접 편집 저장"</b>을 눌러야 저장돼요.
+                <ul>
+                  <li>무드 키워드: 쉼표로 구분, 1~5개</li>
+                  <li>색 3개: <b>색 칸을 눌러</b> 색 고르기 (곡의 처음→절정→끝 느낌)</li>
+                  <li>커버 방향 3개: 커버를 그릴 때 쓰는 문장을 직접 고쳐 쓰기 (예: "비 오는 창가, 수채 일러스트")</li>
+                  <li>하이라이트 구간(숏폼 15초): 후보(★ = AI 추천)를 누르거나 <b>슬라이더</b>로 시작 지점을 옮기고 <b>▶ 이 구간 듣기</b>로 확인</li>
+                </ul>
+              </li>
+              <li>해석 문장 자체는 직접 고칠 수 없고 한 줄 수정으로만 바뀌어요(해석과 근거 수치가 어긋나지 않게).</li>
+            </ul>
+          </li>
+          <li><b>수락</b> — "이 해석으로 수락"을 누르면 커버 3장·채널 홍보 글 4개·피칭 메일(영·한)을 동시에 만들어요(약 40초). 수락하면 노트는 더 못 고쳐요.</li>
+          <li><b>결과물</b>
+            <ul>
+              <li><b>이 커버로 만들기</b>: 고른 커버로 숏폼 15초·Spotify Canvas 8초·채널별 이미지·제목 얹은 커버를 만들어요(약 40초, AI 사용 없음).
+                다른 커버를 골라도 되고, 한 번 만든 커버로 다시 돌아가면 바로 보여요. 글(채널 글·피칭)은 어떤 커버를 골라도 같아요.</li>
+              <li><b>다시 / 다시 쓰기</b>: 커버·채널 글·피칭 메일을 하나씩 다시 만들어요. 요청 칸에 한 줄 쓰면 반영돼요(예: "사람 없이", "더 짧게"). <b>AI를 쓰고, 항목마다 3회</b>예요. 이전 버전도 남아요.</li>
+              <li><b>직접 올린 사진</b>: 밴드 사진을 올리면 커버 후보(cover-own)로 들어가요. 골라서 영상까지 만들 수 있어요.</li>
+              <li><b>ZIP 다운로드</b>: 영상까지 만든 뒤 생겨요. 커버·영상·채널별 글과 이미지·피칭 메일·릴리즈 브리프가 들어 있어요.</li>
+              <li>틱톡·인스타그램(릴스)에는 숏폼 영상이 같이 붙어요. 피칭 메일의 <mark>[대괄호]</mark>는 밴드가 직접 채우는 칸이에요.</li>
+            </ul>
+          </li>
+        </ol>
+        <p class="hint">맨 아래 "호출 기록"에 어떤 요청을 보냈고 얼마나 걸렸는지 남아요. 오류를 알려 주실 때 작업 ID(진행 상태 옆)와 같이 캡처해 주세요.</p>
+      </div>
+    </details>
+  </section>
+
+  <section class="card guide">
+    <details>
+      <summary><b>🙋 팀에 확인 요청 드리는 것</b> — 10/6까지 의견 주세요</summary>
+      <div class="gbody">
+        <h3>모두</h3>
+        <ul>
+          <li><b>여러 곡으로 다양하게</b> 테스트하고 오류·이상한 점을 알려 주세요: 긴 곡/짧은 곡, 보컬 없는 곡, 영어 가사, wav/mp3, 큰 파일, 중간에 새로고침하거나 창을 닫았다 다시 열기(작업 ID로 열기), 버튼 연속으로 누르기 등.</li>
+          <li><b>A&R 노트</b>: 해석이 곡과 맞는지, 방향성(말투·길이·근거 수치 정도)이 괜찮은지, 키워드·색·커버 방향이 곡에 어울리는지, 하이라이트 추천 구간이 정말 좋은 구간인지.</li>
+          <li><b>커버 3종</b>: 디자인 방향, 세 장이 서로 충분히 다른지, 곡 분위기와 맞는지, 이상한 그림(글자·손 모양 등)이 없는지.</li>
+          <li><b>영상</b>: 숏폼(훅 문구·확대 속도·파형·제목 위치·페이드)과 Canvas의 느낌, 샘플 영상으로 SNS에 올릴 만한지, 바꾸고 싶은 템플릿 요소.</li>
+          <li><b>채널 홍보 글</b>: 인스타·틱톡·스레드·X 각각의 말투·길이·해시태그가 실제 채널에 맞는지, 어색한 표현.</li>
+          <li><b>피칭 메일</b>: 영어·한국어 메일 품질, 큐레이터가 읽을 만한지, 빠진 정보(예: 발매일·링크·SNS).</li>
+          <li><b>추가하고 싶은 기능·빼도 될 기능</b>, 기다리는 시간이 너무 긴 곳.</li>
+        </ul>
+        <h3>팀장님 (화면)</h3>
+        <ul>
+          <li>진행 화면 단계 이름(업로드 → 수치 재는 중 → 곡을 듣는 중 → 해석 쓰는 중)과 문구, 기다리는 동안 보여줄 것(먼저 나오는 BPM·파형 활용).</li>
+          <li>A&R 노트 화면 구성 — 한 줄 수정·직접 편집·하이라이트 슬라이더·다시 듣기 배치. 미리 듣기는 응답의 <code>audio_url</code>로 가능.</li>
+          <li>API 응답 구조(<a href="/docs" target="_blank">/docs</a>)에서 바꾸거나 추가해야 할 필드 — <b>10/7부터는 필드 추가만 가능</b>해요.</li>
+          <li>숏폼 템플릿 2·3번째 스펙(위치·색·글꼴·움직임), 채널 이미지 비율, 커버 위 제목 배치.</li>
+        </ul>
+        <h3>동의·개인정보 (팀원4)</h3>
+        <ul>
+          <li>지금 받는 정보: 음원 파일, 곡 제목·아티스트·장르·곡 소개·가사(선택), 접속 IP(하루 한도용), 동의 여부와 시각, 밴드가 쓴 수정 문장. <b>7일 뒤 자동 삭제</b>(결과보고서용 처리 시간·수정 횟수 같은 지표만 개인정보 없이 남김).</li>
+          <li>동의 문구 확정본: ① 자작곡·권리 보유 확약 ② 개인정보 수집 항목·목적·7일 보관 ③ 음원이 Google Gemini로 전송되고 무료 티어 특성상 학습에 쓰일 수 있음 ④ (선택) 발표 자료 사용. 문구와 버전 이름을 주시면 반영해요.</li>
+          <li>이메일·연락처를 받을지(결과 알림 등), 받는다면 보관 기간.</li>
+          <li>테스트 밴드 안내문에 넣을 것: 처리 시간, 하루 3곡, 7일 보관, AI 생성 표기.</li>
+        </ul>
+        <p class="hint">의견은 화면 캡처 + 작업 ID + "무엇을 했더니 → 어떻게 됐고 → 어떻게 되길 원하는지"로 보내 주시면 바로 반영할게요.</p>
+      </div>
+    </details>
+  </section>
 
   <!-- 1. 시작 -->
   <section class="card" id="start">
@@ -92,18 +183,22 @@
     <div class="hint" id="evidence"></div>
     <div class="hint" id="correctionNow"></div>
 
-    <label>한 줄 수정 — "이게 아니라 이거야" (AI가 해석을 다시 씀, 횟수 1 사용)</label>
+    <label>한 줄 수정 — "이게 아니라 이거야" (AI가 해석·키워드·색·커버 방향을 다시 씀, AI 횟수 1 사용)</label>
     <div class="row"><input type="text" id="correction" placeholder="예: 터지는 게 아니라 체념이야"><button style="flex:0 0 auto" id="sendCorrection">해석 다시 쓰기</button></div>
 
-    <label>무드 키워드 (쉼표로 구분, 1~5개 — 직접 편집은 횟수 제한 없음)</label><input type="text" id="kw">
-    <label>색 3개</label><div class="swatches" id="colors"></div>
-    <label>커버 방향</label><div id="covdirs"></div>
-    <label>하이라이트 구간 (15초) — 후보를 누르거나 시작 초를 직접 입력</label>
+    <div class="hint" style="margin-top:14px"><b>직접 편집</b> — 아래 값을 고친 뒤 "직접 편집 저장"을 누르세요. AI를 쓰지 않아 횟수 제한이 없어요.</div>
+    <label>무드 키워드 (쉼표로 구분, 1~5개)</label><input type="text" id="kw">
+    <label>색 3개 (색 칸을 눌러 바꾸기 — 곡의 처음→절정→끝 느낌)</label><div class="swatches" id="colors"></div>
+    <label>커버 방향 (커버 3장을 그릴 때 쓰는 문장, 직접 고쳐 쓰기)</label><div id="covdirs"></div>
+    <label>하이라이트 구간 (숏폼에 쓰일 15초) — 후보를 누르거나, 슬라이더로 시작 지점을 옮기고 ▶로 들어 보세요</label>
     <div id="cands"></div>
-    <div class="row"><input type="text" id="hlStart" placeholder="시작(초)"><span class="hint" id="hlNow"></span></div>
+    <canvas id="hlWave" width="880" height="56" style="margin-top:8px"></canvas>
+    <input type="range" id="hlRange" min="0" max="100" step="0.5" style="width:100%">
+    <div class="row"><button id="hlPlay" style="flex:0 0 auto">▶ 이 구간 듣기</button><span class="hint" id="hlNow"></span></div>
+    <audio id="hlAudio" preload="none"></audio>
     <div class="row" style="margin-top:12px">
-      <button id="saveDirect">직접 편집 저장</button>
-      <button id="relisten">다시 듣기 (Gemini 1회, 횟수 1)</button>
+      <button id="saveDirect" title="키워드·색·커버 방향·하이라이트 구간 — AI를 쓰지 않아 횟수 제한 없음">직접 편집 저장 (횟수 제한 없음)</button>
+      <button id="relisten" title="Gemini가 곡을 처음부터 다시 듣고 해석을 새로 써요. 가사를 추가했거나 해석이 곡과 많이 다를 때">다시 듣기 (AI 횟수 1 사용)</button>
       <button class="primary" id="accept">이 해석으로 수락 → 결과물 만들기</button>
     </div>
     <div id="noteErr" class="err hide"></div>
@@ -130,7 +225,7 @@
 <script>
 const API = "";  // 같은 서버에서 열리므로 상대 경로
 const $ = (id) => document.getElementById(id);
-let jobId = null, pollTimer = null, note = null, selectedStart = null;
+let jobId = null, pollTimer = null, note = null, lastStatus = null, renderingShown = false;
 
 function log(msg) { const t = new Date().toLocaleTimeString(); $("log").textContent = `${t}  ${msg}\n` + $("log").textContent; }
 function show(id, on = true) { $(id).classList.toggle("hide", !on); }
@@ -180,13 +275,15 @@ async function poll() {
   clearTimeout(pollTimer);
   let st;
   try { st = await api("GET", `/jobs/${jobId}`); } catch (e) { alertBox("statusErr", e.message); return; }
-  renderStatus(st);
+  renderStatus(st); lastStatus = st;
   if (st.stage === "note_ready") { await loadNote(); show("result", false); return; }
-  if (["awaiting_cover", "rendering", "done"].includes(st.stage)) {
-    show("note", false); await loadPackage(st.stage);
-    if (st.stage === "rendering") pollTimer = setTimeout(poll, 3000);
-    return;
+  if (st.stage === "rendering") {
+    // 렌더링 중에는 결과 화면을 한 번만 그리고(버튼 잠금), 이후엔 위쪽 진행 상태만 갱신 → 깜빡이지 않게
+    if (!renderingShown) { show("note", false); await loadPackage(st.stage); renderingShown = true; }
+    pollTimer = setTimeout(poll, 3000); return;
   }
+  renderingShown = false;
+  if (["awaiting_cover", "done"].includes(st.stage)) { show("note", false); await loadPackage(st.stage); return; }
   if (st.stage === "failed") return;
   pollTimer = setTimeout(poll, 2500);
 }
@@ -217,7 +314,7 @@ async function loadNote() {
   note = await api("GET", `/jobs/${jobId}/note`);
   show("note");
   $("noteVer").textContent = `v${note.version}`;
-  $("edits").textContent = `AI 수정 남은 횟수 ${note.edits_remaining}`;
+  $("edits").textContent = `AI 다시 쓰기·다시 듣기 남은 횟수 ${note.edits_remaining} (합쳐서 5회)`;
   $("interp").textContent = note.interpretation;
   const ev = note.evidence;
   $("evidence").textContent = `근거: ${ev.bpm} BPM${ev.bpm_measured && ev.bpm_measured !== ev.bpm ? ` (측정 ${ev.bpm_measured})` : ""} · ${ev.key} · ${ev.energy_change}  |  ${note.ai_generated.models.join(", ")}`;
@@ -225,15 +322,17 @@ async function loadNote() {
   $("kw").value = note.mood_keywords.join(", ");
   $("colors").innerHTML = note.colors.map(c => `<input type="color" value="${c}">`).join("");
   $("covdirs").innerHTML = note.cover_directions.map(c => `<div class="row" style="margin:4px 0"><span style="flex:0 0 32px" class="pill">${c.id}</span><input type="text" data-cid="${c.id}" value="${c.text.replace(/"/g, "&quot;")}"></div>`).join("");
-  selectedStart = null;
   const sel = note.highlight.selected;
   $("cands").innerHTML = note.highlight.candidates.map(c =>
-    `<div class="cand ${c.start === sel.start ? "sel" : ""}" data-start="${c.start}">${c.id === note.highlight.recommended_id ? "★ " : ""}<b>${fmt(c.start)}~${fmt(c.end)}</b> ${c.reason}</div>`).join("");
-  document.querySelectorAll(".cand").forEach(el => el.onclick = () => {
-    document.querySelectorAll(".cand").forEach(x => x.classList.remove("sel")); el.classList.add("sel");
-    selectedStart = parseFloat(el.dataset.start); $("hlStart").value = "";
-  });
-  $("hlStart").value = ""; $("hlNow").textContent = `지금 선택: ${fmt(sel.start)}~${fmt(sel.end)}`;
+    `<div class="cand" data-start="${c.start}">${c.id === note.highlight.recommended_id ? "★ 추천 " : ""}<b>${fmt(c.start)}~${fmt(c.end)}</b> ${c.reason}</div>`).join("");
+  const dur = (lastStatus && lastStatus.early && lastStatus.early.duration_sec) || (sel.end + HL);
+  $("hlRange").max = Math.max(0, dur - HL); $("hlRange").value = sel.start;
+  document.querySelectorAll(".cand").forEach(el => el.onclick = () => { $("hlRange").value = el.dataset.start; drawHighlight(); });
+  $("hlRange").oninput = drawHighlight;
+  const audioUrl = lastStatus && lastStatus.audio_url;
+  $("hlPlay").disabled = !audioUrl; $("hlPlay").title = audioUrl ? "" : "미리 듣기 음원이 없어요";
+  if (audioUrl) $("hlAudio").src = API + audioUrl;
+  drawHighlight();
   show("noteErr", false);
 }
 
@@ -246,9 +345,8 @@ function directEdits() {
   const dirs = [...document.querySelectorAll("[data-cid]")].map(i => ({ id: i.dataset.cid, text: i.value.trim() }))
     .filter(d => d.text !== note.cover_directions.find(c => c.id === d.id).text);
   if (dirs.length) body.cover_directions = dirs;
-  const typed = $("hlStart").value.trim();
-  const start = typed ? parseFloat(typed) : selectedStart;
-  if (start !== null && !isNaN(start) && start !== note.highlight.selected.start) body.highlight_start = start;
+  const start = parseFloat($("hlRange").value);
+  if (Math.abs(start - note.highlight.selected.start) >= 0.5) body.highlight_start = start;
   return body;
 }
 
@@ -278,12 +376,34 @@ $("accept").onclick = async () => {
   catch (e) { alertBox("noteErr", `[${e.code}] ${e.message}`); }
 };
 
+const HL = 15;  // 하이라이트 길이(초)
+function drawHighlight() {
+  const start = parseFloat($("hlRange").value), w = note.waveform, c = $("hlWave"), g = c.getContext("2d");
+  const dur = parseFloat($("hlRange").max) + HL;
+  g.clearRect(0, 0, c.width, c.height);
+  const x0 = start / dur * c.width, x1 = (start + HL) / dur * c.width;
+  g.fillStyle = "#dbe4ff"; g.fillRect(x0, 0, x1 - x0, c.height);
+  const bw = c.width / w.length;
+  w.forEach((v, i) => { const x = i * bw, h = Math.max(1, v * c.height); g.fillStyle = (x >= x0 && x <= x1) ? "#3b5bdb" : "#adb5bd"; g.fillRect(x, (c.height - h) / 2, Math.max(1, bw - 0.5), h); });
+  const saved = Math.abs(start - note.highlight.selected.start) < 0.5;
+  $("hlNow").textContent = `선택: ${fmt(start)}~${fmt(start + HL)}` + (saved ? " (저장됨)" : " — 저장하려면 '직접 편집 저장'");
+  document.querySelectorAll(".cand").forEach(el => el.classList.toggle("sel", Math.abs(parseFloat(el.dataset.start) - start) < 0.5));
+}
+let hlStop = null;
+$("hlPlay").onclick = () => {
+  const a = $("hlAudio"), start = parseFloat($("hlRange").value);
+  if (!a.paused) { a.pause(); $("hlPlay").textContent = "▶ 이 구간 듣기"; return; }
+  a.currentTime = start; a.play(); $("hlPlay").textContent = "■ 멈춤";
+  clearInterval(hlStop);
+  hlStop = setInterval(() => { if (a.currentTime >= start + HL || a.paused) { a.pause(); clearInterval(hlStop); $("hlPlay").textContent = "▶ 이 구간 듣기"; } }, 200);
+};
+
 // ---------- 4. 결과 ----------
 async function loadPackage(stage) {
   const p = await api("GET", `/jobs/${jobId}/package`);
   show("result");
   $("resultHint").textContent = stage === "awaiting_cover" ? "— 커버를 하나 고르면 숏폼·Canvas·채널 이미지를 만들어요"
-    : stage === "rendering" ? "— 영상·이미지 만드는 중 (40초 안팎)…" : "— 완료";
+    : stage === "rendering" ? "— 영상·이미지 만드는 중 (40초 안팎, 위쪽 진행 상태에서 확인)… 끝나면 자동으로 바뀌어요" : "— 완료";
   $("covers").innerHTML = p.covers.map(c => {
     const v = c.versions[c.versions.length - 1];
     const picked = c.selected ? ` · <b>선택됨 v${c.selected_v}</b>` : "";
@@ -302,7 +422,8 @@ async function loadPackage(stage) {
 
   $("channels").innerHTML = "<h2>채널 홍보 글</h2>" + Object.entries(p.channels).map(([ch, c]) => {
     const imgs = c.images ? `<div class="row" style="margin-top:6px">${Object.entries(c.images).map(([r, u]) => `<a href="${API + u}" target="_blank" style="flex:0 0 auto"><img src="${API + u}" style="height:120px;border-radius:6px"></a><span class="hint" style="flex:0 0 auto">${r}</span>`).join("")}</div>` : "";
-    return `<label>${ch} v${c.v}${c.hook ? ` — 훅: “${esc(c.hook)}”` : ""}</label><div class="copy">${esc(c.text)}${c.hashtags ? "\n\n" + c.hashtags.join(" ") : ""}</div>${imgs}
+    const vid = c.video ? `<div style="margin-top:6px"><video src="${API + c.video}" controls preload="metadata" style="height:200px;border-radius:6px"></video><span class="hint"> ← 이 채널에 올릴 숏폼</span></div>` : "";
+    return `<label>${ch} v${c.v}${c.hook ? ` — 훅: “${esc(c.hook)}”` : ""}</label><div class="copy">${esc(c.text)}${c.hashtags ? "\n\n" + c.hashtags.join(" ") : ""}</div>${vid}${imgs}
       <div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 더 짧게)" data-req="${c.item_id}"><button style="flex:0 0 auto" data-regen="${c.item_id}" ${c.regenerate_remaining ? "" : "disabled"}>다시 쓰기 (${c.regenerate_remaining})</button></div>`;
   }).join("");
   $("pitch").innerHTML = Object.keys(p.pitch).length ? "<h2>피칭 메일</h2>" + Object.entries(p.pitch).map(([lang, m]) =>
