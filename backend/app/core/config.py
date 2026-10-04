@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # Gemini (오디오 듣기)
     gemini_api_key: str
+    gemini_api_key_backup: str | None = None  # 메인 키의 하루 한도가 찼을 때만 사용
     gemini_model: str
     gemini_tier: str = "free"
     gemini_inline_max_mb: float = 15.0  # 이보다 크면 Files API로 업로드
@@ -58,6 +59,11 @@ class Settings(BaseSettings):
         if v and v.strip() in FORBIDDEN_MODELS:
             raise ValueError(f"'{v}' 모델은 종료(예정)되어 사용할 수 없어요. .env의 모델명을 바꿔 주세요.")
         return v.strip() if v else v
+
+    @field_validator("gemini_api_key_backup")
+    @classmethod
+    def _blank_to_none(cls, v: str | None) -> str | None:
+        return v.strip() or None if v else None
 
     @property
     def cors_origin_list(self) -> list[str]:
