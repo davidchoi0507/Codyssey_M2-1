@@ -1,7 +1,8 @@
 """Gemini 어댑터: 압축 음원 + librosa 결과 → 듣기 결과(Listening).
 
 음원이 작으면 요청에 직접 넣고, 크면 Files API로 올렸다가 분석 직후 삭제한다.
-메인 키의 하루 한도가 차면(429 PerDay) 백업 키로 처음부터 다시 한다 — 업로드 파일은 프로젝트별이라 같이 다시 올린다.
+한 키 안에서 모델 순서(settings.gemini_models)대로 시도한다: 하루 한도(429 PerDay)나 재시도로도 안 풀린 혼잡이면
+다음 모델로. 메인 키의 모든 모델이 하루 한도로 막혔을 때만 백업 키로 넘어간다 (업로드 파일은 프로젝트별이라 다시 올린다).
 google-genai 2.28 기준 (client.aio.models.generate_content, response_schema=Pydantic).
 """
 import json
@@ -44,25 +45,38 @@ class GeminiListener:
         return self.s.gemini_model
 
     async def listen(self, audio_path: Path, features: Features, song: dict) -> tuple[Listening, dict]:
-        """반환: (듣기 결과, 메타데이터 — 실제 응답 모델 버전·전송 방식·토큰 사용량·사용한 키)."""
-        for i, (label, client) in enumerate(self.clients):
-            try:
-                listening, meta = await self._listen_with(client, audio_path, features, song)
-                meta["api_key"] = label
-                return listening, meta
-            except errors.APIError as e:
-                if _daily_quota_exhausted(e) and i + 1 < len(self.clients):
-                    log.warning("Gemini %s 키 하루 한도 소진 — %s 키로 전환", label, self.clients[i + 1][0])
-                    continue
-                log.exception("Gemini 호출 실패 (%s 키)", label)
-                if _daily_quota_exhausted(e):
-                    raise AppError("GEMINI_DAILY_LIMIT", "오늘 AI 분석 한도가 찼어요. 내일 다시 시도해 주세요.", True) from e
-                if e.code == 429:
-                    raise AppError("GEMINI_RATE_LIMIT", "AI가 잠시 바빠요. 잠시 뒤 다시 시도해 주세요.", True) from e
-                raise AppError("GEMINI_ERROR", "AI가 곡을 듣는 중 문제가 생겼어요. 다시 시도해 주세요.", True) from e
-        raise AssertionError("unreachable")
+        """반환: (듣기 결과, 메타데이터 — 실제 응답 모델·버전·전송 방식·토큰 사용량·사용한 키)."""
+        models = self.s.gemini_models
+        last: errors.APIError | None = None
+        for label, client in self.clients:
+            key_exhausted = True  # 이 키의 모든 모델이 하루 한도로 막혔는지
+            for model in models:
+                try:
+                    listening, meta = await self._listen_with(client, model, audio_path, features, song)
+                    meta["api_key"] = label
+                    return listening, meta
+                except errors.APIError as e:
+                    last = e
+                    if _daily_quota_exhausted(e):
+                        log.warning("Gemini %s 키 %s 하루 한도 소진 — 다음 모델로", label, model)
+                    elif _retryable(e):
+                        key_exhausted = False
+                        log.warning("Gemini %s 키 %s 재시도 후에도 실패 (%s) — 다음 모델로", label, model, e.code)
+                    else:
+                        log.exception("Gemini 호출 실패 (%s 키, %s)", label, model)
+                        raise AppError("GEMINI_ERROR", "AI가 곡을 듣는 중 문제가 생겼어요. 다시 시도해 주세요.", True) from e
+            if not key_exhausted:
+                break  # 혼잡일 뿐 한도가 남아 있으면 백업 키로 넘어가지 않는다
+            log.warning("Gemini %s 키의 모든 모델 하루 한도 소진", label)
 
-    async def _listen_with(self, client: genai.Client, audio_path: Path, features: Features,
+        log.error("Gemini 모든 시도 실패: %s", last)
+        if _daily_quota_exhausted(last):
+            raise AppError("GEMINI_DAILY_LIMIT", "오늘 AI 분석 한도가 찼어요. 내일 다시 시도해 주세요.", True) from last
+        if last.code == 429:
+            raise AppError("GEMINI_RATE_LIMIT", "AI가 잠시 바빠요. 잠시 뒤 다시 시도해 주세요.", True) from last
+        raise AppError("GEMINI_ERROR", "AI가 곡을 듣는 중 문제가 생겼어요. 다시 시도해 주세요.", True) from last
+
+    async def _listen_with(self, client: genai.Client, model: str, audio_path: Path, features: Features,
                            song: dict) -> tuple[Listening, dict]:
         size_mb = audio_path.stat().st_size / 1024 / 1024
         uploaded = None
@@ -92,7 +106,7 @@ class GeminiListener:
             )
             resp = await with_retry(
                 lambda: client.aio.models.generate_content(
-                    model=self.s.gemini_model, contents=[audio_part, user_text], config=config),
+                    model=model, contents=[audio_part, user_text], config=config),
                 is_retryable=_retryable, max_retries=self.s.api_max_retries, what="Gemini 듣기")
         finally:
             if uploaded is not None:
@@ -111,7 +125,7 @@ class GeminiListener:
 
         usage = resp.usage_metadata
         meta = {
-            "model": self.s.gemini_model,
+            "model": model,
             "model_version": resp.model_version,
             "transport": transport,
             "audio_mb": round(size_mb, 2),

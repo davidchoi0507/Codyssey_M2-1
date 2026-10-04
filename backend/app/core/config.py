@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     gemini_api_key: str
     gemini_api_key_backup: str | None = None  # 메인 키의 하루 한도가 찼을 때만 사용
     gemini_model: str
+    # 하루 한도(또는 혼잡이 재시도로도 안 풀릴 때) 다음으로 쓸 모델들, 쉼표 구분. 키마다 이 순서를 다 돈다
+    gemini_fallback_models: str = "gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite"
     gemini_tier: str = "free"
     gemini_inline_max_mb: float = 15.0  # 이보다 크면 Files API로 업로드
 
@@ -63,7 +65,18 @@ class Settings(BaseSettings):
     @field_validator("gemini_api_key_backup")
     @classmethod
     def _blank_to_none(cls, v: str | None) -> str | None:
-        return v.strip() or None if v else None
+        # 빈 값 뒤 같은 줄 주석("KEY=   # 설명")은 dotenv가 값으로 읽는다 → 키가 아니므로 버린다
+        v = (v or "").strip()
+        return None if not v or v.startswith("#") else v
+
+    @property
+    def gemini_models(self) -> list[str]:
+        """메인 모델 + 폴백 모델 (중복 제거, 순서 유지)."""
+        names = [self.gemini_model] + [m.strip() for m in self.gemini_fallback_models.split(",") if m.strip()]
+        bad = [m for m in names if m in FORBIDDEN_MODELS]
+        if bad:
+            raise ValueError(f"{bad} 모델은 종료(예정)되어 사용할 수 없어요. .env의 GEMINI_FALLBACK_MODELS를 바꿔 주세요.")
+        return list(dict.fromkeys(names))
 
     @property
     def cors_origin_list(self) -> list[str]:
