@@ -3,12 +3,15 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
+import yaml
+
 from app.core.config import Settings
 from app.core.stages import ANALYSIS_STEPS, QUEUED_LABEL, STAGE_LABELS, Stage
 from app.pipeline.jobfiles import JobFiles
+from app.pipeline.render import SHORT_TEMPLATE, TEMPLATES
 from app.schemas.common import AIGenerated, ErrorInfo
 from app.schemas.job import EarlyResult, JobStatus, StepStatus
-from app.schemas.package import CHANNELS, ChannelOut, CoverItem, CoverVersion, Package, PitchOut
+from app.schemas.package import CHANNELS, ChannelOut, CoverItem, CoverVersion, Package, PitchOut, VideoItem
 
 _STEP_PROGRESS = {"measure": 0.15, "listen": 0.45, "note": 0.8}
 
@@ -53,43 +56,67 @@ def job_status(jf: JobFiles, queue_position: int | None = None) -> JobStatus:
                      updated_at=datetime.fromisoformat(st["updated_at"]))
 
 
-def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], str]) -> Package:
+def regen_remaining(settings: Settings, jf: JobFiles, item_id: str, events: list[dict] | None = None) -> int:
+    used = sum(1 for e in (events if events is not None else jf.events())
+               if e["event"] == "item_regenerated" and e.get("item") == item_id)
+    return max(settings.cover_regen_per_job - used, 0)
+
+
+def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], str],
+                  zip_url: str | None = None) -> Package:
     st = jf.status()
+    events = jf.events()
     models: set[str] = set()
-    for e in jf.events():
-        if e.get("model") and e["event"] in ("cover_generated", "visual_meta", "copy_meta", "pitch_meta", "note_meta"):
+    for e in events:
+        if e.get("model") and e["event"] in ("cover_generated", "visual_meta", "copy_meta", "pitch_meta", "note_meta",
+                                            "item_regenerated"):
             models.add(e["model"])
     if jf.listening.exists():
         models.add("gemini:" + jf.read_json(jf.listening)["meta"]["model"])
+    sel = jf.read_json(jf.selected_cover) if jf.selected_cover.exists() else None
+
+    def link(p: Path) -> str | None:
+        return url_for(p) if p.exists() else None
 
     covers = []
-    for idx in (1, 2, 3):
-        versions = []
-        for v in range(1, 100):
-            p = jf.cover(idx, v)
-            if not p.exists():
-                break
-            big, titled = jf.cover(idx, v, "_3000"), jf.cover(idx, v, "_title")
-            versions.append(CoverVersion(v=v, url=url_for(p), url_3000=url_for(big) if big.exists() else None,
-                                         url_title=url_for(titled) if titled.exists() else None))
+    for item_id, direction_id, path in [(f"cover-{i}", f"c{i}", lambda v, s="", i=i: jf.cover(i, v, s)) for i in (1, 2, 3)]             + [("cover-own", "own", lambda v, s="": jf.own_cover(v, s))]:
+        versions = [CoverVersion(v=v, url=url_for(path(v)), url_3000=link(path(v, "_3000")),
+                                 url_title=link(path(v, "_title")))
+                    for v in range(1, (jf.latest_version(path) or 0) + 1)]
         if versions:
-            covers.append(CoverItem(item_id=f"cover-{idx}", direction_id=f"c{idx}", versions=versions,
-                                    selected=False, regenerate_remaining=settings.cover_regen_per_job))
+            picked = sel is not None and sel["item_id"] == item_id
+            covers.append(CoverItem(item_id=item_id, direction_id=direction_id, versions=versions, selected=picked,
+                                    selected_v=sel["v"] if picked else None,
+                                    regenerate_remaining=0 if item_id == "cover-own"
+                                    else regen_remaining(settings, jf, item_id, events)))
 
+    image_specs = yaml.safe_load((TEMPLATES / "channel_images.yaml").read_text(encoding="utf-8"))
     channels = {}
     for ch in CHANNELS:
-        p = jf.channel_copy(ch, 1)
-        if p.exists():
-            d = jf.read_json(p)
+        v = jf.latest_version(lambda i: jf.channel_copy(ch, i))
+        if v:
+            d = jf.read_json(jf.channel_copy(ch, v))
+            images = {ratio: url_for(jf.channel_image(ch, ratio)) for ratio in image_specs.get(ch, {})
+                      if jf.channel_image(ch, ratio).exists()}
             channels[ch] = ChannelOut(item_id=f"copy-{ch}", text=d["text"], hashtags=d.get("hashtags") or None,
-                                      hook=d.get("hook"), images=None)
+                                      hook=d.get("hook"), images=images or None, v=v,
+                                      regenerate_remaining=regen_remaining(settings, jf, f"copy-{ch}", events))
 
     pitch = {}
     for lang in ("en", "ko"):
-        p = jf.pitch(lang, 1)
-        if p.exists():
-            d = jf.read_json(p)
-            pitch[lang] = PitchOut(item_id=f"pitch-{lang}", subject=d["subject"], body=d["body"])
+        v = jf.latest_version(lambda i: jf.pitch(lang, i))
+        if v:
+            d = jf.read_json(jf.pitch(lang, v))
+            pitch[lang] = PitchOut(item_id=f"pitch-{lang}", subject=d["subject"], body=d["body"], v=v,
+                                   regenerate_remaining=regen_remaining(settings, jf, f"pitch-{lang}", events))
 
-    return Package(job_id=jf.job_id, stage=st["stage"], covers=covers, channels=channels, pitch=pitch,
+    videos = []
+    for name, kind, template, duration in ((f"short_{SHORT_TEMPLATE}", "short", SHORT_TEMPLATE, settings.highlight_sec),
+                                           ("canvas", "canvas", None, settings.canvas_sec)):
+        if jf.video(name).exists():
+            videos.append(VideoItem(item_id=f"short-{template}" if kind == "short" else "canvas", kind=kind,
+                                    template=template, url=url_for(jf.video(name)), duration=duration))
+
+    return Package(job_id=jf.job_id, stage=st["stage"], covers=covers, videos=videos, channels=channels, pitch=pitch,
+                   zip_url=zip_url if st["stage"] == Stage.DONE else None,
                    ai_generated=AIGenerated(notice="이 결과물은 AI로 생성되었습니다.", models=sorted(models)))

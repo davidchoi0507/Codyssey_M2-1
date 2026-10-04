@@ -111,8 +111,15 @@
 
   <!-- 4. 결과 -->
   <section class="card hide" id="result">
-    <h2>4. 결과물</h2>
+    <h2>4. 결과물 <span class="hint" id="resultHint"></span></h2>
     <div class="covers" id="covers"></div>
+    <div class="row" style="margin-top:10px">
+      <div><label>직접 올린 사진으로 (jpg·png, 800px 이상 — 정사각으로 잘림)</label><input type="file" id="ownFile" accept="image/*"></div>
+      <div style="flex:0 0 auto;align-self:flex-end"><button id="ownUpload">사진 올리기</button></div>
+    </div>
+    <div id="videos" style="margin-top:14px"></div>
+    <div class="row" style="margin-top:10px"><a id="zip" class="hide" href="#"><button class="primary">ZIP 다운로드</button></a></div>
+    <div id="resultErr" class="err hide"></div>
     <div id="channels" style="margin-top:14px"></div>
     <div id="pitch" style="margin-top:14px"></div>
   </section>
@@ -175,7 +182,11 @@ async function poll() {
   try { st = await api("GET", `/jobs/${jobId}`); } catch (e) { alertBox("statusErr", e.message); return; }
   renderStatus(st);
   if (st.stage === "note_ready") { await loadNote(); show("result", false); return; }
-  if (["awaiting_cover", "rendering", "done"].includes(st.stage)) { show("note", false); await loadPackage(); return; }
+  if (["awaiting_cover", "rendering", "done"].includes(st.stage)) {
+    show("note", false); await loadPackage(st.stage);
+    if (st.stage === "rendering") pollTimer = setTimeout(poll, 3000);
+    return;
+  }
   if (st.stage === "failed") return;
   pollTimer = setTimeout(poll, 2500);
 }
@@ -268,19 +279,55 @@ $("accept").onclick = async () => {
 };
 
 // ---------- 4. 결과 ----------
-async function loadPackage() {
+async function loadPackage(stage) {
   const p = await api("GET", `/jobs/${jobId}/package`);
   show("result");
+  $("resultHint").textContent = stage === "awaiting_cover" ? "— 커버를 하나 고르면 숏폼·Canvas·채널 이미지를 만들어요"
+    : stage === "rendering" ? "— 영상·이미지 만드는 중 (40초 안팎)…" : "— 완료";
   $("covers").innerHTML = p.covers.map(c => {
     const v = c.versions[c.versions.length - 1];
-    return `<figure style="margin:0"><a href="${API + (v.url_3000 || v.url)}" target="_blank"><img src="${API + v.url}" alt="${c.item_id}"></a><figcaption class="hint">${c.item_id} (${c.direction_id}) · 누르면 3000px</figcaption></figure>`;
+    const picked = c.selected ? ` · <b>선택됨 v${c.selected_v}</b>` : "";
+    const regen = c.item_id === "cover-own" ? "" :
+      `<div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 사람 없이)" data-req="${c.item_id}"><button style="flex:0 0 auto" data-regen="${c.item_id}" ${c.regenerate_remaining ? "" : "disabled"}>다시 (${c.regenerate_remaining})</button></div>`;
+    return `<figure style="margin:0"><a href="${API + (v.url_title || v.url_3000 || v.url)}" target="_blank"><img src="${API + v.url}" alt="${c.item_id}" style="${c.selected ? "outline:3px solid var(--accent)" : ""}"></a>
+      <figcaption class="hint">${c.item_id} v${v.v}${picked}${v.url_title ? " · 누르면 제목 얹은 3000px" : " · 누르면 3000px"}</figcaption>
+      <div class="row" style="margin-top:4px"><button data-select="${c.item_id}" data-v="${v.v}" ${stage === "rendering" ? "disabled" : ""}>이 커버로 만들기</button></div>${regen}</figure>`;
   }).join("");
-  $("channels").innerHTML = "<h2>채널 홍보 글</h2>" + Object.entries(p.channels).map(([ch, c]) =>
-    `<label>${ch}${c.hook ? ` — 훅: “${c.hook}”` : ""}</label><div class="copy">${esc(c.text)}${c.hashtags ? "\n\n" + c.hashtags.join(" ") : ""}</div>`).join("");
+  document.querySelectorAll("[data-select]").forEach(b => b.onclick = () => selectCover(b.dataset.select, parseInt(b.dataset.v)));
+  document.querySelectorAll("[data-regen]").forEach(b => b.onclick = () => regen(b.dataset.regen, b));
+
+  $("videos").innerHTML = p.videos.length ? "<h2>영상</h2><div class='row' style='align-items:flex-start'>" + p.videos.map(v =>
+    `<div style="flex:0 0 240px"><video src="${API + v.url}" controls ${v.kind === "canvas" ? "loop muted autoplay" : ""} style="width:240px;border-radius:8px"></video><div class="hint">${v.kind === "short" ? "숏폼 " + v.duration + "초" : "Spotify Canvas " + v.duration + "초 (무음 반복)"}</div></div>`).join("") + "</div>" : "";
+  if (p.zip_url) { $("zip").href = API + p.zip_url; show("zip"); } else show("zip", false);
+
+  $("channels").innerHTML = "<h2>채널 홍보 글</h2>" + Object.entries(p.channels).map(([ch, c]) => {
+    const imgs = c.images ? `<div class="row" style="margin-top:6px">${Object.entries(c.images).map(([r, u]) => `<a href="${API + u}" target="_blank" style="flex:0 0 auto"><img src="${API + u}" style="height:120px;border-radius:6px"></a><span class="hint" style="flex:0 0 auto">${r}</span>`).join("")}</div>` : "";
+    return `<label>${ch} v${c.v}${c.hook ? ` — 훅: “${esc(c.hook)}”` : ""}</label><div class="copy">${esc(c.text)}${c.hashtags ? "\n\n" + c.hashtags.join(" ") : ""}</div>${imgs}
+      <div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 더 짧게)" data-req="${c.item_id}"><button style="flex:0 0 auto" data-regen="${c.item_id}" ${c.regenerate_remaining ? "" : "disabled"}>다시 쓰기 (${c.regenerate_remaining})</button></div>`;
+  }).join("");
   $("pitch").innerHTML = Object.keys(p.pitch).length ? "<h2>피칭 메일</h2>" + Object.entries(p.pitch).map(([lang, m]) =>
-    `<label>${lang === "en" ? "영어" : "한국어"} — 제목: ${esc(m.subject)}</label><div class="copy">${esc(m.body).replace(/(\[[^\]]+\])/g, '<mark>$1</mark>')}</div>`).join("") : "";
+    `<label>${lang === "en" ? "영어" : "한국어"} v${m.v} — 제목: ${esc(m.subject)}</label><div class="copy">${esc(m.body).replace(/(\[[^\]]+\])/g, '<mark>$1</mark>')}</div>
+     <div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 더 짧고 캐주얼하게)" data-req="${m.item_id}"><button style="flex:0 0 auto" data-regen="${m.item_id}" ${m.regenerate_remaining ? "" : "disabled"}>다시 쓰기 (${m.regenerate_remaining})</button></div>`).join("") : "";
+  document.querySelectorAll("#channels [data-regen], #pitch [data-regen]").forEach(b => b.onclick = () => regen(b.dataset.regen, b));
   log(`AI 사용 모델: ${p.ai_generated.models.join(", ")}`);
+  show("resultErr", false);
 }
+
+async function selectCover(itemId, v) {
+  try { await api("POST", `/jobs/${jobId}/cover/select`, { item_id: itemId, v }); poll(); }
+  catch (e) { alertBox("resultErr", `[${e.code}] ${e.message}`); }
+}
+async function regen(itemId, btn) {
+  const input = document.querySelector(`[data-req="${itemId}"]`);
+  btn.disabled = true; const label = btn.textContent; btn.textContent = "만드는 중…";
+  try { await api("POST", `/jobs/${jobId}/items/${itemId}/regenerate`, { request: input && input.value.trim() || null }); await poll(); }
+  catch (e) { alertBox("resultErr", `[${e.code}] ${e.message}`); btn.disabled = false; btn.textContent = label; }
+}
+$("ownUpload").onclick = async () => {
+  const f = $("ownFile").files[0]; if (!f) return alertBox("resultErr", "사진을 골라 주세요.");
+  const fd = new FormData(); fd.append("file", f);
+  try { await api("POST", `/jobs/${jobId}/own-image`, fd, true); poll(); } catch (e) { alertBox("resultErr", `[${e.code}] ${e.message}`); }
+};
 
 function esc(s) { return s.replace(/[&<>]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch])); }
 function alertBox(id, msg) { const el = $(id); el.textContent = msg; show(id); }

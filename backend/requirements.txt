@@ -5,6 +5,7 @@ pydantic>=2
 pydantic-settings>=2
 python-multipart
 python-ulid
+pyyaml          # 템플릿 설정 (app/templates/*.yaml)
 
 # 분석
 librosa

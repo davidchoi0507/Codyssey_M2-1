@@ -51,12 +51,21 @@ def connect(db_path: Path | None = None) -> Iterator[sqlite3.Connection]:
         if path not in _initialized:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.executescript(SCHEMA)
+            _migrate(conn)
             _initialized.add(path)
         conn.execute("PRAGMA busy_timeout=10000")
         with conn:  # 블록이 끝나면 commit, 예외면 rollback
             yield conn
     finally:
         conn.close()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """나중에 추가한 열. 이미 있으면 그대로."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}
+    if "client" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN client TEXT")  # 업로드한 IP — 하루 생성 한도용
+        conn.execute("CREATE INDEX IF NOT EXISTS jobs_client ON jobs(client, created_at)")
 
 
 def import_legacy_files(jobs_dir: Path) -> int:
@@ -76,7 +85,7 @@ def import_legacy_files(jobs_dir: Path) -> int:
                 events = [json.loads(line) for line in (d / "events.jsonl").read_text(encoding="utf-8").splitlines()
                           if line.strip()]
             created = events[0]["ts"] if events else st["updated_at"]
-            conn.execute("INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?)",
+            conn.execute("INSERT INTO jobs (job_id, stage, step, error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
                          (d.name, st["stage"], st.get("step"),
                           json.dumps(st["error"], ensure_ascii=False) if st.get("error") else None,
                           created, st["updated_at"]))

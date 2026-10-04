@@ -62,6 +62,32 @@ class JobFiles:
         """cover_{1..3}_v{n}.png / suffix "_3000" 업스케일 / "_title" 제목 오버레이."""
         return self.root / "covers" / f"cover_{idx}_v{version}{suffix}.png"
 
+    def own_cover(self, version: int, suffix: str = "") -> Path:
+        """밴드가 직접 올린 사진 (정사각으로 잘라 3000px). item_id = cover-own."""
+        return self.root / "covers" / f"own_v{version}{suffix}.png"
+
+    @property
+    def selected_cover(self) -> Path:
+        """선택한 커버 {item_id, v, at} — 렌더링 기준."""
+        return self.root / "covers" / "selected.json"
+
+    def video(self, name: str) -> Path:
+        """short_{template}.mp4 / canvas.mp4"""
+        return self.root / "video" / f"{name}.mp4"
+
+    def channel_image(self, channel: str, ratio: str) -> Path:
+        return self.root / "channels" / channel / f"image_{ratio.replace(':', 'x')}.png"
+
+    def latest_version(self, path_for_version) -> int | None:
+        """path_for_version(v)가 있는 가장 큰 v (재생성으로 버전이 늘어나는 항목용)."""
+        v = None
+        for i in range(1, 100):
+            p = path_for_version(i)
+            if p is None or not p.exists():
+                break
+            v = i
+        return v
+
     def channel_copy(self, channel: str, version: int) -> Path:
         return self.root / "channels" / channel / f"copy_v{version}.json"
 
@@ -121,6 +147,7 @@ class JobFiles:
         err = json.dumps(error, ensure_ascii=False) if error else None
         with db.connect() as conn:
             conn.execute(
-                "INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(job_id) DO UPDATE SET "
+                "INSERT INTO jobs (job_id, stage, step, error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(job_id) DO UPDATE SET "
                 "stage = excluded.stage, step = excluded.step, error = excluded.error, updated_at = excluded.updated_at",
                 (self.job_id, str(stage), step, err, now, now))

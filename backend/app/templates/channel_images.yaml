@@ -1,0 +1,10 @@
+# 채널별 이미지 (선택한 커버 + 곡 제목). 비율 키는 패키지 channels.<채널>.images 의 키 그대로.
+instagram:
+  "1:1":  {size: [1080, 1080], layout: square}
+  "4:5":  {size: [1080, 1350], layout: poster}
+tiktok:
+  "9:16": {size: [1080, 1920], layout: poster}
+threads:
+  "4:5":  {size: [1080, 1350], layout: poster}
+x:
+  "16:9": {size: [1600, 900], layout: wide}

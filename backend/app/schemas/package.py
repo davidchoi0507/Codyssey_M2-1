@@ -16,10 +16,11 @@ class CoverVersion(BaseModel):
 
 
 class CoverItem(BaseModel):
-    item_id: str
-    direction_id: str
+    item_id: str = Field(description="cover-1~3 (AI), cover-own (직접 올린 사진)")
+    direction_id: str = Field(description="노트 커버 방향 id (c1~c3), 직접 올린 사진은 own")
     versions: list[CoverVersion]
     selected: bool = False
+    selected_v: int | None = Field(default=None, description="선택한 버전 (selected일 때)")
     regenerate_remaining: int
 
 
@@ -36,13 +37,17 @@ class ChannelOut(BaseModel):
     text: str
     hashtags: list[str] | None = None
     hook: str | None = None
-    images: dict[str, str] | None = None
+    images: dict[str, str] | None = Field(default=None, description="비율 → 이미지 링크 (커버 선택 후 렌더링되면 생김)")
+    v: int = 1
+    regenerate_remaining: int | None = None
 
 
 class PitchOut(BaseModel):
     item_id: str
     subject: str
     body: str
+    v: int = 1
+    regenerate_remaining: int | None = None
 
 
 class Package(BaseModel):

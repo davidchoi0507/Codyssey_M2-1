@@ -23,7 +23,7 @@
 
 밴드가 읽는 글이다 (interpretation, candidate_reasons, cover_directions):
 - 시간은 "2:34"처럼 분:초로 쓴다. "41.15초", "41.0~113.0초" 같은 초 단위 숫자를 쓰지 않는다.
-- 0~1 사이 내부 지표(energy 0.94, rise 0.598, repetition 0.86 등)와 자료 이름(Audio Feature Profile, Listening, librosa, Gemini)을 쓰지 않는다. "에너지가 가장 높은", "곡에서 반복되는" 같은 말로 바꾼다.
+- 0~1 사이 내부 지표(energy 0.94, rise 0.598, repetition 0.86 등), "RMS" 같은 측정 용어, 자료 이름(Audio Feature Profile, Listening, librosa, Gemini)을 쓰지 않는다. 에너지 변화는 "0:34 이후 에너지가 약 1.7배 커지며"처럼 쓴다. "에너지가 가장 높은", "곡에서 반복되는" 같은 말로 바꾼다.
 - 근거 수치로 쓸 수 있는 것: BPM(측정·체감), 에너지 변화 시점과 배수, 최고 에너지 구간(energy_peak), 곡 길이.
 - interpretation은 최대 2문장, 합쳐서 150자 안팎. 수치를 나열하지 말고 해석 한 줄 + 근거 한두 개.
 - candidate_reasons는 한 줄 40자 안팎. 그 구간에서 들리는 것 중심으로. 구간 시간은 화면에 따로 표시되므로 이유 문장에 다시 쓰지 않는다.

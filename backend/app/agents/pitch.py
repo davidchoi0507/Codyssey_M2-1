@@ -27,7 +27,8 @@ def _check(p: PitchSet) -> list[str]:
     return problems
 
 
-async def write_pitch(settings: Settings, note: ARNote, song: dict, listening: dict | None) -> tuple[PitchSet, dict]:
+async def write_pitch(settings: Settings, note: ARNote, song: dict, listening: dict | None,
+                      request: str | None = None, previous: dict | None = None) -> tuple[PitchSet, dict]:
     rec = next(c for c in note.highlight.candidates if c.id == note.highlight.recommended_id)
     payload = {
         "song": {k: song.get(k) for k in ("title", "artist", "genre", "description", "lyrics", "release_date")},
@@ -40,6 +41,8 @@ async def write_pitch(settings: Settings, note: ARNote, song: dict, listening: d
         "heard": {k: listening.get(k) for k in ("genre_feel", "instrumentation", "vocal_texture", "lyrics_gist")}
         if listening else None,
     }
+    if request:
+        payload["revision_request"] = {"request": request, "previous_mail": previous}
     pitch, usage = await ask_json(chat_model(settings), load_prompt("pitch"), payload, PitchSet,
                                   check=_check, what="피칭 메일")
     return pitch, {"model": model_label(settings), **usage}

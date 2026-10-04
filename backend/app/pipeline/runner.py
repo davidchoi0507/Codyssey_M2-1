@@ -4,7 +4,8 @@
   librosa 동시 실행도, Gemini 동시 호출(무료 티어 분당 5회)도 같이 제한된다. 자리를 기다리는 작업은
   들어온 순서대로 queue_position(1부터)을 가진다.
 - 생성(코디세이 API 호출뿐, CPU 거의 안 씀)은 대기열 없이 바로 시작한다. 이미지 동시 호출은 generate.py의 세마포어.
-- 서버가 다시 켜지면 끝나지 않은 작업(uploaded·analyzing·generating)을 다시 넣는다.
+- 렌더링(숏폼·Canvas, ffmpeg)도 CPU를 많이 쓰므로 같은 자리를 쓴다.
+- 서버가 다시 켜지면 끝나지 않은 작업(uploaded·analyzing·generating·rendering)을 다시 넣는다.
   단계마다 결과 파일이 있으면 건너뛰므로 끊긴 단계부터 이어진다.
 """
 import asyncio
@@ -19,6 +20,7 @@ from app.pipeline.analyze import run_analysis
 from app.pipeline.generate import run_generation
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.note_edit import relisten_pending, run_relisten
+from app.pipeline.render import run_render
 
 log = logging.getLogger(__name__)
 
@@ -77,19 +79,24 @@ class JobRunner:
     def start_relisten(self, jf: JobFiles) -> None:
         self._start(jf.job_id, lambda: self._in_slot(jf, lambda: run_relisten(self.s, jf)))
 
+    def start_render(self, jf: JobFiles) -> None:
+        self._start(jf.job_id, lambda: self._in_slot(jf, lambda: run_render(self.s, jf)))
+
     def start_generation(self, jf: JobFiles) -> None:
         self._start(jf.job_id, lambda: run_generation(self.s, jf))
 
     def recover(self) -> list[str]:
         """서버 시작 시: 끝나지 않은 작업을 다시 넣는다 (먼저 들어온 작업부터)."""
         with db.connect() as conn:
-            rows = conn.execute("SELECT job_id, stage FROM jobs WHERE stage IN (?, ?, ?) ORDER BY created_at",
-                                (Stage.UPLOADED, Stage.ANALYZING, Stage.GENERATING)).fetchall()
+            rows = conn.execute("SELECT job_id, stage FROM jobs WHERE stage IN (?, ?, ?, ?) ORDER BY created_at",
+                                (Stage.UPLOADED, Stage.ANALYZING, Stage.GENERATING, Stage.RENDERING)).fetchall()
         for r in rows:
             jf = JobFiles(self.s.jobs_dir, r["job_id"])
             jf.event("recovered", stage=r["stage"])
             if r["stage"] == Stage.GENERATING:
                 self.start_generation(jf)
+            elif r["stage"] == Stage.RENDERING:
+                self.start_render(jf)
             elif r["stage"] == Stage.ANALYZING and relisten_pending(jf):
                 self.start_relisten(jf)
             else:

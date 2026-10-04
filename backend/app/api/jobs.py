@@ -2,12 +2,13 @@
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from app.api.deps import job_files, runner, settings
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.pipeline.intake import create_job
+from app.pipeline.limits import check_daily_limits, client_ip, record_client
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.runner import JobRunner
 from app.pipeline.views import job_status
@@ -20,6 +21,7 @@ CHUNK = 1024 * 1024
 
 @router.post("", response_model=JobCreated, status_code=201, summary="곡 업로드 (분석 시작)")
 async def create(
+    request: Request,
     file: UploadFile = File(description="음원 .mp3/.wav, 200MB·10분 이하"),
     title: str = Form(), artist: str = Form(), genre: str = Form(""), description: str = Form(""),
     lyrics: str | None = Form(None),
@@ -30,6 +32,8 @@ async def create(
     consent_version: str = Form(description="동의 문구 버전"),
     s: Settings = Depends(settings), r: JobRunner = Depends(runner),
 ) -> JobCreated:
+    client = client_ip(request)
+    check_daily_limits(s, client)  # 파일을 받기 전에
     s.jobs_dir.mkdir(parents=True, exist_ok=True)
     limit = s.max_upload_mb * 1024 * 1024
     with tempfile.TemporaryDirectory(dir=s.data_dir) as tmp:
@@ -47,6 +51,7 @@ async def create(
                    "consent_external_ai": consent_external_ai, "consent_showcase": consent_showcase,
                    "consent_version": consent_version}
         jf = create_job(s, tmp_path, filename=file.filename or "", song=song, consent=consent, source="api")
+    record_client(jf.job_id, client)
     r.start_analysis(jf)
     return JobCreated(job_id=jf.job_id, status_url=f"/jobs/{jf.job_id}")
 
@@ -74,6 +79,8 @@ async def retry(jf: JobFiles = Depends(job_files), r: JobRunner = Depends(runner
         raise AppError("NOT_RETRYABLE", "이 문제는 다시 시도해도 해결되지 않아요. 새로 올려 주세요.", False, http_status=409)
     if st.get("step") == "generate":
         r.start_generation(jf)
+    elif st.get("step") == "render":
+        r.start_render(jf)
     else:
         r.start_analysis(jf)
     jf.event("retry", step=st.get("step"))
