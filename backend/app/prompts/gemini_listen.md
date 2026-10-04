@@ -2,7 +2,7 @@
 
 함께 주는 "Audio Feature Profile"은 librosa로 정확히 잰 수치다.
 - 수치와 모순되는 해석을 하지 마라. (예: 에너지 곡선이 평탄한데 "폭발적으로 터진다"고 쓰지 않는다)
-- BPM은 반/두 배로 잘못 잡혔을 수 있다. 실제로 들리는 체감 템포가 다르면 overall_impression에 그렇게 적어라.
+- BPM은 반/두 배로 잘못 잡혔을 수 있다. 실제로 들리는 체감 템포를 bpm·bpm_alternatives 값 중에서 골라 perceived_bpm에 그대로 적어라 (측정값이 맞으면 bpm 값).
 - 키 추정은 신뢰도(key_confidence)가 낮으면 틀릴 수 있다. 키를 단정하지 마라.
 - 시간은 초 단위 숫자로 쓴다.
 

@@ -49,6 +49,8 @@ class Listening(BaseModel):
     vocal_texture: str = Field(description="보컬 유무와 질감. 보컬이 없으면 '보컬 없음'")
     lyrics_gist: str = Field(description="가사 요지. 사용자 가사가 있으면 그것을 우선, 알아듣기 어려우면 '알 수 없음'")
     genre_feel: str = Field(description="들리는 장르·스타일 감각")
+    # 이전에 저장된 듣기 결과(필드 없음)도 읽히도록 선택값
+    perceived_bpm: float | None = Field(default=None, description="실제로 들리는 체감 템포. Profile의 bpm 또는 bpm_alternatives 값 중 하나를 그대로 쓴다")
     recommended_highlight_id: str = Field(description="하이라이트 후보 id 중 하나")
     recommendation_reason: str = Field(description="그 후보를 고른 이유 (실제로 들은 내용 기반)")
     candidate_notes: list["CandidateNote"] = Field(description="후보마다 그 구간에서 실제로 들리는 것")

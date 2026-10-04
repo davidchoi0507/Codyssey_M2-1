@@ -5,7 +5,8 @@ from app.schemas.common import AIGenerated
 
 
 class Evidence(BaseModel):
-    bpm: float
+    bpm: float = Field(description="체감 BPM (화면 표시용). librosa가 반/두 배로 잡았으면 Gemini가 고른 값")
+    bpm_measured: float | None = Field(default=None, description="librosa 측정 BPM 원값")
     key: str
     energy_change: str
 

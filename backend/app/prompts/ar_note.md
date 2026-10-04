@@ -5,7 +5,7 @@
 
 반드시 지킬 것:
 - Audio Feature Profile과 Listening에 없는 사실은 쓰지 않는다. 악기·가사·분위기를 지어내지 않는다.
-- interpretation은 1~2문장. 밴드가 "맞아, 이 곡 그거야"라고 느낄 핵심 해석을 쓰고, 근거 수치(BPM, 에너지 변화 시점·배수 등)를 문장 안에 넣는다. BPM이 체감 템포와 다르다고 Listening에 적혀 있으면 체감 템포를 기준으로 쓰되 측정값과 함께 쓴다.
+- interpretation은 1~2문장. 밴드가 "맞아, 이 곡 그거야"라고 느낄 핵심 해석을 쓰고, 근거 수치(BPM, 에너지 변화 시점·배수 등)를 문장 안에 넣는다. BPM은 Listening의 perceived_bpm(체감 템포)을 쓴다. 측정 bpm과 달라도 측정값은 문장에 쓰지 않는다 (화면 근거란도 체감 BPM을 보여준다). perceived_bpm이 없으면 측정 bpm을 쓴다. 문장 안의 BPM은 정수로 반올림한다 (예: 86 BPM).
 - 키 신뢰도(key_confidence)가 0.15 미만이면 키를 해석 근거로 쓰지 않는다.
 - energy_change는 Audio Feature Profile의 energy_change 값을 그대로 옮긴다.
 - mood_keywords: 정확히 5개, 한국어 한 단어(명사 위주). 서로 겹치지 않게.

@@ -33,6 +33,14 @@ def _check_draft(d: ARNoteDraft, candidate_ids: set[str]) -> list[str]:
     return problems
 
 
+
+def _perceived_bpm(features: Features, listening: Listening) -> float:
+    """Gemini가 고른 체감 BPM을 측정값·반/두 배 후보 중 가장 가까운 값으로 맞춘다 (엉뚱한 숫자 방지)."""
+    options = [features.bpm, *features.bpm_alternatives]
+    if listening.perceived_bpm is None:
+        return features.bpm
+    return min(options, key=lambda b: abs(b - listening.perceived_bpm))
+
 async def write_note(settings: Settings, *, job_id: str, features: Features, listening: Listening,
                      song: dict, gemini_model: str, version: int = 1,
                      user_correction: str | None = None) -> tuple[ARNote, dict]:
@@ -53,7 +61,8 @@ async def write_note(settings: Settings, *, job_id: str, features: Features, lis
         job_id=job_id,
         version=version,
         interpretation=draft.interpretation,
-        evidence=Evidence(bpm=features.bpm, key=features.key, energy_change=features.energy_change),
+        evidence=Evidence(bpm=_perceived_bpm(features, listening), bpm_measured=features.bpm,
+                          key=features.key, energy_change=features.energy_change),
         mood_keywords=draft.mood_keywords,
         colors=[c.upper() for c in draft.colors],
         cover_directions=[CoverDirection(id=f"c{i}", text=t) for i, t in enumerate(draft.cover_directions, 1)],
