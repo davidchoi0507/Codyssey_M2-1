@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     public_base_url: str = "http://localhost:8000"
     cors_origins: str = "http://localhost:3000"
+    playground_enabled: bool = True  # /playground 백엔드 흐름 확인용 페이지 (팀 공유용, 밴드 공개 시 끔)
     data_dir: Path = Path("./data")
     db_path: Path = Path("./data/app.db")
     download_token_secret: str = ""

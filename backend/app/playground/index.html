@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>백엔드 흐름 테스트</title>
+<style>
+  :root { --bg:#f6f5f2; --card:#fff; --ink:#1d1d1f; --mute:#6b6b70; --line:#e2e0da; --accent:#3b5bdb; --ok:#2b8a3e; --bad:#c92a2a; --warn:#e8590c; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 0 0 12px; }
+  .sub { color: var(--mute); font-size: 13px; margin-bottom: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  label { display:block; font-size:13px; color:var(--mute); margin:10px 0 4px; }
+  input[type=text], textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff; }
+  textarea { min-height: 70px; resize: vertical; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .row > * { flex: 1 1 180px; }
+  button { padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:#fff; font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.5; cursor:default; }
+  .chk label { display:flex; gap:8px; align-items:center; color:var(--ink); margin:4px 0; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; } .bar > i { display:block; height:100%; background:var(--accent); transition: width .4s; }
+  .steps { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; } .steps span { font-size:12px; padding:3px 8px; border-radius:999px; background:#eee; }
+  .steps .done { background:#d3f9d8; } .steps .running { background:#dbe4ff; } .steps .failed { background:#ffe3e3; }
+  .err { background:#fff5f5; border:1px solid #ffc9c9; color:var(--bad); padding:10px; border-radius:8px; margin-top:10px; }
+  .hint { color:var(--mute); font-size:12px; }
+  .pill { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; background:#f1f3f5; margin-right:4px; }
+  .interp { font-size:17px; line-height:1.6; margin: 6px 0 10px; }
+  .swatches { display:flex; gap:8px; } .swatches input { width:56px; height:36px; border:1px solid var(--line); border-radius:6px; padding:2px; }
+  .cand { border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin:6px 0; cursor:pointer; } .cand.sel { border-color:var(--accent); background:#f3f6ff; }
+  .covers { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; } .covers img { width:100%; border-radius:8px; display:block; }
+  .copy { white-space:pre-wrap; background:#fafaf8; border:1px solid var(--line); border-radius:8px; padding:10px; font-size:14px; }
+  canvas { width:100%; height:60px; display:block; }
+  .log { font:12px/1.5 ui-monospace, Consolas, monospace; color:var(--mute); max-height:160px; overflow:auto; white-space:pre-wrap; }
+  .hide { display:none; }
+  @media (max-width: 640px) { .covers { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>인디 앨범 스튜디오 — 백엔드 흐름 테스트</h1>
+  <div class="sub">이 서버의 API를 그대로 호출하는 <b>백엔드 흐름 확인용</b> 페이지입니다. 실제 화면(디자인)은 프론트에서 만듭니다.</div>
+
+  <!-- 1. 시작 -->
+  <section class="card" id="start">
+    <h2>1. 곡 올리기 또는 기존 작업 열기</h2>
+    <div class="row">
+      <div><label>음원 (mp3 / wav, 10분 이하)</label><input type="file" id="file" accept=".mp3,.wav"></div>
+    </div>
+    <div class="row">
+      <div><label>곡 제목</label><input type="text" id="title" placeholder="예: 새벽의 끝"></div>
+      <div><label>아티스트</label><input type="text" id="artist" placeholder="예: 샘플 밴드"></div>
+      <div><label>장르 (선택)</label><input type="text" id="genre"></div>
+    </div>
+    <label>곡 소개 (선택, 비슷한 아티스트를 쓰면 피칭 메일에 반영)</label><input type="text" id="desc">
+    <label>가사 (선택)</label><textarea id="lyrics"></textarea>
+    <div class="chk">
+      <label><input type="checkbox" id="c1" checked> (필수) 자작곡이며 권리를 가지고 있어요</label>
+      <label><input type="checkbox" id="c2" checked> (필수) 개인정보 수집·7일 보관에 동의해요</label>
+      <label><input type="checkbox" id="c3" checked> (필수) 음원이 Gemini로 전송되고 무료 티어 학습에 쓰일 수 있음을 알아요</label>
+      <label><input type="checkbox" id="c4"> (선택) 발표 자료에 써도 좋아요</label>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="primary" id="upload">올리고 분석 시작</button><span class="hint">Gemini 1회 사용</span></div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:18px 0">
+    <div class="row">
+      <div><label>기존 작업 ID</label><input type="text" id="jobid" placeholder="01M4…"></div>
+      <div style="flex:0 0 auto;align-self:flex-end"><button id="open">열기</button></div>
+    </div>
+    <div class="hint" style="margin-top:6px">샘플: <a href="#" data-job="01M427T4Y9Z2QA70A8HJ9W81JT">샘플곡 1 (결과까지)</a> ·
+      <a href="#" data-job="01M427VYXAYMFEDW8XXQ265X01">샘플곡 2 (결과까지)</a> ·
+      <a href="#" data-job="01M427MZC8RGQW3PBR2CVAQMGT">샘플곡 3 (결과까지)</a> ·
+      <a href="#" data-job="01M4273XRE1ABK6SXKRVDYVEMK">노트 수정 테스트용 (수락 전)</a></div>
+  </section>
+
+  <!-- 2. 진행 -->
+  <section class="card hide" id="progress">
+    <h2>2. 진행 상태 <span class="hint" id="jobLabel"></span></h2>
+    <div class="row"><strong id="stageLabel">-</strong><span class="hint" id="queue"></span></div>
+    <div class="bar" style="margin-top:8px"><i id="bar" style="width:0"></i></div>
+    <div class="steps" id="steps"></div>
+    <div id="early" class="hide"><div class="hint" id="earlySummary"></div><canvas id="wave" width="880" height="60"></canvas></div>
+    <div id="statusErr" class="err hide"></div>
+    <div class="row" style="margin-top:10px"><button id="retry" class="hide">실패한 단계부터 다시 시도</button></div>
+  </section>
+
+  <!-- 3. 노트 -->
+  <section class="card hide" id="note">
+    <h2>3. A&R 노트 <span class="pill" id="noteVer"></span><span class="pill" id="edits"></span></h2>
+    <div class="interp" id="interp"></div>
+    <div class="hint" id="evidence"></div>
+    <div class="hint" id="correctionNow"></div>
+
+    <label>한 줄 수정 — "이게 아니라 이거야" (AI가 해석을 다시 씀, 횟수 1 사용)</label>
+    <div class="row"><input type="text" id="correction" placeholder="예: 터지는 게 아니라 체념이야"><button style="flex:0 0 auto" id="sendCorrection">해석 다시 쓰기</button></div>
+
+    <label>무드 키워드 (쉼표로 구분, 1~5개 — 직접 편집은 횟수 제한 없음)</label><input type="text" id="kw">
+    <label>색 3개</label><div class="swatches" id="colors"></div>
+    <label>커버 방향</label><div id="covdirs"></div>
+    <label>하이라이트 구간 (15초) — 후보를 누르거나 시작 초를 직접 입력</label>
+    <div id="cands"></div>
+    <div class="row"><input type="text" id="hlStart" placeholder="시작(초)"><span class="hint" id="hlNow"></span></div>
+    <div class="row" style="margin-top:12px">
+      <button id="saveDirect">직접 편집 저장</button>
+      <button id="relisten">다시 듣기 (Gemini 1회, 횟수 1)</button>
+      <button class="primary" id="accept">이 해석으로 수락 → 결과물 만들기</button>
+    </div>
+    <div id="noteErr" class="err hide"></div>
+  </section>
+
+  <!-- 4. 결과 -->
+  <section class="card hide" id="result">
+    <h2>4. 결과물</h2>
+    <div class="covers" id="covers"></div>
+    <div id="channels" style="margin-top:14px"></div>
+    <div id="pitch" style="margin-top:14px"></div>
+  </section>
+
+  <section class="card"><h2>호출 기록</h2><div class="log" id="log"></div></section>
+</main>
+
+<script>
+const API = "";  // 같은 서버에서 열리므로 상대 경로
+const $ = (id) => document.getElementById(id);
+let jobId = null, pollTimer = null, note = null, selectedStart = null;
+
+function log(msg) { const t = new Date().toLocaleTimeString(); $("log").textContent = `${t}  ${msg}\n` + $("log").textContent; }
+function show(id, on = true) { $(id).classList.toggle("hide", !on); }
+function fmt(sec) { sec = Math.max(0, Math.round(sec)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`; }
+
+async function api(method, path, body, isForm) {
+  const opt = { method, headers: {} };
+  if (body && isForm) opt.body = body;
+  else if (body) { opt.body = JSON.stringify(body); opt.headers["Content-Type"] = "application/json"; }
+  const t = performance.now();
+  const res = await fetch(API + path, opt);
+  const data = await res.json().catch(() => ({}));
+  log(`${method} ${path} → ${res.status} (${Math.round(performance.now() - t)}ms)${res.ok ? "" : "  " + (data.code || "") + " " + (data.message || "")}`);
+  if (!res.ok) throw data;
+  return data;
+}
+
+// ---------- 1. 시작 ----------
+$("upload").onclick = async () => {
+  const f = $("file").files[0];
+  if (!f) return alertBox("statusErr", "음원 파일을 골라 주세요.");
+  const fd = new FormData();
+  fd.append("file", f);
+  fd.append("title", $("title").value || f.name.replace(/\.[^.]+$/, ""));
+  fd.append("artist", $("artist").value || "테스트 밴드");
+  fd.append("genre", $("genre").value); fd.append("description", $("desc").value);
+  if ($("lyrics").value.trim()) fd.append("lyrics", $("lyrics").value);
+  fd.append("consent_original", $("c1").checked); fd.append("consent_privacy", $("c2").checked);
+  fd.append("consent_external_ai", $("c3").checked); fd.append("consent_showcase", $("c4").checked);
+  fd.append("consent_version", "test-page-v1");
+  $("upload").disabled = true;
+  try { const r = await api("POST", "/jobs", fd, true); openJob(r.job_id); }
+  catch (e) { show("progress"); alertBox("statusErr", e.message || "업로드 실패"); }
+  finally { $("upload").disabled = false; }
+};
+$("open").onclick = () => $("jobid").value.trim() && openJob($("jobid").value.trim());
+document.querySelectorAll("[data-job]").forEach(a => a.onclick = (e) => { e.preventDefault(); openJob(a.dataset.job); });
+
+function openJob(id) {
+  jobId = id; $("jobid").value = id; $("jobLabel").textContent = id;
+  ["note", "result"].forEach(s => show(s, false));
+  show("progress"); poll();
+}
+
+// ---------- 2. 진행 ----------
+async function poll() {
+  clearTimeout(pollTimer);
+  let st;
+  try { st = await api("GET", `/jobs/${jobId}`); } catch (e) { alertBox("statusErr", e.message); return; }
+  renderStatus(st);
+  if (st.stage === "note_ready") { await loadNote(); show("result", false); return; }
+  if (["awaiting_cover", "rendering", "done"].includes(st.stage)) { show("note", false); await loadPackage(); return; }
+  if (st.stage === "failed") return;
+  pollTimer = setTimeout(poll, 2500);
+}
+
+function renderStatus(st) {
+  $("stageLabel").textContent = `${st.stage_label}  (${st.stage})`;
+  $("queue").textContent = st.queue_position ? `대기 ${st.queue_position}번째` : "";
+  $("bar").style.width = `${Math.round(st.progress * 100)}%`;
+  $("steps").innerHTML = st.steps.map(s => `<span class="${s.status}">${s.label} · ${s.status}</span>`).join("");
+  if (st.early) {
+    show("early"); $("earlySummary").textContent = `먼저 나온 수치: ${st.early.summary}`;
+    drawWave(st.early.waveform);
+  }
+  if (st.error) alertBox("statusErr", `[${st.error.code}] ${st.error.message} (재시도 ${st.error.retryable ? "가능" : "불가"})`);
+  else show("statusErr", false);
+  show("retry", st.stage === "failed" && st.error && st.error.retryable);
+}
+$("retry").onclick = async () => { try { await api("POST", `/jobs/${jobId}/retry`); poll(); } catch (e) { alertBox("statusErr", e.message); } };
+
+function drawWave(w) {
+  const c = $("wave"), g = c.getContext("2d"); g.clearRect(0, 0, c.width, c.height);
+  g.fillStyle = "#3b5bdb"; const bw = c.width / w.length;
+  w.forEach((v, i) => { const h = Math.max(1, v * c.height); g.fillRect(i * bw, (c.height - h) / 2, Math.max(1, bw - 0.5), h); });
+}
+
+// ---------- 3. 노트 ----------
+async function loadNote() {
+  note = await api("GET", `/jobs/${jobId}/note`);
+  show("note");
+  $("noteVer").textContent = `v${note.version}`;
+  $("edits").textContent = `AI 수정 남은 횟수 ${note.edits_remaining}`;
+  $("interp").textContent = note.interpretation;
+  const ev = note.evidence;
+  $("evidence").textContent = `근거: ${ev.bpm} BPM${ev.bpm_measured && ev.bpm_measured !== ev.bpm ? ` (측정 ${ev.bpm_measured})` : ""} · ${ev.key} · ${ev.energy_change}  |  ${note.ai_generated.models.join(", ")}`;
+  $("correctionNow").textContent = note.user_correction ? `반영된 밴드 수정: “${note.user_correction}”` : "";
+  $("kw").value = note.mood_keywords.join(", ");
+  $("colors").innerHTML = note.colors.map(c => `<input type="color" value="${c}">`).join("");
+  $("covdirs").innerHTML = note.cover_directions.map(c => `<div class="row" style="margin:4px 0"><span style="flex:0 0 32px" class="pill">${c.id}</span><input type="text" data-cid="${c.id}" value="${c.text.replace(/"/g, "&quot;")}"></div>`).join("");
+  selectedStart = null;
+  const sel = note.highlight.selected;
+  $("cands").innerHTML = note.highlight.candidates.map(c =>
+    `<div class="cand ${c.start === sel.start ? "sel" : ""}" data-start="${c.start}">${c.id === note.highlight.recommended_id ? "★ " : ""}<b>${fmt(c.start)}~${fmt(c.end)}</b> ${c.reason}</div>`).join("");
+  document.querySelectorAll(".cand").forEach(el => el.onclick = () => {
+    document.querySelectorAll(".cand").forEach(x => x.classList.remove("sel")); el.classList.add("sel");
+    selectedStart = parseFloat(el.dataset.start); $("hlStart").value = "";
+  });
+  $("hlStart").value = ""; $("hlNow").textContent = `지금 선택: ${fmt(sel.start)}~${fmt(sel.end)}`;
+  show("noteErr", false);
+}
+
+function directEdits() {
+  const body = {};
+  const kw = $("kw").value.split(",").map(s => s.trim()).filter(Boolean);
+  if (kw.join() !== note.mood_keywords.join()) body.mood_keywords = kw;
+  const colors = [...$("colors").querySelectorAll("input")].map(i => i.value.toUpperCase());
+  if (colors.join() !== note.colors.join()) body.colors = colors;
+  const dirs = [...document.querySelectorAll("[data-cid]")].map(i => ({ id: i.dataset.cid, text: i.value.trim() }))
+    .filter(d => d.text !== note.cover_directions.find(c => c.id === d.id).text);
+  if (dirs.length) body.cover_directions = dirs;
+  const typed = $("hlStart").value.trim();
+  const start = typed ? parseFloat(typed) : selectedStart;
+  if (start !== null && !isNaN(start) && start !== note.highlight.selected.start) body.highlight_start = start;
+  return body;
+}
+
+async function patch(body, btn) {
+  btn.disabled = true; const label = btn.textContent; btn.textContent = "처리 중…";
+  try { await api("PATCH", `/jobs/${jobId}/note`, body); await loadNote(); $("correction").value = ""; }
+  catch (e) { alertBox("noteErr", `[${e.code}] ${e.message}`); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+$("sendCorrection").onclick = () => {
+  const c = $("correction").value.trim();
+  if (!c) return alertBox("noteErr", "수정할 문장을 써 주세요.");
+  patch({ correction: c, ...directEdits() }, $("sendCorrection"));
+};
+$("saveDirect").onclick = () => {
+  const body = directEdits();
+  if (!Object.keys(body).length) return alertBox("noteErr", "바뀐 내용이 없어요.");
+  patch(body, $("saveDirect"));
+};
+$("relisten").onclick = async () => {
+  try { await api("POST", `/jobs/${jobId}/note/relisten`); show("note", false); poll(); }
+  catch (e) { alertBox("noteErr", `[${e.code}] ${e.message}`); }
+};
+$("accept").onclick = async () => {
+  if (Object.keys(directEdits()).length && !confirm("저장하지 않은 직접 편집이 있어요. 그대로 수락할까요?")) return;
+  try { await api("POST", `/jobs/${jobId}/note/accept`, { version: note.version }); show("note", false); poll(); }
+  catch (e) { alertBox("noteErr", `[${e.code}] ${e.message}`); }
+};
+
+// ---------- 4. 결과 ----------
+async function loadPackage() {
+  const p = await api("GET", `/jobs/${jobId}/package`);
+  show("result");
+  $("covers").innerHTML = p.covers.map(c => {
+    const v = c.versions[c.versions.length - 1];
+    return `<figure style="margin:0"><a href="${API + (v.url_3000 || v.url)}" target="_blank"><img src="${API + v.url}" alt="${c.item_id}"></a><figcaption class="hint">${c.item_id} (${c.direction_id}) · 누르면 3000px</figcaption></figure>`;
+  }).join("");
+  $("channels").innerHTML = "<h2>채널 홍보 글</h2>" + Object.entries(p.channels).map(([ch, c]) =>
+    `<label>${ch}${c.hook ? ` — 훅: “${c.hook}”` : ""}</label><div class="copy">${esc(c.text)}${c.hashtags ? "\n\n" + c.hashtags.join(" ") : ""}</div>`).join("");
+  $("pitch").innerHTML = Object.keys(p.pitch).length ? "<h2>피칭 메일</h2>" + Object.entries(p.pitch).map(([lang, m]) =>
+    `<label>${lang === "en" ? "영어" : "한국어"} — 제목: ${esc(m.subject)}</label><div class="copy">${esc(m.body).replace(/(\[[^\]]+\])/g, '<mark>$1</mark>')}</div>`).join("") : "";
+  log(`AI 사용 모델: ${p.ai_generated.models.join(", ")}`);
+}
+
+function esc(s) { return s.replace(/[&<>]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch])); }
+function alertBox(id, msg) { const el = $(id); el.textContent = msg; show(id); }
+</script>
+</body>
+</html>

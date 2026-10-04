@@ -1,11 +1,12 @@
 """FastAPI 앱: 라우터 등록, CORS, 에러 형식 통일."""
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.api import files, jobs, note, package
 from app.db import import_legacy_files
@@ -64,3 +65,9 @@ def health() -> dict:
 
 for r in (jobs.router, note.router, package.router, files.router):
     app.include_router(r)
+
+if settings.playground_enabled:
+    @app.get("/playground", include_in_schema=False)
+    def playground() -> FileResponse:
+        """백엔드 흐름 확인용 페이지 (실제 화면이 아님). PLAYGROUND_ENABLED=false로 끈다."""
+        return FileResponse(Path(__file__).parent / "playground" / "index.html")
