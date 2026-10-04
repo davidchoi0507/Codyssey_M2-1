@@ -43,7 +43,8 @@ def _perceived_bpm(features: Features, listening: Listening) -> float:
 
 async def write_note(settings: Settings, *, job_id: str, features: Features, listening: Listening,
                      song: dict, gemini_model: str, version: int = 1,
-                     user_correction: str | None = None) -> tuple[ARNote, dict]:
+                     user_correction: str | None = None, previous_interpretation: str | None = None,
+                     edits_remaining: int | None = None) -> tuple[ARNote, dict]:
     payload = {
         "song": song,
         "audio_feature_profile": profile_for_prompt(features),
@@ -51,6 +52,8 @@ async def write_note(settings: Settings, *, job_id: str, features: Features, lis
     }
     if user_correction:
         payload["user_correction"] = user_correction
+        if previous_interpretation:
+            payload["previous_interpretation"] = previous_interpretation
     candidate_ids = {c.id for c in features.highlight_candidates}
     draft, usage = await ask_json(chat_model(settings), load_prompt("ar_note"), payload, ARNoteDraft,
                                   check=lambda d: _check_draft(d, candidate_ids), what="A&R 노트")
@@ -74,7 +77,7 @@ async def write_note(settings: Settings, *, job_id: str, features: Features, lis
         ),
         waveform=features.waveform,
         user_correction=user_correction,
-        edits_remaining=settings.note_edits_per_job,
+        edits_remaining=settings.note_edits_per_job if edits_remaining is None else edits_remaining,
         ai_generated=AIGenerated(models=[f"gemini:{gemini_model}", model_label(settings)]),
     )
     return note, {"model": model_label(settings), **usage}

@@ -18,6 +18,7 @@ from app.core.stages import Stage
 from app.pipeline.analyze import run_analysis
 from app.pipeline.generate import run_generation
 from app.pipeline.jobfiles import JobFiles
+from app.pipeline.note_edit import relisten_pending, run_relisten
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +30,10 @@ class JobRunner:
         self.slots = asyncio.Semaphore(settings.cpu_workers)
         self.waiting: list[str] = []  # 분석 자리를 기다리는 job_id (들어온 순서)
         self.tasks: dict[str, asyncio.Task] = {}
+        self.locks: dict[str, asyncio.Lock] = {}  # 노트 수정이 같은 작업에서 겹치지 않게 (버전 번호 충돌 방지)
+
+    def lock(self, job_id: str) -> asyncio.Lock:
+        return self.locks.setdefault(job_id, asyncio.Lock())
 
     def is_running(self, job_id: str) -> bool:
         t = self.tasks.get(job_id)
@@ -55,19 +60,22 @@ class JobRunner:
 
         self.tasks[job_id] = asyncio.create_task(run())
 
-    async def _analysis_in_slot(self, jf: JobFiles) -> None:
+    async def _in_slot(self, jf: JobFiles, coro_factory) -> None:
         self.waiting.append(jf.job_id)
         try:
             await self.slots.acquire()
         finally:
             self.waiting.remove(jf.job_id)
         try:
-            await run_analysis(self.s, jf, self.pool)
+            await coro_factory()
         finally:
             self.slots.release()
 
     def start_analysis(self, jf: JobFiles) -> None:
-        self._start(jf.job_id, lambda: self._analysis_in_slot(jf))
+        self._start(jf.job_id, lambda: self._in_slot(jf, lambda: run_analysis(self.s, jf, self.pool)))
+
+    def start_relisten(self, jf: JobFiles) -> None:
+        self._start(jf.job_id, lambda: self._in_slot(jf, lambda: run_relisten(self.s, jf)))
 
     def start_generation(self, jf: JobFiles) -> None:
         self._start(jf.job_id, lambda: run_generation(self.s, jf))
@@ -82,6 +90,8 @@ class JobRunner:
             jf.event("recovered", stage=r["stage"])
             if r["stage"] == Stage.GENERATING:
                 self.start_generation(jf)
+            elif r["stage"] == Stage.ANALYZING and relisten_pending(jf):
+                self.start_relisten(jf)
             else:
                 self.start_analysis(jf)
         return [r["job_id"] for r in rows]

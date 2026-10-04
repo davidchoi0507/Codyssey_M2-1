@@ -15,6 +15,12 @@
 - recommended_id: 기본은 Listening의 추천을 따른다. 수치와 명백히 어긋날 때만 바꾸고, 그때는 해당 후보 이유에 왜 골랐는지 쓴다.
 - 사용자가 준 곡 소개·장르가 있으면 존중하되, 들은 내용과 다르면 들은 내용을 우선한다.
 
+밴드가 해석을 고쳤을 때 (user_correction이 있으면):
+- user_correction은 밴드가 previous_interpretation(지난 해석)을 읽고 "이 곡은 그게 아니라 이거야"라고 고친 말이다. 곡을 만든 사람의 말이므로 감정·의도·분위기 해석은 user_correction을 최우선으로 따른다.
+- interpretation을 그 방향으로 다시 쓰고, mood_keywords·colors·cover_directions도 고친 해석에 맞게 바꾼다. 지난 해석의 표현을 되풀이하지 않는다.
+- 측정 수치(BPM, 에너지 변화 시점·배수)는 바꾸지 않는다. 수치를 고친 해석에 맞는 말로 다시 풀어 쓴다 (예: 에너지가 커져도 "터진다" 대신 "끝내 놓아 버린다").
+- user_correction 문장을 그대로 옮겨 적지 않는다.
+
 밴드가 읽는 글이다 (interpretation, candidate_reasons, cover_directions):
 - 시간은 "2:34"처럼 분:초로 쓴다. "41.15초", "41.0~113.0초" 같은 초 단위 숫자를 쓰지 않는다.
 - 0~1 사이 내부 지표(energy 0.94, rise 0.598, repetition 0.86 등)와 자료 이름(Audio Feature Profile, Listening, librosa, Gemini)을 쓰지 않는다. "에너지가 가장 높은", "곡에서 반복되는" 같은 말로 바꾼다.
