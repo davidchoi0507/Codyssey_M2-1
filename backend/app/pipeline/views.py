@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.core.config import Settings
-from app.core.stages import ANALYSIS_STEPS, STAGE_LABELS, Stage
+from app.core.stages import ANALYSIS_STEPS, QUEUED_LABEL, STAGE_LABELS, Stage
 from app.pipeline.jobfiles import JobFiles
 from app.schemas.common import AIGenerated, ErrorInfo
 from app.schemas.job import EarlyResult, JobStatus, StepStatus
@@ -13,8 +13,9 @@ from app.schemas.package import CHANNELS, ChannelOut, CoverItem, CoverVersion, P
 _STEP_PROGRESS = {"measure": 0.15, "listen": 0.45, "note": 0.8}
 
 
-def job_status(jf: JobFiles) -> JobStatus:
-    st = jf.read_json(jf.root / "status.json")
+def job_status(jf: JobFiles, queue_position: int | None = None) -> JobStatus:
+    """queue_position: 분석 자리를 기다리는 순번 (JobRunner.queue_position). CLI 내보내기는 None."""
+    st = jf.status()
     stage, step = Stage(st["stage"]), st.get("step")
     keys = [k for k, _ in ANALYSIS_STEPS]
 
@@ -44,14 +45,16 @@ def job_status(jf: JobFiles) -> JobStatus:
         f = jf.read_json(jf.features)
         early = EarlyResult(bpm=f["bpm"], duration_sec=f["duration_sec"], waveform=f["waveform"], summary=f["summary"])
     label = dict(ANALYSIS_STEPS).get(step) if stage == Stage.ANALYZING else STAGE_LABELS[stage]
+    if queue_position:
+        label = QUEUED_LABEL.format(n=queue_position)
     return JobStatus(job_id=jf.job_id, stage=stage, stage_label=label or STAGE_LABELS[stage], progress=progress,
-                     queue_position=None, steps=steps, early=early,
+                     queue_position=queue_position, steps=steps, early=early,
                      error=ErrorInfo(**st["error"]) if st.get("error") else None,
                      updated_at=datetime.fromisoformat(st["updated_at"]))
 
 
 def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], str]) -> Package:
-    st = jf.read_json(jf.root / "status.json")
+    st = jf.status()
     models: set[str] = set()
     for e in jf.events():
         if e.get("model") and e["event"] in ("cover_generated", "visual_meta", "copy_meta", "note_meta"):

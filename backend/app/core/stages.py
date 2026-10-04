@@ -24,6 +24,9 @@ STAGE_LABELS: dict[Stage, str] = {
     Stage.FAILED: "문제가 생겼어요",
 }
 
+# 분석 차례를 기다릴 때 stage_label (GET /jobs/{id}의 queue_position과 같이 나감)
+QUEUED_LABEL = "차례를 기다리는 중 ({n}번째)"
+
 # analyzing 단계 안의 세부 진행 (GET /jobs/{id}의 steps)
 ANALYSIS_STEPS: list[tuple[str, str]] = [
     ("upload", "업로드"),

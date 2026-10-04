@@ -29,14 +29,14 @@ def list_jobs(settings) -> None:
         return
     for d in sorted(settings.jobs_dir.iterdir()):
         jf = JobFiles(settings.jobs_dir, d.name)
-        status = jf.read_json(d / "status.json") if (d / "status.json").exists() else {}
+        status = jf.status() if jf.exists() else {}
         song = jf.read_json(jf.song) if jf.song.exists() else {}
         print(f"{d.name}  {status.get('stage', '?'):12} {song.get('title', '')} / {song.get('artist', '')}")
 
 
 def print_summary(jf: JobFiles) -> None:
     song = jf.read_json(jf.song)
-    status = jf.read_json(jf.root / "status.json")
+    status = jf.status()
     print(f"■ {song['title']} / {song['artist']}   [{status['stage']}]  {jf.job_id}")
     if status.get("error"):
         print("  에러:", status["error"])
@@ -66,7 +66,7 @@ def print_summary(jf: JobFiles) -> None:
             mark = "★" if c["id"] == rec else " "
             print(f"  {mark}{c['id']} {fmt(c['start'])}~{fmt(c['end'])} {c['reason']}")
         print(f"  모델: {', '.join(note['ai_generated']['models'])}")
-    timings = [json.loads(line) for line in (jf.root / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    timings = jf.events()
     steps = [f"{e['step']} {e['sec']}초" for e in timings if e["event"] == "step_end" and e.get("ok")]
     print("\n[소요] " + ", ".join(steps))
 

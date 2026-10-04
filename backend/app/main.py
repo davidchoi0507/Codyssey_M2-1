@@ -8,12 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import files, jobs, note, package
+from app.db import import_legacy_files
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.pipeline.runner import JobRunner
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 settings = get_settings()
+log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -21,7 +23,11 @@ async def lifespan(app: FastAPI):
     if not settings.download_token_secret:
         raise RuntimeError("DOWNLOAD_TOKEN_SECRET이 비어 있어요 (.env)")
     settings.jobs_dir.mkdir(parents=True, exist_ok=True)
+    if n := import_legacy_files(settings.jobs_dir):
+        log.info("작업 폴더 기록 %d건을 DB로 옮김", n)
     app.state.runner = JobRunner(settings)
+    if recovered := app.state.runner.recover():
+        log.info("끝나지 않은 작업 %d건 다시 시작: %s", len(recovered), ", ".join(recovered))
     yield
     app.state.runner.shutdown()
 

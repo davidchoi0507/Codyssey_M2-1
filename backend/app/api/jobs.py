@@ -52,8 +52,8 @@ async def create(
 
 
 @router.get("/{job_id}", response_model=JobStatus, summary="진행 상태 (2~3초마다 폴링)")
-def status(jf: JobFiles = Depends(job_files)) -> JobStatus:
-    return job_status(jf)
+def status(jf: JobFiles = Depends(job_files), r: JobRunner = Depends(runner)) -> JobStatus:
+    return job_status(jf, r.queue_position(jf.job_id))
 
 
 @router.patch("/{job_id}/info", response_model=dict, summary="기다리는 동안 추가 입력 (가사·채널·발매일)")
@@ -67,7 +67,7 @@ def patch_info(body: JobInfoPatch, jf: JobFiles = Depends(job_files)) -> dict:
 
 @router.post("/{job_id}/retry", response_model=JobStatus, summary="실패한 단계부터 다시 시도")
 async def retry(jf: JobFiles = Depends(job_files), r: JobRunner = Depends(runner)) -> JobStatus:
-    st = jf.read_json(jf.root / "status.json")
+    st = jf.status()
     if st["stage"] != "failed":
         raise AppError("NOT_FAILED", "실패한 작업만 다시 시도할 수 있어요.", False, http_status=409)
     if (st.get("error") or {}).get("retryable") is False:
@@ -77,4 +77,4 @@ async def retry(jf: JobFiles = Depends(job_files), r: JobRunner = Depends(runner
     else:
         r.start_analysis(jf)
     jf.event("retry", step=st.get("step"))
-    return job_status(jf)
+    return job_status(jf, r.queue_position(jf.job_id))

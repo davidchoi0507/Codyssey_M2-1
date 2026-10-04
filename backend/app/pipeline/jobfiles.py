@@ -1,12 +1,14 @@
 """작업 폴더 data/jobs/<job_id>/ 의 경로와 기록 (ARCHITECTURE.md '작업 파일 구조').
 
-DB(SQLite)가 붙기 전까지 단계 상태·지표는 이 폴더의 status.json / events.jsonl에 남긴다.
+결과물은 이 폴더에 파일로, 단계 상태·지표(events)·동의 기록은 SQLite(app/db.py)에 남긴다.
 """
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ulid import ULID
+
+from app import db
 
 
 def new_job_id() -> str:
@@ -67,10 +69,6 @@ class JobFiles:
     def song(self) -> Path:
         return self.root / "song.json"
 
-    @property
-    def consent(self) -> Path:
-        return self.root / "consent.json"
-
     # 기록
     def write_json(self, path: Path, data) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -81,25 +79,45 @@ class JobFiles:
     def read_json(self, path: Path):
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def exists(self) -> bool:
+        with db.connect() as conn:
+            return conn.execute("SELECT 1 FROM jobs WHERE job_id = ?", (self.job_id,)).fetchone() is not None
+
+    def status(self) -> dict:
+        """{job_id, stage, step, error, updated_at} — 없는 작업이면 KeyError."""
+        with db.connect() as conn:
+            r = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (self.job_id,)).fetchone()
+        if r is None:
+            raise KeyError(self.job_id)
+        return {"job_id": r["job_id"], "stage": r["stage"], "step": r["step"],
+                "error": json.loads(r["error"]) if r["error"] else None, "updated_at": r["updated_at"]}
+
     def event(self, event: str, **payload) -> None:
-        """지표 자동 기록 (나중에 events 테이블로 옮김)."""
-        self.root.mkdir(parents=True, exist_ok=True)
-        with (self.root / "events.jsonl").open("a", encoding="utf-8") as f:
-            f.write(json.dumps({"ts": now_iso(), "event": event, **payload}, ensure_ascii=False) + "\n")
+        """지표 자동 기록 (events 테이블)."""
+        with db.connect() as conn:
+            conn.execute("INSERT INTO events (job_id, ts, event, payload) VALUES (?, ?, ?, ?)",
+                         (self.job_id, now_iso(), event, json.dumps(payload, ensure_ascii=False)))
 
     def events(self) -> list[dict]:
-        p = self.root / "events.jsonl"
-        if not p.exists():
-            return []
-        return [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
+        with db.connect() as conn:
+            rows = conn.execute("SELECT ts, event, payload FROM events WHERE job_id = ? ORDER BY id",
+                                (self.job_id,)).fetchall()
+        return [{"ts": r["ts"], "event": r["event"], **json.loads(r["payload"])} for r in rows]
+
+    def save_consent(self, record: dict) -> None:
+        with db.connect() as conn:
+            conn.execute("INSERT OR REPLACE INTO consents VALUES (?, ?)",
+                         (self.job_id, json.dumps(record, ensure_ascii=False)))
 
     def fail(self, error: dict) -> None:
         """실패 기록 — 진행 중이던 단계(step)를 남겨서 화면이 어느 단계에서 멈췄는지 보여줄 수 있게."""
-        p = self.root / "status.json"
-        step = self.read_json(p).get("step") if p.exists() else None
-        self.set_status("failed", step=step, error=error)
+        self.set_status("failed", step=self.status()["step"], error=error)
 
     def set_status(self, stage: str, *, step: str | None = None, error: dict | None = None) -> None:
-        self.write_json(self.root / "status.json",
-                        {"job_id": self.job_id, "stage": stage, "step": step, "error": error,
-                         "updated_at": now_iso()})
+        now = now_iso()
+        err = json.dumps(error, ensure_ascii=False) if error else None
+        with db.connect() as conn:
+            conn.execute(
+                "INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(job_id) DO UPDATE SET "
+                "stage = excluded.stage, step = excluded.step, error = excluded.error, updated_at = excluded.updated_at",
+                (self.job_id, str(stage), step, err, now, now))

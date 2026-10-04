@@ -38,9 +38,8 @@ def create_job(settings: Settings, src: Path, *, filename: str, song: dict, cons
     # 확장자는 원래 파일명 기준 (업로드 임시 파일엔 확장자가 없을 수 있음)
     stored = store_original(src, jf.root / "input", ext=ext)
     jf.write_json(jf.song, song)
-    jf.write_json(jf.consent, {**{k: bool(consent.get(k)) for k in (*REQUIRED_CONSENTS, "consent_showcase")},
-                               "version": consent["consent_version"], "at": now_iso(),
-                               "gemini_tier": settings.gemini_tier})
+    jf.save_consent({**{k: bool(consent.get(k)) for k in (*REQUIRED_CONSENTS, "consent_showcase")},
+                     "version": consent["consent_version"], "at": now_iso(), "gemini_tier": settings.gemini_tier})
     jf.set_status(Stage.UPLOADED)
     jf.event("uploaded", size_mb=round(size_mb, 1), stored=stored.name,
              stored_mb=round(stored.stat().st_size / 1024 / 1024, 1), duration_sec=round(duration, 1), source=source)

@@ -64,7 +64,7 @@ async def main() -> int:
     try:
         if args.resume:
             jf = JobFiles(settings.jobs_dir, args.resume)
-            if not jf.root.exists():
+            if not jf.exists():
                 raise AppError("JOB_NOT_FOUND", f"작업을 찾을 수 없어요: {args.resume}", False)
         elif args.audio:
             jf = create_cli_job(args, settings)

@@ -27,7 +27,7 @@ def job_files(job_id: str) -> JobFiles:
     if not _JOB_ID.match(job_id):
         raise not_found
     jf = JobFiles(get_settings().jobs_dir, job_id)
-    if not (jf.root / "status.json").exists():
+    if not jf.exists():
         raise not_found
     return jf
 
