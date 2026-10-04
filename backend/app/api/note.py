@@ -6,7 +6,7 @@ from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import Stage
 from app.pipeline.generate import accept_note
-from app.pipeline.note_edit import edit_note, ensure_editable, latest_note
+from app.pipeline.note_edit import edit_note, edits_remaining, ensure_editable, latest_note
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.runner import JobRunner
 from app.pipeline.views import job_status
@@ -18,14 +18,15 @@ router = APIRouter(prefix="/jobs/{job_id}/note", tags=["A&R 노트"])
 
 
 @router.get("", response_model=ARNote, summary="A&R 노트 조회 (최신 버전)")
-def get_note(jf: JobFiles = Depends(job_files)) -> ARNote:
-    return latest_note(jf)
+def get_note(jf: JobFiles = Depends(job_files), s: Settings = Depends(settings)) -> ARNote:
+    # 남은 횟수는 노트에 저장된 값이 아니라 지금 기록으로 계산 (제한 규칙이 바뀌어도 맞게)
+    return latest_note(jf).model_copy(update={"edits_remaining": edits_remaining(s, jf)})
 
 
 @router.patch("", response_model=ARNote,
               summary="노트 수정 (한 줄 수정·직접 편집·하이라이트 선택) → 새 버전",
               description="correction이 있으면 해석을 다시 써서 10초 안팎 걸린다. 직접 편집 필드는 그 위에 덮어쓴다. "
-                          "PATCH 1회와 다시 듣기 1회가 각각 수정 횟수 1회 (edits_remaining).")
+                          "한 줄 수정과 다시 듣기만 횟수를 쓴다 (edits_remaining). 직접 편집은 제한 없음.")
 async def patch_note(body: NotePatch, jf: JobFiles = Depends(job_files), r: JobRunner = Depends(runner),
                      s: Settings = Depends(settings)) -> ARNote:
     if r.is_running(jf.job_id):
@@ -42,7 +43,7 @@ async def relisten(jf: JobFiles = Depends(job_files), r: JobRunner = Depends(run
     async with r.lock(jf.job_id):
         if r.is_running(jf.job_id):
             raise AppError("JOB_BUSY", "이미 처리 중이에요. 잠시만 기다려 주세요.", True, http_status=409)
-        ensure_editable(s, jf)
+        ensure_editable(s, jf, uses_ai=True)
         jf.event("relisten_requested")
         jf.set_status(Stage.ANALYZING, step="listen")  # 차례를 기다리는 동안 수정·수락이 끼어들지 않게
         r.start_relisten(jf)

@@ -2,7 +2,8 @@
 
 - 수정할 때마다 새 버전(note_v{n+1}.json)을 만들고 이전 버전은 남긴다. 수락 전(note_ready)에만 고칠 수 있다.
 - 한 줄 수정(correction)이 있으면 A&R 에이전트가 해석을 다시 쓰고, 직접 편집한 필드는 그 위에 덮어쓴다.
-- 횟수 제한: 수정(PATCH 1회)과 다시 듣기를 합쳐 작업당 NOTE_EDITS_PER_JOB회 (PROJECT_BRIEF). 다시 듣기가 실패하면 되돌려준다.
+- 횟수 제한: AI를 부르는 것(한 줄 수정, 다시 듣기)만 합쳐 작업당 NOTE_EDITS_PER_JOB회. 직접 편집(키워드·색·커버 방향·
+  하이라이트)은 비용이 없어 제한하지 않는다 (2026-10-04 사용자 결정). 다시 듣기가 실패하면 되돌려준다.
 """
 import logging
 import re
@@ -20,12 +21,14 @@ from app.schemas.requests import NotePatch
 
 log = logging.getLogger(__name__)
 _HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
-EDIT_EVENTS = ("note_edited", "relisten_requested")
-
-
 def edits_remaining(settings: Settings, jf: JobFiles) -> int:
-    ev = [e["event"] for e in jf.events()]
-    used = sum(ev.count(k) for k in EDIT_EVENTS) - ev.count("relisten_failed")
+    """남은 AI 수정 횟수 (한 줄 수정 + 다시 듣기)."""
+    used = 0
+    for e in jf.events():
+        if (e["event"] == "note_edited" and e.get("correction")) or e["event"] == "relisten_requested":
+            used += 1
+        elif e["event"] == "relisten_failed":
+            used -= 1
     return max(settings.note_edits_per_job - used, 0)
 
 
@@ -46,15 +49,15 @@ def latest_note(jf: JobFiles) -> ARNote:
     return ARNote.model_validate(jf.read_json(jf.note(v)))
 
 
-def ensure_editable(settings: Settings, jf: JobFiles) -> int:
-    """고칠 수 있는 상태인지 확인하고 남은 횟수를 돌려준다."""
+def ensure_editable(settings: Settings, jf: JobFiles, *, uses_ai: bool) -> int:
+    """고칠 수 있는 상태인지 확인하고 남은 AI 수정 횟수를 돌려준다. 횟수 제한은 AI를 부를 때만."""
     if jf.accepted.exists():
         raise AppError("NOTE_LOCKED", "이미 수락한 노트는 고칠 수 없어요.", False, http_status=409)
     if jf.status()["stage"] != Stage.NOTE_READY:
         raise AppError("NOTE_NOT_READY", "노트가 준비된 뒤에 고칠 수 있어요.", True, http_status=409)
     remaining = edits_remaining(settings, jf)
-    if remaining <= 0:
-        raise AppError("NOTE_EDIT_LIMIT", f"노트 수정·다시 듣기는 작업당 {settings.note_edits_per_job}번까지예요.",
+    if uses_ai and remaining <= 0:
+        raise AppError("NOTE_EDIT_LIMIT", f"한 줄 수정·다시 듣기는 작업당 {settings.note_edits_per_job}번까지예요. 키워드·색·커버 방향·구간은 계속 직접 고칠 수 있어요.",
                        False, http_status=429)
     return remaining
 
@@ -110,7 +113,7 @@ def _apply_direct_edits(note: ARNote, patch: NotePatch, highlight_sec: float) ->
 
 
 async def edit_note(settings: Settings, jf: JobFiles, patch: NotePatch) -> ARNote:
-    remaining = ensure_editable(settings, jf)
+    remaining = ensure_editable(settings, jf, uses_ai=bool(patch.correction))
     note = latest_note(jf)
     features = Features.model_validate(jf.read_json(jf.features))
     _check_patch(patch, note, features.duration_sec, settings.highlight_sec)
@@ -127,7 +130,7 @@ async def edit_note(settings: Settings, jf: JobFiles, patch: NotePatch) -> ARNot
         jf.event("note_meta", version=version, sec=round(time.monotonic() - t, 2), **meta)
         new = _keep_user_choices(new, note)
     else:
-        new = note.model_copy(update={"version": version, "edits_remaining": remaining - 1})
+        new = note.model_copy(update={"version": version, "edits_remaining": remaining})
 
     new = _apply_direct_edits(new, patch, settings.highlight_sec)
     jf.write_json(jf.note(version), new.model_dump())
