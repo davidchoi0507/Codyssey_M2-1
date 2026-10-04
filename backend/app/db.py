@@ -31,6 +31,15 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_job ON events(job_id, id);
 
+CREATE TABLE IF NOT EXISTS bands (
+    code        TEXT PRIMARY KEY,  -- 초대 코드 (정규화: 대문자, 하이픈 없음)
+    name        TEXT NOT NULL,
+    daily_limit INTEGER NOT NULL,
+    active      INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL,
+    note        TEXT
+);
+
 CREATE TABLE IF NOT EXISTS consents (
     job_id  TEXT PRIMARY KEY,
     record  TEXT NOT NULL         -- JSON (동의 항목, 문구 버전, 시각, Gemini 티어)
@@ -66,6 +75,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "client" not in cols:
         conn.execute("ALTER TABLE jobs ADD COLUMN client TEXT")  # 업로드한 IP — 하루 생성 한도용
         conn.execute("CREATE INDEX IF NOT EXISTS jobs_client ON jobs(client, created_at)")
+    if "band_code" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN band_code TEXT")  # 올린 밴드 (초대 코드) — 밴드별 한도·통계
+        conn.execute("CREATE INDEX IF NOT EXISTS jobs_band ON jobs(band_code, created_at)")
 
 
 def import_legacy_files(jobs_dir: Path) -> int:

@@ -42,8 +42,10 @@ class Settings(BaseSettings):
     max_upload_mb: int = 200  # 10분 24bit/48kHz WAV(약 173MB)까지. 실제 기준은 max_duration_sec
     max_duration_sec: int = 600
     cpu_workers: int = 2
-    daily_jobs_per_client: int = 3
+    daily_jobs_per_client: int = 3   # 초대 코드 없이 올릴 때 접속 IP별 (코드 필수면 안 씀)
+    daily_jobs_per_band: int = 5     # 밴드(초대 코드)별 기본값 — 밴드마다 bands.daily_limit로 바꿀 수 있음
     daily_jobs_global: int = 60
+    band_code_required: bool = False  # true면 곡을 올릴 때 초대 코드(X-Band-Code) 필수 — 밴드 테스트 때 켬
     note_edits_per_job: int = 5
     cover_regen_per_job: int = 3
     retention_days: int = 7

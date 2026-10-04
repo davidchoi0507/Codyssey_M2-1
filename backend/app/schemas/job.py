@@ -2,9 +2,18 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.common import ErrorInfo
+
+
+class BandInfo(BaseModel):
+    """GET /band — 초대 코드로 확인한 밴드."""
+    name: str
+    code: str = Field(description="보기 좋은 형식 (ABCD-EFGH)")
+    daily_limit: int
+    used_today: int
+    remaining_today: int
 
 
 class JobCreated(BaseModel):

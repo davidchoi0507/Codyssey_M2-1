@@ -2,12 +2,13 @@
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile
 
 from app.api.deps import file_url, job_files, runner, settings
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.pipeline.intake import create_job
+from app.pipeline.bands import find_band
 from app.pipeline.limits import check_daily_limits, client_ip, record_client
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.runner import JobRunner
@@ -30,10 +31,12 @@ async def create(
     consent_external_ai: bool = Form(description="음원의 Gemini 전송·무료 티어 학습 가능성 고지 — 필수"),
     consent_showcase: bool = Form(False, description="발표 사용 동의 — 선택"),
     consent_version: str = Form(description="동의 문구 버전"),
+    x_band_code: str | None = Header(default=None, description="밴드 초대 코드 (BAND_CODE_REQUIRED=true면 필수)"),
     s: Settings = Depends(settings), r: JobRunner = Depends(runner),
 ) -> JobCreated:
     client = client_ip(request)
-    check_daily_limits(s, client)  # 파일을 받기 전에
+    band = find_band(x_band_code)
+    check_daily_limits(s, client, band)  # 파일을 받기 전에
     s.jobs_dir.mkdir(parents=True, exist_ok=True)
     limit = s.max_upload_mb * 1024 * 1024
     with tempfile.TemporaryDirectory(dir=s.data_dir) as tmp:
@@ -51,7 +54,7 @@ async def create(
                    "consent_external_ai": consent_external_ai, "consent_showcase": consent_showcase,
                    "consent_version": consent_version}
         jf = create_job(s, tmp_path, filename=file.filename or "", song=song, consent=consent, source="api")
-    record_client(jf.job_id, client)
+    record_client(jf.job_id, client, band)
     r.start_analysis(jf)
     return JobCreated(job_id=jf.job_id, status_url=f"/jobs/{jf.job_id}")
 
