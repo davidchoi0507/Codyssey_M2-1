@@ -1,6 +1,6 @@
-"""생성 파이프라인 (노트 수락 후): 비주얼 디렉터 → 커버 3장 + 카피라이터 채널 4종.
+"""생성 파이프라인 (노트 수락 후): 비주얼 디렉터 → 커버 3장 + 카피라이터 채널 4종 + 피칭 메일(영·한).
 
-- 비주얼 디렉터·카피라이터는 병렬. 커버 3장도 동시에 생성 (이미지 API 동시 호출 수는 세마포어로 제한).
+- 비주얼 디렉터·카피라이터·피칭은 병렬. 커버 3장도 동시에 생성 (이미지 API 동시 호출 수는 세마포어로 제한).
 - 결과는 버전 번호를 붙여 저장하고, 다시 실행하면 이미 있는 파일은 건너뛴다 (실패한 항목부터 재실행).
 - 끝나면 awaiting_cover (사용자가 커버를 고르면 숏폼·채널 이미지 렌더링 — 10/7·10/9).
 """
@@ -10,6 +10,7 @@ import time
 
 from app.adapters.codyssey_image import CodysseyImage
 from app.agents.copywriter import write_copy
+from app.agents.pitch import write_pitch
 from app.agents.visual import plan_covers
 from app.core.config import Settings
 from app.core.errors import AppError
@@ -83,6 +84,15 @@ async def _copy(settings: Settings, jf: JobFiles, note: ARNote, song: dict) -> N
     jf.event("copy_meta", **meta)
 
 
+async def _pitch(settings: Settings, jf: JobFiles, note: ARNote, song: dict, listening: dict | None) -> None:
+    if all(jf.pitch(lang, 1).exists() for lang in ("en", "ko")):
+        return
+    pitch, meta = await write_pitch(settings, note, song, listening)
+    for lang in ("en", "ko"):
+        jf.write_json(jf.pitch(lang, 1), getattr(pitch, lang).model_dump())
+    jf.event("pitch_meta", **meta)
+
+
 async def run_generation(settings: Settings, jf: JobFiles) -> None:
     note = accepted_note(jf)
     song = jf.read_json(jf.song)
@@ -92,7 +102,7 @@ async def run_generation(settings: Settings, jf: JobFiles) -> None:
     t = time.monotonic()
     try:
         results = await asyncio.gather(_covers(settings, jf, note, song, listening), _copy(settings, jf, note, song),
-                                       return_exceptions=True)
+                                       _pitch(settings, jf, note, song, listening), return_exceptions=True)
         for r in results:
             if isinstance(r, Exception):
                 raise r

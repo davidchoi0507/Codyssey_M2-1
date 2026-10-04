@@ -65,6 +65,9 @@ class JobFiles:
     def channel_copy(self, channel: str, version: int) -> Path:
         return self.root / "channels" / channel / f"copy_v{version}.json"
 
+    def pitch(self, lang: str, version: int) -> Path:
+        return self.root / "pitch" / f"pitch_{lang}_v{version}.json"
+
     @property
     def song(self) -> Path:
         return self.root / "song.json"

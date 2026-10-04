@@ -8,7 +8,7 @@ from app.core.stages import ANALYSIS_STEPS, QUEUED_LABEL, STAGE_LABELS, Stage
 from app.pipeline.jobfiles import JobFiles
 from app.schemas.common import AIGenerated, ErrorInfo
 from app.schemas.job import EarlyResult, JobStatus, StepStatus
-from app.schemas.package import CHANNELS, ChannelOut, CoverItem, CoverVersion, Package
+from app.schemas.package import CHANNELS, ChannelOut, CoverItem, CoverVersion, Package, PitchOut
 
 _STEP_PROGRESS = {"measure": 0.15, "listen": 0.45, "note": 0.8}
 
@@ -57,7 +57,7 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
     st = jf.status()
     models: set[str] = set()
     for e in jf.events():
-        if e.get("model") and e["event"] in ("cover_generated", "visual_meta", "copy_meta", "note_meta"):
+        if e.get("model") and e["event"] in ("cover_generated", "visual_meta", "copy_meta", "pitch_meta", "note_meta"):
             models.add(e["model"])
     if jf.listening.exists():
         models.add("gemini:" + jf.read_json(jf.listening)["meta"]["model"])
@@ -84,5 +84,12 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
             channels[ch] = ChannelOut(item_id=f"copy-{ch}", text=d["text"], hashtags=d.get("hashtags") or None,
                                       hook=d.get("hook"), images=None)
 
-    return Package(job_id=jf.job_id, stage=st["stage"], covers=covers, channels=channels,
+    pitch = {}
+    for lang in ("en", "ko"):
+        p = jf.pitch(lang, 1)
+        if p.exists():
+            d = jf.read_json(p)
+            pitch[lang] = PitchOut(item_id=f"pitch-{lang}", subject=d["subject"], body=d["body"])
+
+    return Package(job_id=jf.job_id, stage=st["stage"], covers=covers, channels=channels, pitch=pitch,
                    ai_generated=AIGenerated(notice="이 결과물은 AI로 생성되었습니다.", models=sorted(models)))

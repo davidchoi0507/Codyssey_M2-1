@@ -73,6 +73,16 @@ class ChannelCopy(BaseModel):
     hook: str | None = Field(default=None, description="(틱톡만) 영상 위에 올릴 짧은 훅 문구")
 
 
+class PitchMail(BaseModel):
+    subject: str = Field(description="메일 제목")
+    body: str = Field(description="메일 본문 (줄바꿈 포함, 자리표시 그대로)")
+
+
+class PitchSet(BaseModel):
+    en: PitchMail = Field(description="영어 메일 (해외 큐레이터용)")
+    ko: PitchMail = Field(description="한국어 메일 (국내 큐레이터·블로그·라디오용)")
+
+
 class CopySet(BaseModel):
     instagram: ChannelCopy
     tiktok: ChannelCopy
