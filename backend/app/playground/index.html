@@ -319,7 +319,7 @@ function renderStatus(st) {
                  generating: "커버 3장·채널 글·피칭 메일을 만드는 중이에요 (보통 40초 안팎)",
                  rendering: "영상·채널 이미지를 만드는 중이에요 (보통 40초 안팎)" }[st.stage];
   if (busy) {
-    if (!progStart) progStart = Date.now();
+    if (!progStart) progStart = workStart || Date.now();  // 버튼을 누른 순간부터 같이 셈
     $("progWorkingText").textContent = `${st.queue_position ? `차례를 기다리는 중 (${st.queue_position}번째)` : busy} · ${Math.round((Date.now() - progStart) / 1000)}초 지남`;
     show("progWorking");
   } else { progStart = null; show("progWorking", false); }
@@ -464,7 +464,7 @@ async function selectCover(itemId, v) {
   catch (e) { hideWorking(); alertBox("resultErr", `[${e.code}] ${e.message}`); document.querySelectorAll("[data-select]").forEach(b => b.disabled = false); }
 }
 function showWorking(text) {
-  if (!workStart) workStart = Date.now();
+  if (!workStart) workStart = progStart || Date.now();
   const sec = Math.round((Date.now() - workStart) / 1000);
   $("workingText").textContent = `${text} · ${sec}초 지남`;
   show("working");
