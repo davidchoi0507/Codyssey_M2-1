@@ -13,6 +13,7 @@ class CoverVersion(BaseModel):
     url: str
     url_3000: str | None = None
     url_title: str | None = None
+    request: str | None = Field(default=None, description="이 버전을 다시 만들 때 밴드가 쓴 요청 한 줄 (첫 버전·요청 없이 재생성은 null)")
 
 
 class CoverItem(BaseModel):
@@ -41,6 +42,7 @@ class ChannelOut(BaseModel):
     video: str | None = Field(default=None, description="(tiktok·instagram) 이 채널에 올릴 숏폼 영상 링크 = videos의 short (릴스·틱톡)")
     v: int = 1
     regenerate_remaining: int | None = None
+    request: str | None = Field(default=None, description="최신 버전(v)을 다시 만들 때 밴드가 쓴 요청 한 줄 (첫 버전·요청 없이 재생성은 null)")
 
 
 class PitchOut(BaseModel):
@@ -49,6 +51,7 @@ class PitchOut(BaseModel):
     body: str
     v: int = 1
     regenerate_remaining: int | None = None
+    request: str | None = Field(default=None, description="최신 버전(v)을 다시 만들 때 밴드가 쓴 요청 한 줄 (첫 버전·요청 없이 재생성은 null)")
 
 
 class Package(BaseModel):
@@ -59,6 +62,8 @@ class Package(BaseModel):
     channels: dict[str, ChannelOut] = {}
     pitch: dict[str, PitchOut] = {}
     zip_url: str | None = None
+    zip_files: list[str] | None = Field(default=None, description="ZIP에 들어갈 파일 (done일 때)")
+    zip_size_bytes: int | None = Field(default=None, description="ZIP 대략 용량 (done일 때, 압축 전 합계)")
     ai_generated: AIGenerated
 
 

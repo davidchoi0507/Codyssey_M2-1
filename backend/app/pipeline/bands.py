@@ -47,6 +47,13 @@ def used_since(code: str, since_utc_iso: str) -> int:
                             (code, since_utc_iso)).fetchone()[0]
 
 
+def job_rows(code: str) -> list[dict]:
+    """밴드가 올린 작업 (최근 것부터). 7일이 지나 지워진 작업은 DB에도 없다."""
+    with db.connect() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT job_id, stage, created_at FROM jobs WHERE band_code = ? ORDER BY created_at DESC", (code,))]
+
+
 def create_band(name: str, daily_limit: int, note: str | None = None) -> str:
     with db.connect() as conn:
         while True:

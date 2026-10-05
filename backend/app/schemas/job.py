@@ -46,3 +46,22 @@ class JobStatus(BaseModel):
     audio_url: str | None = None  # 하이라이트 미리 듣기·구간 다시 고르기용 (압축본 64kbps 모노). 떠났다 돌아와도 들을 수 있게
     error: ErrorInfo | None = None
     updated_at: datetime
+    created_at: datetime | None = None  # (2026-10-05 추가)
+    expires_at: datetime | None = Field(default=None, description="이 시각이 지나면 다음 정리(매일 04:00) 때 삭제. "
+                                                                  "삭제에서 빼둔 작업은 null")
+
+
+class BandJob(BaseModel):
+    """GET /band/jobs 의 한 줄 — 작업 ID를 몰라도 밴드 코드로 이어서 열기."""
+    job_id: str
+    title: str
+    artist: str
+    stage: str
+    stage_label: str
+    created_at: datetime
+    expires_at: datetime | None = None
+
+
+class BandJobs(BaseModel):
+    band: BandInfo
+    jobs: list[BandJob] = Field(description="최근 것부터. 삭제된 작업은 없음")

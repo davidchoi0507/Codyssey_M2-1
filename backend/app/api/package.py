@@ -5,9 +5,10 @@ from fastapi.responses import FileResponse
 from app.api.deps import file_url, job_files, runner, settings
 from app.core.config import Settings
 from app.core.errors import AppError
+from app.core.stages import Stage
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.render import select_cover as record_selection
-from app.pipeline.results import build_zip, regenerate as regenerate_item, save_own_image
+from app.pipeline.results import build_zip, regenerate as regenerate_item, save_own_image, zip_info
 from app.pipeline.runner import JobRunner
 from app.pipeline.views import build_package
 from app.schemas.package import Package
@@ -17,7 +18,10 @@ router = APIRouter(prefix="/jobs/{job_id}", tags=["결과"])
 
 
 def _package(jf: JobFiles, s: Settings) -> Package:
-    return build_package(jf, s, lambda p: file_url(jf, p), zip_url=f"/jobs/{jf.job_id}/zip")
+    pkg = build_package(jf, s, lambda p: file_url(jf, p), zip_url=f"/jobs/{jf.job_id}/zip")
+    if pkg.stage == Stage.DONE:
+        pkg.zip_files, pkg.zip_size_bytes = zip_info(jf, pkg)
+    return pkg
 
 
 def _not_busy(r: JobRunner, jf: JobFiles) -> None:

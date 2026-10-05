@@ -100,39 +100,54 @@ def save_own_image(jf: JobFiles, data: bytes) -> int:
     return v
 
 
-def build_zip(jf: JobFiles, package, models: list[str]) -> Path:
-    """선택한 커버·영상·채널 글·이미지·피칭 메일 + 릴리즈 브리프를 묶는다. 매번 새로 만든다 (몇 초)."""
+def zip_entries(jf: JobFiles, package, models: list[str]) -> tuple[str, list[tuple[str, Path | str]]]:
+    """ZIP에 넣을 (폴더 안 경로, 파일 또는 글) 목록과 최상위 폴더 이름. ZIP 만들기와 패키지의 ZIP 정보가 같이 쓴다."""
     if jf.status()["stage"] != Stage.DONE:
         raise AppError("NOT_READY", "커버를 고르고 영상까지 만들어진 뒤에 받을 수 있어요.", True, http_status=409)
     song = jf.read_json(jf.song)
     note = accepted_note(jf)
     sel = jf.read_json(jf.selected_cover)
-    out = jf.root / "package.zip"
-    tmp = out.with_suffix(".zip.tmp")
     prefix = _safe(f"{song.get('artist', '')} - {song.get('title', '')}".strip(" -")) or jf.job_id
 
-    def add(z: zipfile.ZipFile, src: Path, arc: str) -> None:
-        if src.exists():
-            z.write(src, f"{prefix}/{arc}", compress_type=zipfile.ZIP_STORED)  # png·mp4는 이미 압축돼 있음
+    cover = cover_file(jf, sel["item_id"], sel["v"])
+    entries: list[tuple[str, Path | str]] = [
+        ("cover/cover_3000.png", cover),
+        ("cover/cover_3000_title.png", cover.with_name(cover.name.replace("_3000", "_title"))),
+        ("video/short_15s.mp4", jf.video(f"short_{SHORT_TEMPLATE}")),
+        ("video/spotify_canvas_8s.mp4", jf.video("canvas")),
+    ]
+    for ch, c in package.channels.items():
+        text = c.text + ("\n\n" + " ".join(c.hashtags) if c.hashtags else "")
+        if c.hook:
+            text = f"[영상 위 훅 문구] {c.hook}\n\n" + text
+        if c.video:
+            text = "[올릴 영상] video/short_15s.mp4\n\n" + text
+        entries.append((f"{ch}/post.txt", text))
+        entries += [(f"{ch}/{p.name}", p) for p in sorted((jf.root / "channels" / ch).glob("image_*.png"))]
+    for lang, m in package.pitch.items():
+        entries.append((f"pitch/pitch_{lang}.txt", f"Subject: {m.subject}\n\n{m.body}"))
+    entries.append(("RELEASE_BRIEF.md", _brief(song, note, models)))
+    return prefix, [(arc, src) for arc, src in entries if isinstance(src, str) or src.exists()]
 
+
+def zip_info(jf: JobFiles, package) -> tuple[list[str], int]:
+    """패키지 화면용: ZIP에 들어갈 파일 목록과 대략의 용량(바이트, 압축 전)."""
+    _, entries = zip_entries(jf, package, package.ai_generated.models)
+    size = sum(len(src.encode("utf-8")) if isinstance(src, str) else src.stat().st_size for _, src in entries)
+    return [arc for arc, _ in entries], size
+
+
+def build_zip(jf: JobFiles, package, models: list[str]) -> Path:
+    """선택한 커버·영상·채널 글·이미지·피칭 메일 + 릴리즈 브리프를 묶는다. 매번 새로 만든다 (몇 초)."""
+    prefix, entries = zip_entries(jf, package, models)
+    out = jf.root / "package.zip"
+    tmp = out.with_suffix(".zip.tmp")
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
-        cover = cover_file(jf, sel["item_id"], sel["v"])
-        add(z, cover, "cover/cover_3000.png")
-        add(z, cover.with_name(cover.name.replace("_3000", "_title")), "cover/cover_3000_title.png")
-        add(z, jf.video(f"short_{SHORT_TEMPLATE}"), "video/short_15s.mp4")
-        add(z, jf.video("canvas"), "video/spotify_canvas_8s.mp4")
-        for ch, c in package.channels.items():
-            text = c.text + ("\n\n" + " ".join(c.hashtags) if c.hashtags else "")
-            if c.hook:
-                text = f"[영상 위 훅 문구] {c.hook}\n\n" + text
-            if c.video:
-                text = "[올릴 영상] video/short_15s.mp4\n\n" + text
-            z.writestr(f"{prefix}/{ch}/post.txt", text)
-            for p in sorted((jf.root / "channels" / ch).glob("image_*.png")):
-                add(z, p, f"{ch}/{p.name}")
-        for lang, m in package.pitch.items():
-            z.writestr(f"{prefix}/pitch/pitch_{lang}.txt", f"Subject: {m.subject}\n\n{m.body}")
-        z.writestr(f"{prefix}/RELEASE_BRIEF.md", _brief(song, note, models))
+        for arc, src in entries:
+            if isinstance(src, str):
+                z.writestr(f"{prefix}/{arc}", src)
+            else:
+                z.write(src, f"{prefix}/{arc}", compress_type=zipfile.ZIP_STORED)  # png·mp4는 이미 압축돼 있음
     tmp.replace(out)
     jf.event("zip_built", size_mb=round(out.stat().st_size / 1024 / 1024, 1))
     return out

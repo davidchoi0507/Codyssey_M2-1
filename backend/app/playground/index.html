@@ -123,6 +123,7 @@
         <h3>팀장님 (화면)</h3>
         <ul>
           <li><b>초대 코드 입력 화면</b>(첫 화면): 코드 입력 칸 + "코드 확인"(<code>GET /band</code>, 헤더 <code>X-Band-Code</code>) → 밴드 이름·오늘 남은 곡 수 표시 → 코드는 브라우저에 저장해 두고 곡을 올릴 때(<code>POST /jobs</code>) 같은 헤더로 보내기. 틀린 코드·코드 없음·한도 초과 안내 문구도 필요해요.</li>
+          <li><b>내 작업 목록</b>(10/5 추가): 같은 코드로 <code>GET /band/jobs</code> → 그 밴드의 작업(곡 제목·진행 단계·올린 날·삭제 예정일) → 눌러서 이어하기. 코드 없이 만든 작업도 다시 열 수 있게 작업 ID를 브라우저에도 저장해 주세요. (이 페이지 1번 칸에 예시가 있어요)</li>
           <li>진행 화면 단계 이름(업로드 → 수치 재는 중 → 곡을 듣는 중 → 해석 쓰는 중)과 문구, 기다리는 동안 보여줄 것(먼저 나오는 BPM·파형 활용).</li>
           <li>A&R 노트 화면 구성 — 한 줄 수정·직접 편집·하이라이트 슬라이더·다시 듣기 배치. 미리 듣기는 응답의 <code>audio_url</code>로 가능.</li>
           <li>API 응답 구조(<a href="/docs" target="_blank">/docs</a>)에서 바꾸거나 추가해야 할 필드.</li>
@@ -156,6 +157,7 @@
       <div style="flex:0 0 auto;align-self:flex-end"><button id="bandCheck">코드 확인</button></div>
     </div>
     <div class="hint" id="bandInfo"></div>
+    <div class="hint" id="bandJobs"></div>
     <div class="row">
       <div><label>음원 (mp3 / wav, 10분 이하)</label><input type="file" id="file" accept=".mp3,.wav"></div>
     </div>
@@ -182,6 +184,7 @@
       <a href="#" data-job="01M427VYXAYMFEDW8XXQ265X01">샘플곡 2 (결과까지)</a> ·
       <a href="#" data-job="01M427MZC8RGQW3PBR2CVAQMGT">샘플곡 3 (결과까지)</a> ·
       <a href="#" data-job="01M4273XRE1ABK6SXKRVDYVEMK">노트 수정 테스트용 (수락 전)</a></div>
+    <div class="hint" id="recentJobs" style="margin-top:6px"></div>
   </section>
 
   <!-- 2. 진행 -->
@@ -234,7 +237,7 @@
       <div style="flex:0 0 auto;align-self:flex-end"><button id="ownUpload">사진 올리기</button></div>
     </div>
     <div id="videos" style="margin-top:14px"></div>
-    <div class="row" style="margin-top:10px"><a id="zip" class="hide" href="#"><button class="primary">ZIP 다운로드</button></a></div>
+    <div class="row" style="margin-top:10px"><a id="zip" class="hide" href="#"><button class="primary">ZIP 다운로드</button></a><span class="hint" id="zipInfo" style="cursor:help"></span></div>
     <div id="resultErr" class="err hide"></div>
     <div id="channels" style="margin-top:14px"></div>
     <div id="pitch" style="margin-top:14px"></div>
@@ -279,7 +282,7 @@ $("upload").onclick = async () => {
   fd.append("consent_version", "test-page-v1");
   const code = $("bandCode").value.trim();
   $("upload").disabled = true;
-  try { const r = await api("POST", "/jobs", fd, true, code ? { "X-Band-Code": code } : null); openJob(r.job_id); if (code) checkBand(); }
+  try { const r = await api("POST", "/jobs", fd, true, code ? { "X-Band-Code": code } : null); rememberJob(r.job_id, $("title").value.trim()); openJob(r.job_id); if (code) checkBand(); }
   catch (e) { show("progress"); alertBox("statusErr", e.message || "업로드 실패"); }
   finally { $("upload").disabled = false; }
 };
@@ -290,15 +293,47 @@ async function checkBand() {
     const b = await api("GET", "/band", null, false, { "X-Band-Code": code });
     $("bandInfo").innerHTML = `✅ <b>${esc(b.name)}</b> · 오늘 ${b.used_today}/${b.daily_limit}곡 사용 (남은 ${b.remaining_today}곡)`;
     try { localStorage.setItem("bandCode", code); } catch (e) {}
+    loadBandJobs(code);
   } catch (e) { $("bandInfo").innerHTML = `<span style="color:var(--bad)">${esc(e.message || "코드를 확인하지 못했어요")}</span>`; }
 }
 $("bandCheck").onclick = checkBand;
+
+// 작업 ID를 몰라도 이어서 열기: 밴드 코드로 받은 목록(GET /band/jobs) + 이 브라우저에서 열었던 작업
+function day(iso) { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()}`; }
+function jobLinks(el, title, items) {
+  el.innerHTML = items.length ? `${title}: ` + items.map(j =>
+    `<a href="#" data-open="${j.job_id}">${esc(j.title || j.job_id.slice(-6))}</a>${j.note ? ` <span class="hint">(${esc(j.note)})</span>` : ""}`).join(" · ") : "";
+  el.querySelectorAll("[data-open]").forEach(a => a.onclick = (e) => { e.preventDefault(); openJob(a.dataset.open); });
+}
+async function loadBandJobs(code) {
+  try {
+    const r = await api("GET", "/band/jobs", null, false, { "X-Band-Code": code });
+    jobLinks($("bandJobs"), "📂 이 밴드의 작업", r.jobs.map(j => ({ ...j, note: `${j.stage_label} · ${day(j.created_at)} 올림` +
+      (j.expires_at ? ` · ${day(j.expires_at)} 삭제` : "") })));
+  } catch (e) { $("bandJobs").textContent = ""; }
+}
+function rememberJob(id, title) {
+  try {
+    const all = JSON.parse(localStorage.getItem("recentJobs") || "[]");
+    const prev = all.find(j => j.job_id === id), list = all.filter(j => j.job_id !== id);
+    list.unshift({ job_id: id, title: title || (prev && prev.title) || "" });
+    localStorage.setItem("recentJobs", JSON.stringify(list.slice(0, 10)));
+  } catch (e) {}
+  showRecent();
+}
+function showRecent() {
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem("recentJobs") || "[]"); } catch (e) {}
+  jobLinks($("recentJobs"), "🕘 이 브라우저에서 열었던 작업", list);
+}
+showRecent();
 try { const saved = localStorage.getItem("bandCode"); if (saved) { $("bandCode").value = saved; checkBand(); } } catch (e) {}
 $("open").onclick = () => $("jobid").value.trim() && openJob($("jobid").value.trim());
 document.querySelectorAll("[data-job]").forEach(a => a.onclick = (e) => { e.preventDefault(); openJob(a.dataset.job); });
 
 function openJob(id) {
   jobId = id; $("jobid").value = id; $("jobLabel").textContent = id;
+  rememberJob(id);
   ["note", "result"].forEach(s => show(s, false));
   show("progress"); poll();
 }
@@ -324,6 +359,7 @@ async function poll() {
 
 function renderStatus(st) {
   $("stageLabel").textContent = `${st.stage_label}  (${st.stage})`;
+  $("jobLabel").textContent = st.job_id + (st.expires_at ? ` · ${day(st.expires_at)} 이후 삭제` : "");
   $("queue").textContent = st.queue_position ? `대기 ${st.queue_position}번째` : "";
   $("bar").style.width = `${Math.round(st.progress * 100)}%`;
   $("steps").innerHTML = st.steps.map(s => `<span class="${s.status}">${s.label} · ${s.status}</span>`).join("");
@@ -452,7 +488,7 @@ async function loadPackage(stage) {
     const regen = c.item_id === "cover-own" ? "" :
       `<div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 사람 없이)" data-req="${c.item_id}"><button style="flex:0 0 auto" data-regen="${c.item_id}" ${c.regenerate_remaining ? "" : "disabled"}>다시 (${c.regenerate_remaining})</button></div>`;
     return `<figure style="margin:0"><a href="${API + (v.url_title || v.url_3000 || v.url)}" target="_blank"><img src="${API + v.url}" alt="${c.item_id}" style="${c.selected ? "outline:3px solid var(--accent)" : ""}"></a>
-      <figcaption class="hint">${c.item_id} v${v.v}${picked}${v.url_title ? " · 누르면 제목 얹은 3000px" : " · 누르면 3000px"}</figcaption>
+      <figcaption class="hint">${c.item_id} v${v.v}${picked}${v.url_title ? " · 누르면 제목 얹은 3000px" : " · 누르면 3000px"}${v.request ? `<br>요청: ${esc(v.request)}` : ""}</figcaption>
       <div class="row" style="margin-top:4px"><button data-select="${c.item_id}" data-v="${v.v}" ${stage === "rendering" ? "disabled" : ""}>이 커버로 만들기</button></div>${regen}</figure>`;
   }).join("");
   document.querySelectorAll("[data-select]").forEach(b => b.onclick = () => selectCover(b.dataset.select, parseInt(b.dataset.v)));
@@ -461,6 +497,8 @@ async function loadPackage(stage) {
   $("videos").innerHTML = p.videos.length ? "<h2>영상</h2><div class='row' style='align-items:flex-start'>" + p.videos.map(v =>
     `<div style="flex:0 0 240px"><video src="${API + v.url}" controls ${v.kind === "canvas" ? "loop muted autoplay" : ""} style="width:240px;border-radius:8px"></video><div class="hint">${v.kind === "short" ? "숏폼 " + v.duration + "초" : "Spotify Canvas " + v.duration + "초 (무음 반복)"}</div></div>`).join("") + "</div>" : "";
   if (p.zip_url) { $("zip").href = API + p.zip_url; show("zip"); } else show("zip", false);
+  $("zipInfo").textContent = p.zip_files ? `${p.zip_files.length}개 파일, 약 ${(p.zip_size_bytes / 1048576).toFixed(1)}MB` : "";
+  $("zipInfo").title = p.zip_files ? p.zip_files.join("\n") : "";
 
   $("channels").innerHTML = "<h2>채널 홍보 글</h2>" + Object.entries(p.channels).map(([ch, c]) => {
     const imgs = c.images ? `<div class="row" style="margin-top:6px">${Object.entries(c.images).map(([r, u]) => `<a href="${API + u}" target="_blank" style="flex:0 0 auto"><img src="${API + u}" style="height:120px;border-radius:6px"></a><span class="hint" style="flex:0 0 auto">${r}</span>`).join("")}</div>` : "";

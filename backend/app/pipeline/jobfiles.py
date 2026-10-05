@@ -113,13 +113,14 @@ class JobFiles:
             return conn.execute("SELECT 1 FROM jobs WHERE job_id = ?", (self.job_id,)).fetchone() is not None
 
     def status(self) -> dict:
-        """{job_id, stage, step, error, updated_at} — 없는 작업이면 KeyError."""
+        """{job_id, stage, step, error, created_at, updated_at} — 없는 작업이면 KeyError."""
         with db.connect() as conn:
             r = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (self.job_id,)).fetchone()
         if r is None:
             raise KeyError(self.job_id)
         return {"job_id": r["job_id"], "stage": r["stage"], "step": r["step"],
-                "error": json.loads(r["error"]) if r["error"] else None, "updated_at": r["updated_at"]}
+                "error": json.loads(r["error"]) if r["error"] else None,
+                "created_at": r["created_at"], "updated_at": r["updated_at"]}
 
     def event(self, event: str, **payload) -> None:
         """지표 자동 기록 (events 테이블)."""

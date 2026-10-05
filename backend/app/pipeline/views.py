@@ -1,11 +1,11 @@
 """작업 폴더 → API 응답 형식 (상태, 패키지). API와 CLI 내보내기가 같이 쓴다."""
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import yaml
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.core.stages import ANALYSIS_STEPS, QUEUED_LABEL, STAGE_LABELS, Stage
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.render import SHORT_TEMPLATE, TEMPLATES
@@ -15,6 +15,14 @@ from app.schemas.package import CHANNELS, ChannelOut, CoverItem, CoverVersion, P
 
 _STEP_PROGRESS = {"measure": 0.15, "listen": 0.45, "note": 0.8}
 VIDEO_CHANNELS = ("tiktok", "instagram")  # 숏폼(9:16)을 올리는 채널 — 틱톡, 인스타 릴스
+
+
+def expires_at(job_id: str, created_at: str) -> datetime | None:
+    """7일 삭제(scripts/cleanup.py)와 같은 기준. 삭제에서 빼둔 작업(KEEP_JOB_IDS)은 None."""
+    s = get_settings()
+    if job_id in {j.strip() for j in s.keep_job_ids.split(",")}:
+        return None
+    return datetime.fromisoformat(created_at) + timedelta(days=s.retention_days)
 
 
 def job_status(jf: JobFiles, queue_position: int | None = None,
@@ -56,7 +64,9 @@ def job_status(jf: JobFiles, queue_position: int | None = None,
                      queue_position=queue_position, steps=steps, early=early,
                      audio_url=url_for(jf.analysis_mp3) if url_for and jf.analysis_mp3.exists() else None,
                      error=ErrorInfo(**st["error"]) if st.get("error") else None,
-                     updated_at=datetime.fromisoformat(st["updated_at"]))
+                     updated_at=datetime.fromisoformat(st["updated_at"]),
+                     created_at=datetime.fromisoformat(st["created_at"]),
+                     expires_at=expires_at(jf.job_id, st["created_at"]))
 
 
 def regen_remaining(settings: Settings, jf: JobFiles, item_id: str, events: list[dict] | None = None) -> int:
@@ -77,6 +87,7 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
     if jf.listening.exists():
         models.add("gemini:" + jf.read_json(jf.listening)["meta"]["model"])
     sel = jf.read_json(jf.selected_cover) if jf.selected_cover.exists() else None
+    requests = {(e["item"], e["v"]): e.get("request") for e in events if e["event"] == "item_regenerated"}
 
     def link(p: Path) -> str | None:
         return url_for(p) if p.exists() else None
@@ -84,7 +95,7 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
     covers = []
     for item_id, direction_id, path in [(f"cover-{i}", f"c{i}", lambda v, s="", i=i: jf.cover(i, v, s)) for i in (1, 2, 3)]             + [("cover-own", "own", lambda v, s="": jf.own_cover(v, s))]:
         versions = [CoverVersion(v=v, url=url_for(path(v)), url_3000=link(path(v, "_3000")),
-                                 url_title=link(path(v, "_title")))
+                                 url_title=link(path(v, "_title")), request=requests.get((item_id, v)))
                     for v in range(1, (jf.latest_version(path) or 0) + 1)]
         if versions:
             picked = sel is not None and sel["item_id"] == item_id
@@ -104,6 +115,7 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
                       if jf.channel_image(ch, ratio).exists()}
             channels[ch] = ChannelOut(item_id=f"copy-{ch}", text=d["text"], hashtags=d.get("hashtags") or None,
                                       hook=d.get("hook"), images=images or None, v=v,
+                                      request=requests.get((f"copy-{ch}", v)),
                                       video=url_for(short) if ch in VIDEO_CHANNELS and short.exists() else None,
                                       regenerate_remaining=regen_remaining(settings, jf, f"copy-{ch}", events))
 
@@ -113,6 +125,7 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
         if v:
             d = jf.read_json(jf.pitch(lang, v))
             pitch[lang] = PitchOut(item_id=f"pitch-{lang}", subject=d["subject"], body=d["body"], v=v,
+                                   request=requests.get((f"pitch-{lang}", v)),
                                    regenerate_remaining=regen_remaining(settings, jf, f"pitch-{lang}", events))
 
     videos = []
