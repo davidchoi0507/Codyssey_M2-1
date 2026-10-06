@@ -183,8 +183,11 @@ def analyze_file(path: str, highlight_sec: float = 15.0) -> dict:
     key, key_conf = _estimate_key(chroma)
     chroma_s = _per_second(chroma, n_sec)
 
-    # 반복성: 1초 단위 크로마 자기유사도 (±3초 이웃은 제외)
-    rec = librosa.segment.recurrence_matrix(chroma_s, mode="affinity", sym=True, width=3)
+    # 반복성: 1초 단위 크로마 자기유사도 (±3초 이웃은 제외). librosa는 width < (초 수 - 1) // 2를 요구해서
+    # 아주 짧은 곡(CLI는 최소 길이 검사를 건너뛸 수 있음)에서는 이웃 범위를 줄인다.
+    width = min(3, (n_sec - 1) // 2 - 1)
+    rec = (librosa.segment.recurrence_matrix(chroma_s, mode="affinity", sym=True, width=width) if width >= 1
+           else np.zeros((n_sec, n_sec)))
     repetition = _norm01(_smooth(np.asarray(rec).sum(axis=1), 3))
 
     candidates = _highlights(_smooth(energy, 3), repetition, beats, int(round(highlight_sec)), duration)

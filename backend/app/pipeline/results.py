@@ -19,7 +19,7 @@ from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import Stage
 from app.media.images import save_png, upscale
-from app.pipeline.generate import accepted_note
+from app.pipeline.generate import accepted_note, song_duration
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.render import SHORT_TEMPLATE, cover_file
 from app.pipeline.views import regen_remaining
@@ -61,14 +61,14 @@ async def regenerate(settings: Settings, jf: JobFiles, item_id: str, request: st
     elif kind == "copy":
         prev_v = jf.latest_version(lambda i: jf.channel_copy(key, i)) or 0
         prev = jf.read_json(jf.channel_copy(key, prev_v))["text"] if prev_v else None
-        copyset, meta = await write_copy(settings, note, song, request=request, previous=prev)
+        copyset, meta = await write_copy(settings, note, song, song_duration(jf), request=request, previous=prev)
         v = prev_v + 1
         jf.write_json(jf.channel_copy(key, v), getattr(copyset, key).model_dump())
     else:
         prev_v = jf.latest_version(lambda i: jf.pitch(key, i)) or 0
         prev = jf.read_json(jf.pitch(key, prev_v)) if prev_v else None
         listening = jf.read_json(jf.listening)["result"] if jf.listening.exists() else None
-        pitch, meta = await write_pitch(settings, note, song, listening, request=request, previous=prev)
+        pitch, meta = await write_pitch(settings, note, song, listening, song_duration(jf), request=request, previous=prev)
         v = prev_v + 1
         jf.write_json(jf.pitch(key, v), getattr(pitch, key).model_dump())
     jf.event("item_regenerated", item=item_id, v=v, request=request, sec=round(time.monotonic() - t, 2),

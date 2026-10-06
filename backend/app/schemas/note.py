@@ -45,6 +45,8 @@ class ARNote(BaseModel):
     highlight: Highlight
     waveform: list[float]
     user_correction: str | None = None
+    genre_heard: str | None = Field(default=None, description="AI가 듣고 느낀 장르감 (AI 제안). 피칭 메일엔 밴드가 입력한 "
+                                    "장르만 쓰고, 입력 장르가 비었을 때만 이 값을 참고한다")
     edits_remaining: int
     ai_generated: AIGenerated
 

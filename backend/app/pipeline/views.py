@@ -66,7 +66,8 @@ def job_status(jf: JobFiles, queue_position: int | None = None,
                      error=ErrorInfo(**st["error"]) if st.get("error") else None,
                      updated_at=datetime.fromisoformat(st["updated_at"]),
                      created_at=datetime.fromisoformat(st["created_at"]),
-                     expires_at=expires_at(jf.job_id, st["created_at"]))
+                     expires_at=expires_at(jf.job_id, st["created_at"]),
+                     retries=sum(1 for e in jf.events() if e["event"] == "retry"))
 
 
 def regen_remaining(settings: Settings, jf: JobFiles, item_id: str, events: list[dict] | None = None) -> int:

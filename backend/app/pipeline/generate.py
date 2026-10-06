@@ -31,6 +31,11 @@ def accepted_note(jf: JobFiles) -> ARNote:
     return ARNote.model_validate(jf.read_json(jf.note(v)))
 
 
+def song_duration(jf: JobFiles) -> float:
+    """곡 길이(초) — 글 속 시간 표현 검사용."""
+    return float(jf.read_json(jf.features)["duration_sec"])
+
+
 def accept_note(jf: JobFiles, version: int | None = None) -> ARNote:
     """지정 버전(없으면 최신)을 확정본으로 기록."""
     v = version or jf.latest_note_version()
@@ -78,7 +83,7 @@ async def _covers(settings: Settings, jf: JobFiles, note: ARNote, song: dict, li
 async def _copy(settings: Settings, jf: JobFiles, note: ARNote, song: dict) -> None:
     if all(jf.channel_copy(ch, 1).exists() for ch in CHANNELS):
         return
-    copyset, meta = await write_copy(settings, note, song)
+    copyset, meta = await write_copy(settings, note, song, song_duration(jf))
     for ch in CHANNELS:
         jf.write_json(jf.channel_copy(ch, 1), getattr(copyset, ch).model_dump())
     jf.event("copy_meta", **meta)
@@ -87,7 +92,7 @@ async def _copy(settings: Settings, jf: JobFiles, note: ARNote, song: dict) -> N
 async def _pitch(settings: Settings, jf: JobFiles, note: ARNote, song: dict, listening: dict | None) -> None:
     if all(jf.pitch(lang, 1).exists() for lang in ("en", "ko")):
         return
-    pitch, meta = await write_pitch(settings, note, song, listening)
+    pitch, meta = await write_pitch(settings, note, song, listening, song_duration(jf))
     for lang in ("en", "ko"):
         jf.write_json(jf.pitch(lang, 1), getattr(pitch, lang).model_dump())
     jf.event("pitch_meta", **meta)

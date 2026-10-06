@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     # 한도
     max_upload_mb: int = 200  # 10분 24bit/48kHz WAV(약 173MB)까지. 실제 기준은 max_duration_sec
     max_duration_sec: int = 600
+    min_duration_sec: int = 15  # 숏폼 하이라이트(highlight_sec)보다 짧으면 결과물을 못 만든다
     cpu_workers: int = 2
     daily_jobs_per_client: int = 3   # 초대 코드 없이 올릴 때 접속 IP별 (코드 필수면 안 씀)
     daily_jobs_per_band: int = 5     # 밴드(초대 코드)별 기본값 — 밴드마다 bands.daily_limit로 바꿀 수 있음

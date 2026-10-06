@@ -77,6 +77,7 @@ async def write_note(settings: Settings, *, job_id: str, features: Features, lis
         ),
         waveform=features.waveform,
         user_correction=user_correction,
+        genre_heard=listening.genre_feel or None,
         edits_remaining=settings.note_edits_per_job if edits_remaining is None else edits_remaining,
         ai_generated=AIGenerated(models=[f"gemini:{gemini_model}", model_label(settings)]),
     )

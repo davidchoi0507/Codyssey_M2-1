@@ -19,6 +19,8 @@ class BandInfo(BaseModel):
 class JobCreated(BaseModel):
     job_id: str
     status_url: str
+    duplicate: bool = Field(default=False, description="같은 곡을 바로 전에 올린 작업이 있어 새로 만들지 않고 그 작업을 "
+                                                       "돌려줌 (연속 클릭 방지, 2026-10-07 추가)")
 
 
 class StepStatus(BaseModel):
@@ -49,6 +51,8 @@ class JobStatus(BaseModel):
     created_at: datetime | None = None  # (2026-10-05 추가)
     expires_at: datetime | None = Field(default=None, description="이 시각이 지나면 다음 정리(매일 04:00) 때 삭제. "
                                                                   "삭제에서 빼둔 작업은 null")
+    retries: int = Field(default=0, description="'실패한 단계부터 다시 시도'를 누른 횟수. 다시 시도는 하루 곡 수·AI 횟수를 "
+                                                "쓰지 않음 (2026-10-07 추가)")
 
 
 class BandJob(BaseModel):

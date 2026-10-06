@@ -1,5 +1,7 @@
 """업로드·진행 화면: POST /jobs, GET /jobs/{job_id}, PATCH /jobs/{job_id}/info"""
+import hashlib
 import tempfile
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile
@@ -18,6 +20,19 @@ from app.schemas.requests import JobInfoPatch
 
 router = APIRouter(prefix="/jobs", tags=["작업"])
 CHUNK = 1024 * 1024
+# 연속 클릭 방지 (팀 테스트 P1-1): 같은 사람(밴드 코드 또는 IP)이 같은 파일·제목·아티스트를 이 시간 안에 다시 올리면
+# 새 작업을 만들지 않고 앞 작업을 돌려준다. 서버 프로세스 하나라 메모리로 충분 (재시작하면 비워짐).
+DUPLICATE_WINDOW_SEC = 120
+_recent_uploads: dict[tuple, tuple[str, float]] = {}
+
+
+def _find_duplicate(key: tuple) -> str | None:
+    now = time.monotonic()
+    for k, (_, at) in list(_recent_uploads.items()):
+        if now - at > DUPLICATE_WINDOW_SEC:
+            del _recent_uploads[k]
+    hit = _recent_uploads.get(key)
+    return hit[0] if hit else None
 
 
 @router.post("", response_model=JobCreated, status_code=201, summary="곡 업로드 (분석 시작)")
@@ -42,18 +57,24 @@ async def create(
     with tempfile.TemporaryDirectory(dir=s.data_dir) as tmp:
         tmp_path = Path(tmp) / "upload"
         written = 0
+        digest = hashlib.sha256()
         with tmp_path.open("wb") as out:
             while chunk := await file.read(CHUNK):
                 written += len(chunk)
+                digest.update(chunk)
                 if written > limit:
                     raise AppError("UPLOAD_TOO_LARGE", f"{s.max_upload_mb}MB 이하 파일만 올릴 수 있어요.", False,
                                    http_status=413)
                 out.write(chunk)
+        dup_key = (band["code"] if band else client, digest.hexdigest(), title.strip(), artist.strip())
+        if (dup := _find_duplicate(dup_key)) and JobFiles(s.jobs_dir, dup).status()["stage"] != "failed":
+            return JobCreated(job_id=dup, status_url=f"/jobs/{dup}", duplicate=True)
         song = {"title": title, "artist": artist, "genre": genre, "description": description, "lyrics": lyrics}
         consent = {"consent_original": consent_original, "consent_privacy": consent_privacy,
                    "consent_external_ai": consent_external_ai, "consent_showcase": consent_showcase,
                    "consent_version": consent_version}
         jf = create_job(s, tmp_path, filename=file.filename or "", song=song, consent=consent, source="api")
+        _recent_uploads[dup_key] = (jf.job_id, time.monotonic())
     record_client(jf.job_id, client, band)
     r.start_analysis(jf)
     return JobCreated(job_id=jf.job_id, status_url=f"/jobs/{jf.job_id}")

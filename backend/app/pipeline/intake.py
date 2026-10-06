@@ -33,6 +33,9 @@ def create_job(settings: Settings, src: Path, *, filename: str, song: dict, cons
     duration = probe_duration(src)
     if duration > settings.max_duration_sec:
         raise AppError("TOO_LONG", f"{settings.max_duration_sec // 60}분 이하 곡만 처리할 수 있어요.", False)
+    if round(duration, 1) < settings.min_duration_sec:
+        raise AppError("TOO_SHORT", f"{settings.min_duration_sec}초 이상인 곡만 처리할 수 있어요 "
+                       f"(숏폼 하이라이트가 {settings.min_duration_sec}초예요). 올린 곡은 {duration:.0f}초예요.", False)
 
     jf = JobFiles(settings.jobs_dir, new_job_id())
     # 확장자는 원래 파일명 기준 (업로드 임시 파일엔 확장자가 없을 수 있음)
