@@ -70,13 +70,28 @@ def _wrap(draw: ImageDraw.ImageDraw, text: str, f: ImageFont.FreeTypeFont, max_w
 
 def draw_text(img: Image.Image, text: str, *, font_path: Path, size: int, y: int, max_width: int | None = None,
               color=(255, 255, 255), opacity: float = 1.0, max_lines: int = 2, x_center: int | None = None) -> int:
-    """가운데 정렬 글자 + 은은한 그림자. 반환: 마지막 줄 아래 y."""
+    """가운데 정렬 글자 + 은은한 그림자. 반환: 마지막 줄 아래 y.
+
+    max_lines에 안 들어가면 글자를 60%까지 줄이고, 그래도 넘치면 마지막 줄 끝을 "…"로 줄인다 (긴 제목이 말없이 잘리던 문제).
+    """
     if not text:
         return y
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
+    max_w = max_width or img.width - max(120, int(img.width * 0.1))
     f = font(font_path, size)
-    lines = _wrap(d, text, f, max_width or img.width - 120)[:max_lines]
+    lines = _wrap(d, text, f, max_w)
+    min_size = int(size * 0.6)
+    while len(lines) > max_lines and size > min_size:
+        size = max(min_size, int(size * 0.92))
+        f = font(font_path, size)
+        lines = _wrap(d, text, f, max_w)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        last = lines[-1]
+        while last and d.textlength(last + "…", font=f) > max_w:
+            last = last[:-1]
+        lines[-1] = last.rstrip() + "…"
     cx = img.width // 2 if x_center is None else x_center
     line_h = int(size * 1.32)
     alpha = int(255 * opacity)

@@ -2,10 +2,16 @@
 
 CPU 작업이므로 프로세스 풀에서 `analyze_file`을 호출한다 (인자·반환은 pickle 가능한 값만).
 """
+import logging
+import subprocess
+
 import librosa
 import numpy as np
+import soundfile as sf
 
 from app.schemas.analysis import Features, HighlightCandidateFeature, Section
+
+log = logging.getLogger(__name__)
 
 SR = 22050
 HOP = 512
@@ -166,8 +172,24 @@ def _summary(bpm: float, duration: float, change: str, peak: str) -> str:
     return " · ".join(parts)
 
 
+def _load(path: str) -> np.ndarray:
+    """librosa(libsndfile)로 읽고, 못 읽으면 ffmpeg로 디코딩한다.
+
+    끝 프레임이 깨진 mp3는 libsndfile가 LibsndfileError로 멈추지만 ffmpeg는 넘어간다 (2026-10-07 팀 테스트, 코나 곡).
+    """
+    try:
+        return librosa.load(path, sr=SR, mono=True)[0]
+    except sf.SoundFileError as e:
+        log.warning("libsndfile로 못 읽어 ffmpeg로 디코딩: %r", e)
+    pcm = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", path, "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"],
+        check=True, capture_output=True,
+    ).stdout
+    return np.frombuffer(pcm, dtype=np.float32).copy()
+
+
 def analyze_file(path: str, highlight_sec: float = 15.0) -> dict:
-    y, _ = librosa.load(path, sr=SR, mono=True)
+    y = _load(path)
     duration = float(len(y) / SR)
     n_sec = max(1, int(duration))
 

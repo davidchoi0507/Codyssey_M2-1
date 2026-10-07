@@ -47,6 +47,9 @@
   .guide h3 { font-size:14px; margin:14px 0 4px; }
   .guide ul, .guide ol { margin:4px 0; padding-left:20px; } .guide li { margin:3px 0; }
   @media (max-width: 640px) { .covers { grid-template-columns:1fr; } }
+  #zoom { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; z-index: 100; cursor: zoom-out; padding: 16px; }
+  #zoom img { max-width: 100%; max-height: calc(100vh - 80px); object-fit: contain; border-radius: 6px; }
+  #zoom a { color: #fff; }
 </style>
 </head>
 <body>
@@ -581,8 +584,8 @@ async function loadPackage(stage) {
     const picked = c.selected ? ` · <b>선택됨</b>` : "";
     const regen = c.item_id === "cover-own" ? "" :
       `<div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 사람 없이)" data-req="${c.item_id}"><button style="flex:0 0 auto" data-regen="${c.item_id}" ${c.regenerate_remaining ? "" : "disabled"}>다시 만들기 · ${c.regenerate_remaining}회 남음</button></div>`;
-    return `<figure style="margin:0"><a href="${API + (v.url_title || v.url_3000 || v.url)}" target="_blank"><img src="${API + v.url}" alt="${c.item_id}" style="${c.selected ? "outline:3px solid var(--accent)" : ""}"></a>
-      <figcaption class="hint">${coverName(c.item_id)}${v.v > 1 ? ` · ${v.v}번째 버전` : ""}${picked}${v.url_title ? " · 누르면 제목 얹은 3000px" : " · 누르면 3000px"}${v.request ? `<br>요청: ${esc(v.request)}` : ""}</figcaption>
+    return `<figure style="margin:0"><a href="${API + (v.url_title || v.url_3000 || v.url)}" data-zoom><img src="${API + v.url}" alt="${c.item_id}" style="${c.selected ? "outline:3px solid var(--accent)" : ""}"></a>
+      <figcaption class="hint">${coverName(c.item_id)}${v.v > 1 ? ` · ${v.v}번째 버전` : ""}${picked}${v.url_title ? " · 누르면 제목 얹은 3000px 크게 보기" : " · 누르면 3000px 크게 보기"} · <a href="${API + (v.url_title || v.url_3000 || v.url)}" download>다운로드</a>${v.request ? `<br>요청: ${esc(v.request)}` : ""}</figcaption>
       <div class="row" style="margin-top:4px"><button data-select="${c.item_id}" data-v="${v.v}" ${stage === "rendering" ? "disabled" : ""}>이 커버로 만들기</button></div>${regen}</figure>`;
   }).join("");
   document.querySelectorAll("[data-select]").forEach(b => b.onclick = () => selectCover(b.dataset.select, parseInt(b.dataset.v)));
@@ -595,7 +598,7 @@ async function loadPackage(stage) {
   $("zipInfo").title = p.zip_files ? p.zip_files.join("\n") : "";
 
   $("channels").innerHTML = "<h2>채널 홍보 글</h2>" + Object.entries(p.channels).map(([ch, c]) => {
-    const imgs = c.images ? `<div class="row" style="margin-top:6px">${Object.entries(c.images).map(([r, u]) => `<figure style="flex:0 0 auto;margin:0"><a href="${API + u}" target="_blank"><img src="${API + u}" style="height:120px;border-radius:6px;display:block"></a><figcaption class="hint">${ratioName(r)}</figcaption></figure>`).join("")}</div>` : "";
+    const imgs = c.images ? `<div class="row" style="margin-top:6px">${Object.entries(c.images).map(([r, u]) => `<figure style="flex:0 0 auto;margin:0"><a href="${API + u}" data-zoom><img src="${API + u}" style="height:120px;border-radius:6px;display:block"></a><figcaption class="hint">${ratioName(r)} · <a href="${API + u}" download>다운로드</a></figcaption></figure>`).join("")}</div>` : "";
     const vid = c.video ? `<div style="margin-top:6px"><video src="${API + c.video}" controls preload="metadata" style="height:200px;border-radius:6px"></video><span class="hint"> ← 이 채널에 올릴 숏폼</span></div>` : "";
     return `<label>${CH_NAME[ch] || ch}${c.v > 1 ? ` · ${c.v}번째 버전` : ""}${c.hook ? ` — 훅: “${esc(c.hook)}”` : ""}</label><div class="copy">${esc(c.text)}${c.hashtags ? "\n\n" + c.hashtags.join(" ") : ""}</div>${vid}${imgs}
       <div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 더 짧게)" data-req="${c.item_id}"><button style="flex:0 0 auto" data-regen="${c.item_id}" ${c.regenerate_remaining ? "" : "disabled"}>다시 쓰기 · ${c.regenerate_remaining}회 남음</button></div>`;
@@ -642,6 +645,21 @@ function coverName(id) { return id === "cover-own" ? "직접 올린 사진" : `�
 function ratioName(r) { const [w, h] = r.split(/[x:]/).map(Number); const kind = w === h ? "정사각" : w < h ? "세로" : "가로"; return h ? `${kind} ${w}:${h}` : r; }
 function esc(s) { return s.replace(/[&<>]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch])); }
 function alertBox(id, msg) { const el = $(id); el.textContent = msg; show(id); }
+</script>
+<div id="zoom" class="hide"><img alt=""><div><a download>다운로드</a> · <span style="color:#ccc">아무 데나 누르거나 Esc로 닫기</span></div></div>
+<script>
+// 이미지를 누르면 크게 보기 (파일 주소가 다운로드로 내려와서, 새 탭으로 열면 저장만 되던 문제 — 팀 음원 테스트 피드백 10/7)
+document.addEventListener("click", e => {
+  const a = e.target.closest("a[data-zoom]");
+  if (!a) return;
+  e.preventDefault();
+  const z = document.getElementById("zoom");
+  z.querySelector("img").src = a.href;
+  z.querySelector("a").href = a.href;
+  z.classList.remove("hide");
+});
+document.getElementById("zoom").addEventListener("click", e => { if (!e.target.closest("a")) e.currentTarget.classList.add("hide"); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") document.getElementById("zoom").classList.add("hide"); });
 </script>
 </body>
 </html>
