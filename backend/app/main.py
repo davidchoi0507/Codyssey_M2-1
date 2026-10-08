@@ -88,4 +88,5 @@ if settings.playground_enabled:
     @app.get("/playground", include_in_schema=False)
     def playground() -> FileResponse:
         """백엔드 흐름 확인용 페이지 (실제 화면이 아님). PLAYGROUND_ENABLED=false로 끈다."""
-        return FileResponse(Path(__file__).parent / "playground" / "index.html")
+        # no-cache: 배포 후 브라우저가 예전 페이지를 쓰지 않게 (10/8 옛 페이지가 밴드 코드를 안 보내 403)
+        return FileResponse(Path(__file__).parent / "playground" / "index.html", headers={"Cache-Control": "no-cache"})
