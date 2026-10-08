@@ -1,7 +1,7 @@
 """작업 만들기 (업로드 API와 CLI 공용): 형식·길이·크기 확인 → 원본 저장(WAV는 FLAC) → 곡 정보·동의 기록."""
 from pathlib import Path
 
-from app.analysis.audio_io import probe_duration, store_original
+from app.analysis.audio_io import check_magic, probe_duration, store_original
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import Stage
@@ -30,7 +30,8 @@ def create_job(settings: Settings, src: Path, *, filename: str, song: dict, cons
     if enforce_size and size_mb > settings.max_upload_mb:
         raise AppError("UPLOAD_TOO_LARGE", f"{settings.max_upload_mb}MB 이하 파일만 올릴 수 있어요.", False,
                        http_status=413)
-    duration = probe_duration(src)
+    check_magic(src, ext)
+    duration = probe_duration(src, ext)
     if duration > settings.max_duration_sec:
         raise AppError("TOO_LONG", f"{settings.max_duration_sec // 60}분 이하 곡만 처리할 수 있어요.", False)
     if round(duration, 1) < settings.min_duration_sec:

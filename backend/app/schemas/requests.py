@@ -3,14 +3,21 @@ from pydantic import BaseModel, Field
 
 from app.schemas.note import CoverDirection
 
+# 입력 길이 상한 (AI 프롬프트에 그대로 들어가므로 비용·악성 지시 방지). 업로드 폼(POST /jobs)도 같은 값을 쓴다.
+MAX_TITLE = 100
+MAX_GENRE = 50
+MAX_DESCRIPTION = 1000
+MAX_LYRICS = 5000
+
 
 class JobInfoPatch(BaseModel):
     """기다리는 동안 추가 입력 (PATCH /jobs/{job_id}/info). 모든 필드 선택."""
-    lyrics: str | None = None
-    description: str | None = None
-    genre: str | None = None
-    channels: list[str] | None = Field(default=None, description="홍보할 채널 (instagram, tiktok, threads, x)")
-    release_date: str | None = Field(default=None, description="발매일 YYYY-MM-DD")
+    lyrics: str | None = Field(default=None, max_length=MAX_LYRICS)
+    description: str | None = Field(default=None, max_length=MAX_DESCRIPTION)
+    genre: str | None = Field(default=None, max_length=MAX_GENRE)
+    channels: list[str] | None = Field(default=None, max_length=4,
+                                       description="홍보할 채널 (instagram, tiktok, threads, x)")
+    release_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="발매일 YYYY-MM-DD")
 
 
 class NotePatch(BaseModel):

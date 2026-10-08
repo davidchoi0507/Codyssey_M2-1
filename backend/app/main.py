@@ -45,6 +45,21 @@ app = FastAPI(
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list, allow_methods=["*"],
                    allow_headers=["*"])
 
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",      # 올린 파일을 브라우저가 다른 형식(HTML 등)으로 추측하지 않게
+    "X-Frame-Options": "DENY",                # 다른 사이트가 iframe으로 감싸지 못하게
+    "Referrer-Policy": "no-referrer",         # 작업 ID·토큰이 든 주소가 외부 사이트로 새지 않게
+    "Strict-Transport-Security": "max-age=31536000",  # https로만 (http 개발 서버에서는 브라우저가 무시)
+}
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for k, v in SECURITY_HEADERS.items():
+        response.headers.setdefault(k, v)
+    return response
+
 
 @app.exception_handler(AppError)
 async def app_error(_: Request, e: AppError) -> JSONResponse:
@@ -54,7 +69,10 @@ async def app_error(_: Request, e: AppError) -> JSONResponse:
 @app.exception_handler(RequestValidationError)
 async def validation_error(_: Request, e: RequestValidationError) -> JSONResponse:
     fields = sorted({".".join(str(x) for x in err["loc"][1:]) for err in e.errors()})
-    return JSONResponse({"code": "INVALID_REQUEST", "message": f"입력값을 확인해 주세요: {', '.join(fields)}",
+    too_long = {".".join(str(x) for x in err["loc"][1:]): err["ctx"]["max_length"]
+                for err in e.errors() if err["type"] == "string_too_long"}
+    shown = [f"{f}({too_long[f]}자 이내)" if f in too_long else f for f in fields]
+    return JSONResponse({"code": "INVALID_REQUEST", "message": f"입력값을 확인해 주세요: {', '.join(shown)}",
                          "retryable": False, "fields": fields}, status_code=422)
 
 

@@ -16,7 +16,7 @@ from app.pipeline.jobfiles import JobFiles
 from app.pipeline.runner import JobRunner
 from app.pipeline.views import job_status
 from app.schemas.job import JobCreated, JobStatus
-from app.schemas.requests import JobInfoPatch
+from app.schemas.requests import MAX_DESCRIPTION, MAX_GENRE, MAX_LYRICS, MAX_TITLE, JobInfoPatch
 
 router = APIRouter(prefix="/jobs", tags=["작업"])
 CHUNK = 1024 * 1024
@@ -39,18 +39,19 @@ def _find_duplicate(key: tuple) -> str | None:
 async def create(
     request: Request,
     file: UploadFile = File(description="음원 .mp3/.wav, 200MB·10분 이하"),
-    title: str = Form(), artist: str = Form(), genre: str = Form(""), description: str = Form(""),
-    lyrics: str | None = Form(None),
+    title: str = Form(max_length=MAX_TITLE), artist: str = Form(max_length=MAX_TITLE),
+    genre: str = Form("", max_length=MAX_GENRE), description: str = Form("", max_length=MAX_DESCRIPTION),
+    lyrics: str | None = Form(None, max_length=MAX_LYRICS),
     consent_original: bool = Form(description="자작곡(권리 보유) 확약 — 필수"),
     consent_privacy: bool = Form(description="개인정보 수집·7일 보관 — 필수"),
     consent_external_ai: bool = Form(description="음원의 Gemini 전송·무료 티어 학습 가능성 고지 — 필수"),
     consent_showcase: bool = Form(False, description="발표 사용 동의 — 선택"),
-    consent_version: str = Form(description="동의 문구 버전"),
+    consent_version: str = Form(max_length=20, description="동의 문구 버전"),
     x_band_code: str | None = Header(default=None, description="밴드 초대 코드 (BAND_CODE_REQUIRED=true면 필수)"),
     s: Settings = Depends(settings), r: JobRunner = Depends(runner),
 ) -> JobCreated:
     client = client_ip(request)
-    band = find_band(x_band_code)
+    band = find_band(x_band_code, client)
     check_daily_limits(s, client, band)  # 파일을 받기 전에
     s.jobs_dir.mkdir(parents=True, exist_ok=True)
     limit = s.max_upload_mb * 1024 * 1024

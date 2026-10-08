@@ -1,14 +1,15 @@
 """결과 화면: 패키지 목록 / 커버 선택 / 항목 재생성 / 직접 올린 사진 / ZIP"""
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Header, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 
-from app.api.deps import file_url, job_files, runner, settings
+from app.api.deps import ZIP_TOKEN_PATH, check_owner, file_url, find_job, job_files, runner, settings, zip_url
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import Stage
+from app.core.tokens import read_token
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.render import select_cover as record_selection
-from app.pipeline.results import build_zip, regenerate as regenerate_item, save_own_image, zip_info
+from app.pipeline.results import MAX_OWN_IMAGE_MB, build_zip, regenerate as regenerate_item, save_own_image, zip_info
 from app.pipeline.runner import JobRunner
 from app.pipeline.views import build_package
 from app.schemas.package import Package
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/jobs/{job_id}", tags=["결과"])
 
 
 def _package(jf: JobFiles, s: Settings) -> Package:
-    pkg = build_package(jf, s, lambda p: file_url(jf, p), zip_url=f"/jobs/{jf.job_id}/zip")
+    pkg = build_package(jf, s, lambda p: file_url(jf, p), zip_url=zip_url(jf))
     if pkg.stage == Stage.DONE:
         pkg.zip_files, pkg.zip_size_bytes = zip_info(jf, pkg)
     return pkg
@@ -62,15 +63,23 @@ async def regenerate(item_id: str, body: RegenerateRequest | None = None, jf: Jo
              description="jpg·png, 800px 이상, 20MB 이하. 정사각으로 가운데를 잘라 쓴다. 올린 뒤 cover/select로 cover-own을 고르면 렌더링.")
 async def own_image(file: UploadFile = File(), jf: JobFiles = Depends(job_files), r: JobRunner = Depends(runner),
                     s: Settings = Depends(settings)) -> Package:
-    data = await file.read()
+    data = await file.read(MAX_OWN_IMAGE_MB * 1024 * 1024 + 1)  # 한도+1바이트까지만 메모리로 — 넘으면 save_own_image가 거절
     async with r.lock(jf.job_id):
         _not_busy(r, jf)
         save_own_image(jf, data)
     return _package(jf, s)
 
 
-@router.get("/zip", summary="ZIP 다운로드 (done 이후)", response_class=FileResponse)
-def download_zip(jf: JobFiles = Depends(job_files), s: Settings = Depends(settings)) -> FileResponse:
+@router.get("/zip", summary="ZIP 다운로드 (done 이후)", response_class=FileResponse,
+            description="패키지의 zip_url을 그대로 쓴다 (서명 토큰 t 포함, 24시간 유효). 토큰 없이 부르면 X-Band-Code로 확인.")
+def download_zip(job_id: str, request: Request, t: str | None = Query(default=None),
+                 x_band_code: str | None = Header(default=None), s: Settings = Depends(settings)) -> FileResponse:
+    jf = find_job(job_id)
+    if t is not None:
+        if read_token(s.download_token_secret, t) != (jf.job_id, ZIP_TOKEN_PATH):
+            raise AppError("LINK_EXPIRED", "다운로드 링크가 만료되었어요. 결과 화면을 새로고침해 주세요.", False, http_status=403)
+    else:
+        check_owner(jf, request, x_band_code)
     pkg = _package(jf, s)
     path = build_zip(jf, pkg, pkg.ai_generated.models)
     song = jf.read_json(jf.song)

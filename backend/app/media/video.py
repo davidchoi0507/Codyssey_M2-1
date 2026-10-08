@@ -7,9 +7,11 @@ import asyncio
 import logging
 from pathlib import Path
 
+from app.analysis.audio_io import input_args
 from app.core.errors import AppError
 
 log = logging.getLogger(__name__)
+RENDER_TIMEOUT_SEC = 600  # 15초 숏폼은 보통 40초 안팎
 
 
 async def _ffmpeg(args: list[str], out: Path, what: str) -> None:
@@ -18,7 +20,12 @@ async def _ffmpeg(args: list[str], out: Path, what: str) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     proc = await asyncio.create_subprocess_exec("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *args, str(tmp),
                                                 stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
-    _, err = await proc.communicate()
+    try:
+        _, err = await asyncio.wait_for(proc.communicate(), RENDER_TIMEOUT_SEC)
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        err = f"timeout {RENDER_TIMEOUT_SEC}s".encode()
     if proc.returncode != 0:
         tmp.unlink(missing_ok=True)
         log.error("ffmpeg %s 실패: %s", what, err.decode(errors="replace")[-1500:])
@@ -52,7 +59,7 @@ async def render_short(*, bg: Path, cover: Path, overlay: Path, audio: Path, sta
         "-loop", "1", "-framerate", str(fps), "-i", str(bg),
         "-i", str(cover),
         "-loop", "1", "-framerate", str(fps), "-i", str(overlay),
-        "-ss", f"{start:.2f}", "-t", f"{duration:.2f}", "-i", str(audio),
+        "-ss", f"{start:.2f}", "-t", f"{duration:.2f}", *input_args(audio),
         "-filter_complex", graph, "-map", "[vout]", "-map", "[aout]",
         "-t", f"{duration:.2f}", "-r", str(fps),
         "-c:v", "libx264", "-preset", v["preset"], "-crf", str(v["crf"]), "-pix_fmt", "yuv420p",

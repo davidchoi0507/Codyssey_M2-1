@@ -76,6 +76,7 @@ async def regenerate(settings: Settings, jf: JobFiles, item_id: str, request: st
 
 
 MAX_OWN_IMAGE_MB = 20
+MAX_OWN_IMAGE_PIXELS = 40_000_000  # 약 6300×6300. 열 때 가로×세로×3바이트를 쓰므로 메모리 상한 역할
 
 
 def save_own_image(jf: JobFiles, data: bytes) -> int:
@@ -83,10 +84,20 @@ def save_own_image(jf: JobFiles, data: bytes) -> int:
     _ensure_results(jf)
     if len(data) > MAX_OWN_IMAGE_MB * 1024 * 1024:
         raise AppError("IMAGE_TOO_LARGE", f"사진은 {MAX_OWN_IMAGE_MB}MB 이하만 올릴 수 있어요.", False, http_status=413)
+    invalid = AppError("INVALID_IMAGE", "이미지 파일(jpg·png)만 올릴 수 있어요.", False, http_status=422)
     try:
-        img = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
+        img = Image.open(io.BytesIO(data))  # 아직 픽셀을 풀지 않음 — 형식·크기만 읽는다
     except Exception as e:
-        raise AppError("INVALID_IMAGE", "이미지 파일(jpg·png)만 올릴 수 있어요.", False, http_status=422) from e
+        raise invalid from e
+    if img.format not in ("JPEG", "PNG"):
+        raise invalid
+    if img.width * img.height > MAX_OWN_IMAGE_PIXELS:
+        raise AppError("IMAGE_TOO_LARGE", "사진 해상도가 너무 커요. 가로·세로 6000px 이하로 줄여서 올려 주세요.", False,
+                       http_status=413)
+    try:
+        img = ImageOps.exif_transpose(img).convert("RGB")
+    except Exception as e:
+        raise invalid from e
     if min(img.size) < 800:
         raise AppError("IMAGE_TOO_SMALL", "가로·세로 800px 이상인 사진을 올려 주세요.", False, http_status=422)
     side = min(img.size)

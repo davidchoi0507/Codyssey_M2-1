@@ -3,12 +3,13 @@
 CPU 작업이므로 프로세스 풀에서 `analyze_file`을 호출한다 (인자·반환은 pickle 가능한 값만).
 """
 import logging
-import subprocess
+from pathlib import Path
 
 import librosa
 import numpy as np
 import soundfile as sf
 
+from app.analysis.audio_io import CONVERT_TIMEOUT_SEC, input_args, run_ffmpeg
 from app.schemas.analysis import Features, HighlightCandidateFeature, Section
 
 log = logging.getLogger(__name__)
@@ -181,10 +182,8 @@ def _load(path: str) -> np.ndarray:
         return librosa.load(path, sr=SR, mono=True)[0]
     except sf.SoundFileError as e:
         log.warning("libsndfile로 못 읽어 ffmpeg로 디코딩: %r", e)
-    pcm = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", path, "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"],
-        check=True, capture_output=True,
-    ).stdout
+    pcm = run_ffmpeg(["ffmpeg", "-v", "error", *input_args(Path(path)), "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"],
+                     CONVERT_TIMEOUT_SEC, text=False).stdout
     return np.frombuffer(pcm, dtype=np.float32).copy()
 
 

@@ -78,6 +78,8 @@ def _check_patch(patch: NotePatch, note: ARNote, duration: float, highlight_sec:
         ids = {c.id for c in note.cover_directions}
         if not patch.cover_directions or any(c.id not in ids or not c.text.strip() for c in patch.cover_directions):
             problems.append(f"커버 방향 id는 {', '.join(sorted(ids))} 중 하나이고 내용이 있어야 해요")
+        elif any(len(c.text) > 300 for c in patch.cover_directions):
+            problems.append("커버 방향은 각각 300자 이내로 써 주세요")
     if patch.highlight_start is not None and not (0 <= patch.highlight_start <= max(duration - highlight_sec, 0)):
         problems.append(f"하이라이트 시작은 0~{int(max(duration - highlight_sec, 0))}초 사이예요")
     if not patch.model_dump(exclude_none=True):
