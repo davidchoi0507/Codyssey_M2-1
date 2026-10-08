@@ -15,6 +15,7 @@ from PIL import Image, ImageOps
 from app.adapters.codyssey_image import CodysseyImage
 from app.agents.copywriter import write_copy
 from app.agents.pitch import write_pitch
+from app.analysis.labels import display_energy, display_key
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import Stage
@@ -175,7 +176,7 @@ def _brief(song: dict, note, models: list[str]) -> str:
         "## A&R 노트", note.interpretation, "",
         f"- 무드: {' · '.join(note.mood_keywords)}",
         f"- 색: {' '.join(note.colors)}",
-        f"- 근거: {note.evidence.bpm:g} BPM · {note.evidence.key} · {note.evidence.energy_change.replace('RMS', '에너지')}",
+        f"- 근거: {note.evidence.bpm:g} BPM · {display_key(note.evidence.key)} · {display_energy(note.evidence.energy_change)}",
         f"- 하이라이트: {int(sel.start // 60)}:{int(sel.start % 60):02d} ~ {int(sel.end // 60)}:{int(sel.end % 60):02d}",
     ]
     if note.user_correction:

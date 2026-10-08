@@ -10,6 +10,7 @@ import numpy as np
 import soundfile as sf
 
 from app.analysis.audio_io import CONVERT_TIMEOUT_SEC, input_args, run_ffmpeg
+from app.analysis.labels import display_key
 from app.schemas.analysis import Features, HighlightCandidateFeature, Section
 
 log = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ def _estimate_key(chroma: np.ndarray) -> tuple[str, float]:
             r = float(np.corrcoef(profile, np.roll(tmpl, i))[0, 1])
             scores.append(r)
             if r > best_r:
-                best, best_r = f"{_PITCHES[i]} {mode}", r
+                best, best_r = display_key(f"{_PITCHES[i]} {mode}"), r
     # 신뢰도: 1등과 2등 상관계수 차이 (작으면 나란한조·5도 관계와 헷갈리는 중)
     top2 = sorted(scores, reverse=True)[:2]
     return best, round(float(top2[0] - top2[1]), 3)
@@ -85,7 +86,7 @@ def _energy_change(energy: np.ndarray) -> str:
             best_t, best_ratio = t, float(ratio)
     if best_ratio < 1.2:
         return f"뚜렷한 에너지 상승 없이 고르게 유지 (최대 상승 {best_ratio:.1f}배)"
-    return f"{fmt_time(best_t)} 이후 RMS 약 {best_ratio:.1f}배"
+    return f"{fmt_time(best_t)} 이후 에너지 약 {best_ratio:.1f}배"
 
 
 def _energy_peak(energy: np.ndarray) -> str:

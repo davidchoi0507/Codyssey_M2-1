@@ -1,6 +1,7 @@
 """A&R 노트 화면: 조회 / 수정 / 다시 듣기 / 수락"""
 from fastapi import APIRouter, Depends
 
+from app.analysis.labels import display_energy, display_key
 from app.api.deps import job_files, runner, settings
 from app.core.config import Settings
 from app.core.errors import AppError
@@ -20,7 +21,11 @@ router = APIRouter(prefix="/jobs/{job_id}/note", tags=["A&R 노트"])
 @router.get("", response_model=ARNote, summary="A&R 노트 조회 (최신 버전)")
 def get_note(jf: JobFiles = Depends(job_files), s: Settings = Depends(settings)) -> ARNote:
     # 남은 횟수는 노트에 저장된 값이 아니라 지금 기록으로 계산 (제한 규칙이 바뀌어도 맞게)
-    return latest_note(jf).model_copy(update={"edits_remaining": edits_remaining(s, jf)})
+    note = latest_note(jf)
+    # 예전에 저장된 노트도 지금 표기로 (D# → E♭, RMS → 에너지)
+    ev = note.evidence.model_copy(update={"key": display_key(note.evidence.key),
+                                          "energy_change": display_energy(note.evidence.energy_change)})
+    return note.model_copy(update={"edits_remaining": edits_remaining(s, jf), "evidence": ev})
 
 
 @router.patch("", response_model=ARNote,

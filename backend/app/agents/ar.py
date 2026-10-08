@@ -7,6 +7,7 @@ import re
 
 from app.adapters.codyssey_llm import chat_model, model_label
 from app.agents.llm_json import ask_json
+from app.analysis.labels import display_energy, display_key
 from app.analysis.profile import profile_for_prompt
 from app.core.config import Settings
 from app.prompts import load_prompt
@@ -16,6 +17,7 @@ from app.schemas.note import (ARNote, ARNoteDraft, CoverDirection, Evidence, Hig
                               HighlightCandidate, HighlightRange)
 
 _HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
+_FORMAL_ENDING = re.compile(r"니다(?=[.!?\s]|$)")  # 합니다체 — 노트 글은 해요체로 통일 (2026-10-08 사용자 요청)
 
 
 def _check_draft(d: ARNoteDraft, candidate_ids: set[str]) -> list[str]:
@@ -32,6 +34,21 @@ def _check_draft(d: ARNoteDraft, candidate_ids: set[str]) -> list[str]:
         problems.append("candidate_reasons가 후보와 맞지 않음")
     return problems
 
+
+
+def _style_problems(d: ARNoteDraft) -> list[str]:
+    formal = [t for t in [d.interpretation, *(r.reason for r in d.candidate_reasons)] if _FORMAL_ENDING.search(t)]
+    return [f"문장 끝을 해요체(~해요, ~예요)로 통일해야 함 — 합니다체 사용: {formal[0][:40]}"] if formal else []
+
+
+def _note_check(candidate_ids: set[str]):
+    """형식 검사 + 말투 검사. 말투는 첫 답에서만 고쳐 달라고 한다 — 말투 때문에 작업이 실패하지 않게."""
+    calls = {"n": 0}
+
+    def check(d: ARNoteDraft) -> list[str]:
+        calls["n"] += 1
+        return _check_draft(d, candidate_ids) + (_style_problems(d) if calls["n"] == 1 else [])
+    return check
 
 
 def _perceived_bpm(features: Features, listening: Listening) -> float:
@@ -56,7 +73,7 @@ async def write_note(settings: Settings, *, job_id: str, features: Features, lis
             payload["previous_interpretation"] = previous_interpretation
     candidate_ids = {c.id for c in features.highlight_candidates}
     draft, usage = await ask_json(chat_model(settings), load_prompt("ar_note"), payload, ARNoteDraft,
-                                  check=lambda d: _check_draft(d, candidate_ids), what="A&R 노트")
+                                  check=_note_check(candidate_ids), what="A&R 노트")
 
     reasons = {r.id: r.reason for r in draft.candidate_reasons}
     rec = next(c for c in features.highlight_candidates if c.id == draft.recommended_id)
@@ -65,7 +82,7 @@ async def write_note(settings: Settings, *, job_id: str, features: Features, lis
         version=version,
         interpretation=draft.interpretation,
         evidence=Evidence(bpm=_perceived_bpm(features, listening), bpm_measured=features.bpm,
-                          key=features.key, energy_change=features.energy_change),
+                          key=display_key(features.key), energy_change=display_energy(features.energy_change)),
         mood_keywords=draft.mood_keywords,
         colors=[c.upper() for c in draft.colors],
         cover_directions=[CoverDirection(id=f"c{i}", text=t) for i, t in enumerate(draft.cover_directions, 1)],
