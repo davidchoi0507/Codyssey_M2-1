@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>인디 앨범 스튜디오 - 프로젝트 제안서 & 서비스 소개서</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4;
+      margin: 14mm 14mm 14mm 14mm;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      color: #1e293b;
+      background: #ffffff;
+      line-height: 1.55;
+      font-size: 13.5px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page {
+      page-break-after: always;
+      break-after: page;
+      height: 269mm;
+      position: relative;
+      padding: 6mm 4mm 12mm 4mm;
+      display: flex;
+      flex-direction: column;
+    }
+    .page:last-child {
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    /* Page Header & Footer */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1.5px solid #e2e8f0;
+      margin-bottom: 16px;
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 500;
+    }
+    .page-header .brand {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      color: #4f46e5;
+    }
+    .page-footer {
+      position: absolute;
+      bottom: 4mm;
+      left: 4mm;
+      right: 4mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 10.5px;
+      color: #94a3b8;
+    }
+
+    /* Typography & Titles */
+    h1, h2, h3, h4 {
+      color: #0f172a;
+      letter-spacing: -0.3px;
+    }
+    .section-title {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-desc {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 16px;
+    }
+
+    /* Badges & Highlights */
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .badge-primary { background: #e0e7ff; color: #4338ca; }
+    .badge-accent { background: #e0f2fe; color: #0369a1; }
+    .badge-success { background: #dcfce7; color: #15803d; }
+    .badge-dark { background: #0f172a; color: #ffffff; }
+
+    /* Cover Page */
+    .cover-page {
+      justify-content: center;
+      align-items: flex-start;
+      padding: 24mm 16mm 20mm 16mm;
+      background: linear-gradient(145deg, #0f172a 0%, #1e1b4b 60%, #312e81 100%);
+      color: #ffffff;
+      border-radius: 8px;
+    }
+    .cover-top-tag {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: #818cf8;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .cover-title {
+      font-size: 42px;
+      font-weight: 800;
+      line-height: 1.18;
+      margin-bottom: 16px;
+      letter-spacing: -1px;
+      color: #ffffff;
+    }
+    .cover-title span {
+      background: linear-gradient(135deg, #a5b4fc 0%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .cover-subtitle {
+      font-size: 18px;
+      font-weight: 400;
+      color: #cbd5e1;
+      line-height: 1.5;
+      max-width: 580px;
+      margin-bottom: 40px;
+    }
+    .cover-features-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      width: 100%;
+      margin-bottom: 48px;
+    }
+    .cover-feat-card {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .cover-feat-card strong {
+      display: block;
+      color: #ffffff;
+      font-size: 14px;
+      margin-bottom: 3px;
+    }
+    .cover-feat-card span {
+      font-size: 11.5px;
+      color: #94a3b8;
+    }
+    .cover-meta-box {
+      margin-top: auto;
+      width: 100%;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      padding-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .cover-meta-box strong {
+      color: #ffffff;
+    }
+
+    /* Cards & Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .card-accent {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+    }
+    .card-highlight {
+      background: #f5f3ff;
+      border-color: #ddd6fe;
+    }
+    .card h3, .card h4 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+    th {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 700;
+      text-align: left;
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+    }
+    td {
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+      color: #334155;
+      vertical-align: top;
+    }
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    /* Callout & Quotes */
+    .quote-box {
+      background: #eef2ff;
+      border-left: 4px solid #4f46e5;
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #312e81;
+    }
+    .quote-box strong {
+      display: block;
+      color: #1e1b4b;
+      margin-bottom: 3px;
+    }
+
+    .pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .pill {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-size: 11px;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    /* Flow Steps */
+    .flow-steps {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .flow-step-card {
+      flex: 1;
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      position: relative;
+    }
+    .flow-step-card.active {
+      border-color: #4f46e5;
+      background: #faf5ff;
+    }
+    .flow-step-num {
+      width: 24px;
+      height: 24px;
+      background: #4f46e5;
+      color: #ffffff;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 6px;
+    }
+    .flow-step-card strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+      color: #0f172a;
+    }
+    .flow-step-card span {
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.35;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================================ -->
+  <!-- PAGE 1: COVER PAGE                                           -->
+  <!-- ============================================================ -->
+  <section class="page cover-page">
+    <div class="cover-top-tag">CODYSSEY FINAL PROJECT · M2-1</div>
+    <h1 class="cover-title">
+      인디 앨범 스튜디오<br>
+      <span>Indie Album Studio</span>
+    </h1>
+    <p class="cover-subtitle">
+      음원 파일 하나로 완성하는 A&R 콘셉트 기획서, 앨범 커버 3종, 오디오 반응형 영상, 그리고 올인원 발매 홍보 패키지
+    </p>
+
+    <div class="cover-features-list">
+      <div class="cover-feat-card">
+        <strong>🎧 하이브리드 멀티모달 오디오 엔진</strong>
+        <span>librosa DSP(BPM, 에너지) + Google Gemini 청각 분석</span>
+      </div>
+      <div class="cover-feat-card">
+        <strong>📋 AI A&R 방향 조율 및 승인</strong>
+        <span>"체념하는 감정의 필름 사진으로" 한 줄 수정으로 일관성 확보</span>
+      </div>
+      <div class="cover-feat-card">
+        <strong>🎨 유통사 규격 3000px 커버 3종</strong>
+        <span>사진풍 · 일러스트 · 그래픽 추상 스타일 및 텍스트 폰트 오버레이</span>
+      </div>
+      <div class="cover-feat-card">
+        <strong>🎬 오디오 반응형 숏폼 & Canvas</strong>
+        <span>15초 하이라이트 릴스/틱톡 영상 및 Spotify 8초 Canvas 루프</span>
+      </div>
+      <div class="cover-feat-card">
+        <strong>✍️ 채널별 맞춤 카피 4종</strong>
+        <span>인스타그램, 틱톡, 스레드, X 플랫폼별 글자 수 및 태그 규칙 준수</span>
+      </div>
+      <div class="cover-feat-card">
+        <strong>📦 원클릭 ZIP 릴리즈 팩 다운로드</strong>
+        <span>모든 고해상도 에셋과 큐레이터 피칭 메일 일괄 번들링</span>
+      </div>
+    </div>
+
+    <div class="cover-meta-box">
+      <div>
+        <span>프로젝트 총괄: </span><strong>최다인 (Product Lead & UI/UX)</strong><br>
+        <span>엔지니어링 리드: </span><strong>이원일 (Tech Lead & AI/Backend)</strong>
+      </div>
+      <div style="text-align: right;">
+        <span>배포 테스트 서버: </span><strong>https://api.201.n-e.kr</strong><br>
+        <span>문서 버전: </span><strong>v1.0 (2026. 10.)</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- PAGE 2: PROBLEM DEFINITION & BACKGROUND                      -->
+  <!-- ============================================================ -->
+  <section class="page">
+    <div class="page-header">
+      <div class="brand"><span>🎛️</span> Indie Album Studio</div>
+      <div>1. 기획 배경 및 문제 정의</div>
+    </div>
+
+    <h2 class="section-title">1. 기획 배경 및 문제 정의</h2>
+    <p class="section-desc">음악은 훌륭하게 완성되었지만, 발매와 시각적 홍보 단계에서 겪는 인디 창작자의 현실적인 병목을 해결합니다.</p>
+
+    <div class="quote-box">
+      <strong>"곡은 다 만들었는데, 앨범 커버랑 홍보 영상 외주 맡길 돈도 시간도 없습니다."</strong>
+      1인 싱어송라이터와 실용음악 전공생, 소규모 인디 뮤지션은 음악 제작에 모든 에너지를 쏟은 뒤 정작 발매를 위한 비주얼 에셋 제작 단계에서 멈춰 섭니다.
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h4>🚨 인디 뮤지션의 현실적 병목 (Pain Points)</h4>
+        <ul style="padding-left:18px;margin-top:8px;font-size:12px;color:#334155;line-height:1.7;">
+          <li><strong>과중한 외주 비용 부담:</strong> 앨범 커버 디자인 5만~30만 원, 숏폼/리릭비디오 3만~10만 원 등 1곡 발매 시 수십만 원 소요</li>
+          <li><strong>기나긴 소요 시간:</strong> 디자이너 섭외, 시안 피드백, 영상 수작업 편집까지 최소 2주~4주의 시간 지연</li>
+          <li><strong>비주얼 디렉팅 역량 부재:</strong> 본인 음악의 사운드와 분위기를 시각적 언어나 프롬프트로 묘사하기 어려움</li>
+          <li><strong>채널별 파편화된 홍보 준비:</strong> 인스타, 틱톡, 멜론, 스포티파이마다 규격과 글자 수가 달라 개별 준비의 번거로움</li>
+        </ul>
+      </div>
+
+      <div class="card card-highlight">
+        <h4>⚡ 기존 생성형 AI 도구들의 한계</h4>
+        <ul style="padding-left:18px;margin-top:8px;font-size:12px;color:#334155;line-height:1.7;">
+          <li><strong>텍스트 프롬프트 의존의 피로:</strong> 사용자가 "빈 입력창"에 프롬프트를 일일이 적어야 해 음악 감성과 어긋남</li>
+          <li><strong>청각과 시각의 감성 불일치:</strong> 실제 템포(BPM)나 에너지 변화를 읽지 못해 곡 무드와 동떨어진 결과물 생성</li>
+          <li><strong>도구의 파편화:</strong> 커버(Midjourney), 영상(Runway), 글(ChatGPT)이 따로 돌아 전체 발매 패키지의 톤앤매너 불일치</li>
+          <li><strong>유통사 규격 미달:</strong> AI가 생성한 조잡한 텍스트로 인해 스포티파이/애플뮤직 유통 심사 반려 위험</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="font-size:15px;margin:16px 0 8px;">📊 시장 데이터 및 타깃 정의 (Market Validation)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>구분</th>
+          <th>현황 및 통계 지표</th>
+          <th>출처 및 근거</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>글로벌 음악 포화</strong></td>
+          <td>하루 106,000곡이 새로 스트리밍에 등록되며, 그중 88%는 연간 1,000회 미만 재생 (첫 노출 비주얼이 성패를 좌우)</td>
+          <td>Luminate 2025 연말 보고서</td>
+        </tr>
+        <tr>
+          <td><strong>국내 인디 생태계</strong></td>
+          <td>국내 활동 인디 뮤지션 3,168팀 중 2,986팀(94.2%)이 레이블 없이 독자적으로 음원을 직접 발매</td>
+          <td>한국음악레이블산업협회 (2024)</td>
+        </tr>
+        <tr>
+          <td><strong>핵심 타깃 (Persona)</strong></td>
+          <td>자작곡 데모나 마스터 음원을 보유하고 있으나, 외주 예산이 없어 발매를 주저하는 <strong>실용음악과 학생 및 인디 창작자</strong></td>
+          <td>자체 심층 인터뷰</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="page-footer">
+      <span>Indie Album Studio Project Proposal</span>
+      <span>Page 2</span>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- PAGE 3: CORE VALUE & AI A&R NOTE                             -->
+  <!-- ============================================================ -->
+  <section class="page">
+    <div class="page-header">
+      <div class="brand"><span>🎛️</span> Indie Album Studio</div>
+      <div>2. 핵심 솔루션: AI A&R 노트</div>
+    </div>
+
+    <h2 class="section-title">2. 핵심 솔루션: "곡을 먼저 듣는 AI A&R"</h2>
+    <p class="section-desc">질문지를 먼저 길게 받지 않습니다. AI가 음악을 먼저 듣고 해석을 건네며, 한 줄 조율로 전체 에셋이 완성됩니다.</p>
+
+    <div class="quote-box" style="background:#f0fdf4;border-color:#16a34a;color:#14532d;">
+      <strong>💡 솔루션 핵심 철학: "만들기 전에 해석을 맞추고, 그 해석 하나로 전부 만든다."</strong>
+      음반사의 A&R(Artist & Repertoire) 팀이 아티스트의 신곡을 듣고 비주얼 콘셉트를 디렉팅하듯, 멀티모달 AI가 음원의 사운드와 서사를 선제 분석하여 제안합니다.
+    </div>
+
+    <h3 style="font-size:15px;margin:12px 0 8px;">🔬 2-Track 하이브리드 멀티모달 오디오 분석 엔진</h3>
+    <div class="grid-2">
+      <div class="card">
+        <h4>Track A. librosa 오디오 DSP 물리량 파싱</h4>
+        <p style="font-size:12px;color:#475569;margin-bottom:8px;">자(ruler)로 재듯 정확한 오디오 신호의 물리적 수치를 3초 만에 추출합니다.</p>
+        <div class="pill-list">
+          <span class="pill">BPM (템포 정밀 측정)</span>
+          <span class="pill">Key (조성 분석)</span>
+          <span class="pill">Energy Dynamics (에너지 변화)</span>
+          <span class="pill">15초 하이라이트 구간 후보</span>
+        </div>
+      </div>
+      <div class="card">
+        <h4>Track B. Google Gemini 2.5 Flash 청각 청취</h4>
+        <p style="font-size:12px;color:#475569;margin-bottom:8px;">실제 귀로 듣듯 보컬의 질감, 악기 세션, 서사적 감정선을 심층 청취합니다.</p>
+        <div class="pill-list">
+          <span class="pill">보컬 톤 및 음색 질감</span>
+          <span class="pill">악기 구성 (기타, 베이스, 신스)</span>
+          <span class="pill">곡의 서사적 감정 흐름</span>
+          <span class="pill">3색 감정 컬러 팔레트</span>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-size:15px;margin:16px 0 8px;">📋 AI A&R 노트 화면 구성 예시 (승인의 관문)</h3>
+    <div class="card" style="background:#0f172a;color:#ffffff;border:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span class="badge badge-primary">A&R Concept Note v1</span>
+        <span style="font-size:11px;color:#94a3b8;">분석 모델: librosa + Gemini Audio</span>
+      </div>
+      <p style="font-size:14px;color:#e2e8f0;font-style:italic;margin-bottom:12px;line-height:1.6;">
+        “BPM 98의 미디엄 템포 인디 록으로, 찰랑거리는 기타와 따뜻한 베이스 위로 담담한 보컬이 이어집니다. 2분 10초에 후렴이 한 번 크게 열리며, 폭발적인 해방감보다는 체념에 가까운 정서로 들었습니다.”
+      </p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#cbd5e1;padding-top:10px;border-top:1px solid rgba(255,255,255,0.1);">
+        <span>🥁 98 BPM (보통 빠르기)</span> · 
+        <span>🎹 Key: C Major</span> · 
+        <span>🎨 무드 컬러: 짙은 남색 ➔ 주황 ➔ 회보라</span> · 
+        <span>🎬 숏폼 구간: 2:10 ~ 2:25</span>
+      </div>
+    </div>
+
+    <div class="card card-accent" style="margin-top:12px;">
+      <h4 style="color:#15803d;">✨ 사용자의 자유로운 조율 (Human-in-the-Loop)</h4>
+      <p style="font-size:12px;color:#166534;line-height:1.6;">
+        • <strong>A안 스타일 칩 원클릭 조합:</strong> <code>[체념]</code>, <code>[필름 사진]</code>, <code>[어두운]</code> 등 감정/스타일 칩을 누르면 1줄 수정 문장으로 자동 조합되어 AI가 재해석합니다.<br>
+        • <strong>직접 편집 무제한:</strong> 무드 키워드, 3색 팔레트, 하이라이트 15초 슬라이더는 횟수 제한 없이 브라우저에서 직접 변경 및 오디오 미리듣기가 가능합니다.<br>
+        • <strong>단일 컨텍스트 동기화:</strong> 조율된 단 하나의 A&R 노트가 확정되면, 이후 커버·영상·홍보글·피칭 메일이 모두 같은 콘셉트로 일괄 생성됩니다.
+      </p>
+    </div>
+
+    <div class="page-footer">
+      <span>Indie Album Studio Project Proposal</span>
+      <span>Page 3</span>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- PAGE 4: 5 CORE ASSETS                                        -->
+  <!-- ============================================================ -->
+  <section class="page">
+    <div class="page-header">
+      <div class="brand"><span>🎛️</span> Indie Album Studio</div>
+      <div>3. 원클릭 5대 핵심 발매 패키지</div>
+    </div>
+
+    <h2 class="section-title">3. 원클릭 5대 핵심 발매 패키지</h2>
+    <p class="section-desc">음원 유통사 납품부터 주요 SNS 바이럴, 큐레이터 피칭까지 필요한 모든 에셋이 3분 안에 완성됩니다.</p>
+
+    <div class="grid-2">
+      <!-- Asset 1: Artwork -->
+      <div class="card">
+        <h4>1. 고화질 앨범 아트워크 3종 <span class="badge badge-accent">3000px</span></h4>
+        <p style="font-size:12px;color:#64748b;margin-bottom:8px;">A&R 노트의 무드를 3가지 다른 시각적 장르로 병렬 도출합니다.</p>
+        <ul style="padding-left:16px;font-size:11.5px;color:#334155;line-height:1.6;">
+          <li><strong>시안 A (사진풍):</strong> 아날로그 필름 스냅, 감성적인 공간 피사체</li>
+          <li><strong>시안 B (일러스트):</strong> 수채화 및 감각적인 선 드로잉 화풍</li>
+          <li><strong>시안 C (그래픽 추상):</strong> 현대적인 색면 추상 및 미니멀 타이포</li>
+          <li><strong>유통사 심사 통과 보장:</strong> 멜론/스포티파이 공식 규격인 3000×3000px 고해상도 JPG. AI 왜곡 글자 대신 브라우저 폰트 렌더링 적용</li>
+        </ul>
+      </div>
+
+      <!-- Asset 2: Visualizer & Canvas -->
+      <div class="card">
+        <h4>2. 오디오 반응형 영상 2종 <span class="badge badge-accent">9:16 세로</span></h4>
+        <p style="font-size:12px;color:#64748b;margin-bottom:8px;">선택한 커버 아트워크와 음원 주파수가 결합된 모션 에셋입니다.</p>
+        <ul style="padding-left:16px;font-size:11.5px;color:#334155;line-height:1.6;">
+          <li><strong>15초 숏폼 비주얼라이저:</strong> 릴스/틱톡 최적화. 하이라이트 구간에 맞춰 펄스가 뛰는 파형 + 3초 바이럴 훅 문구 오버레이</li>
+          <li><strong>인스타/틱톡 UI 안전 영역 준수:</strong> 캡션과 버튼에 텍스트가 가려지지 않는 안전 영역(Safe-zone) 내 렌더링</li>
+          <li><strong>Spotify Canvas (8초 루프):</strong> 스포티파이 모바일 재생 화면용 무음 무한 루프 영상 (공식 가이드라인 100% 충족)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Asset 3: Copywriting -->
+      <div class="card">
+        <h4>3. 채널별 맞춤 발매 홍보 카피 4종</h4>
+        <p style="font-size:12px;color:#64748b;margin-bottom:8px;">플랫폼마다 다른 글자 수와 해시태그 규칙을 완벽 준수합니다.</p>
+        <ul style="padding-left:16px;font-size:11.5px;color:#334155;line-height:1.6;">
+          <li><strong>Instagram:</strong> 감성적인 곡 서사 4문장 + 공식 제한 5개 해시태그</li>
+          <li><strong>TikTok:</strong> 스크롤을 멈추게 하는 3초 훅 중심의 간결한 캡션</li>
+          <li><strong>Threads:</strong> 대화 유도형 비하인드 스토리 + 주제 태그 1개</li>
+          <li><strong>X (Twitter):</strong> 링크 포함 140자 이내의 압축 요약 텍스트</li>
+        </ul>
+      </div>
+
+      <!-- Asset 4: Pitching -->
+      <div class="card">
+        <h4>4. 공식 피칭 메일 & 제보문 (영/한)</h4>
+        <p style="font-size:12px;color:#64748b;margin-bottom:8px;">플레이리스트 수록과 웹진 소개를 위한 전문 양식입니다.</p>
+        <ul style="padding-left:16px;font-size:11.5px;color:#334155;line-height:1.6;">
+          <li><strong>국문 제보문:</strong> 인기 유튜브 플레이리스트 채널 제보문, 음악 웹진/매체용 보도자료형 메일</li>
+          <li><strong>영문 피치:</strong> Spotify for Artists 에디토리얼 피칭(500자 제한) 및 SubmitHub/Groover용 5줄 숏 피치</li>
+          <li><strong>스마트 마크업:</strong> 아티스트가 채울 칸을 <code>[대괄호]</code>로 명시</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Asset 5: ZIP Pack -->
+    <div class="card card-accent" style="margin-top:2px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h4 style="color:#15803d;font-size:15px;">5. 원클릭 릴리즈 팩 (ZIP 번들 다운로드)</h4>
+          <p style="font-size:12.5px;color:#166534;margin-top:2px;">
+            생성된 모든 고해상도 에셋(3000px 무제 무본 커버, 타이틀 오버레이 커버, 15초 mp4, 8초 Canvas mp4, 채널별 텍스트 txt, 릴리즈 브리프)을 압축하여 제공합니다.
+          </p>
+        </div>
+        <span class="badge badge-success" style="font-size:12px;padding:6px 12px;">원클릭 완성</span>
+      </div>
+    </div>
+
+    <div class="page-footer">
+      <span>Indie Album Studio Project Proposal</span>
+      <span>Page 4</span>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- PAGE 5: WORKFLOW & SYSTEM ARCHITECTURE                       -->
+  <!-- ============================================================ -->
+  <section class="page">
+    <div class="page-header">
+      <div class="brand"><span>🎛️</span> Indie Album Studio</div>
+      <div>4. 이용 흐름 & 시스템 아키텍처</div>
+    </div>
+
+    <h2 class="section-title">4. 사용자 이용 흐름 & 아키텍처</h2>
+    <p class="section-desc">직관적인 4단계 스튜디오 워크플로우와 안정적인 멀티에이전트 백엔드 파이프라인 구조입니다.</p>
+
+    <div class="flow-steps">
+      <div class="flow-step-card">
+        <div class="flow-step-num">1</div>
+        <strong>곡 올리기</strong>
+        <span>초대 코드 입력<br>음원 파일 드롭<br>동의서 확약 (v1)</span>
+      </div>
+      <div class="flow-step-card">
+        <div class="flow-step-num">2</div>
+        <strong>실시간 분석</strong>
+        <span>BPM/파형 조기 표시<br>Gemini 청취 분석<br>(30~50초 소요)</span>
+      </div>
+      <div class="flow-step-card active">
+        <div class="flow-step-num">3</div>
+        <strong>A&R 조율</strong>
+        <span>곡 해석 확인<br>스타일 칩 1줄 수정<br>15초 구간 확정</span>
+      </div>
+      <div class="flow-step-card">
+        <div class="flow-step-num">4</div>
+        <strong>에셋 스튜디오</strong>
+        <span>커버 1종 선택<br>영상/카피 자동 생성<br>ZIP 번들 다운로드</span>
+      </div>
+    </div>
+
+    <h3 style="font-size:15px;margin:16px 0 8px;">🏗️ 시스템 엔드투엔드 아키텍처</h3>
+    <div class="card" style="background:#f1f5f9;border-color:#cbd5e1;padding:14px 18px;">
+      <table style="margin-bottom:0;background:transparent;">
+        <thead>
+          <tr>
+            <th style="width:28%;">티어 (Tier)</th>
+            <th>구현 기술 및 아키텍처 역할</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>User Presentation</strong></td>
+            <td><strong>Vercel (HTML5, Vanilla JS, CSS3 Modern Dark Theme)</strong><br>• 질문 피로도를 없앤 4단계 스튜디오 위저드 플로우<br>• Web Audio API 오디오 15초 프리뷰 및 HTML5 Canvas 오디오 파형 시각화</td>
+          </tr>
+          <tr>
+            <td><strong>Audio Multimodal Engine</strong></td>
+            <td><strong>FastAPI + librosa + Google Gemini API</strong><br>• 오디오 물리량(BPM, 에너지) 추출 및 Gemini 청각 분석 하이브리드 파이프라인<br>• 업로드 즉시 조기 결과(Early Result) 반환으로 체감 대기 시간 최소화</td>
+          </tr>
+          <tr>
+            <td><strong>Multi-Agent Orchestrator</strong></td>
+            <td><strong>LangChain Tool-Calling Multi-Agent</strong><br>• A&R Planner Agent ➔ Visual Director Agent ➔ Copywriter Agent 유기적 협업<br>• 단일 컨텍스트 A&R 노트를 기반으로 커버 3종, 카피 4종, 피칭 2종 병렬 생성</td>
+          </tr>
+          <tr>
+            <td><strong>Rendering & Packaging</strong></td>
+            <td><strong>FFmpeg Engine + Oracle Cloud Dedicated Backend</strong><br>• 1080×1920 세로 숏폼 비주얼라이저 및 Spotify Canvas 무음 영상 자동 합성<br>• 고해상도 에셋 패키징 및 7일 후 안전 자동 파기 파이프라인</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:15px;margin:16px 0 8px;">🔒 AI 윤리 및 데이터 안심 보관 정책 (v1-1006)</h3>
+    <div class="grid-2">
+      <div class="card card-accent">
+        <h4 style="color:#15803d;">🛡️ 7일 후 완전 자동 파기</h4>
+        <p style="font-size:12px;color:#166534;line-height:1.6;">
+          업로드된 음원 원본 및 생성된 모든 에셋은 <strong>작업 완료 시점으로부터 정확히 7일 후 서버에서 완전 자동 삭제</strong>되어 음원 유출 위험을 원천 차단합니다.
+        </p>
+      </div>
+      <div class="card">
+        <h4>⚖️ 2026 AI 기본법 및 유통사 가이드 준수</h4>
+        <p style="font-size:12px;color:#475569;line-height:1.6;">
+          AI 생성물 사전 고지 의무를 준수하며, 유통사 반려를 방지하기 위해 커버 이미지 내 AI 왜곡 글자를 배제하고 공식 메타데이터 표기를 지원합니다.
+        </p>
+      </div>
+    </div>
+
+    <div class="page-footer">
+      <span>Indie Album Studio Project Proposal</span>
+      <span>Page 5</span>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- PAGE 6: CLOSED BETA TESTER RECRUITMENT & COOPERATION         -->
+  <!-- ============================================================ -->
+  <section class="page">
+    <div class="page-header">
+      <div class="brand"><span>🎛️</span> Indie Album Studio</div>
+      <div>5. 테스터 모집 및 현장 전문가 협업 제안</div>
+    </div>
+
+    <h2 class="section-title">5. 클로즈드 베타 테스터 모집 및 협업 제안</h2>
+    <p class="section-desc">실제 발매를 앞둔 인디 뮤지션과 실용음악 전공생을 대상으로 무료 클로즈드 베타를 진행합니다.</p>
+
+    <div class="quote-box">
+      <strong>🎯 현장 전문가 및 음악 감독님께 드리는 말씀:</strong>
+      "감독님께서 평소 작업하시는 상업 프로 레벨의 눈높이에는 아직 부족할 수 있습니다. 외주 예산이 부족한 학생과 인디 친구들이 본인의 곡 감성을 시각화하고 발매 준비를 시작할 수 있는 실질적인 초안 툴로 기획되었습니다. 현업의 관점에서 아낌없는 조언과 쓴소리를 부탁드립니다."
+    </div>
+
+    <h3 style="font-size:15px;margin:14px 0 8px;">🎁 사전 테스터(작곡가/학생) 참여 혜택</h3>
+    <div class="grid-3">
+      <div class="card text-center">
+        <span style="font-size:26px;display:block;margin-bottom:6px;">💳</span>
+        <strong style="display:block;font-size:13px;margin-bottom:4px;color:#0f172a;">전 기능 100% 무료</strong>
+        <span style="font-size:11.5px;color:#64748b;">테스트 기간 동안 초대 코드로 앨범 커버, 영상, 카피 일체 무료 생성</span>
+      </div>
+      <div class="card text-center">
+        <span style="font-size:26px;display:block;margin-bottom:6px;">🚀</span>
+        <strong style="display:block;font-size:13px;margin-bottom:4px;color:#0f172a;">실제 발매 자유 이용</strong>
+        <span style="font-size:11.5px;color:#64748b;">생성된 모든 에셋(커버, 영상, 카피)을 실제 본인 음원 발매 및 SNS 홍보에 자유 활용</span>
+      </div>
+      <div class="card text-center">
+        <span style="font-size:26px;display:block;margin-bottom:6px;">🔐</span>
+        <strong style="display:block;font-size:13px;margin-bottom:4px;color:#0f172a;">안전한 음원 보호</strong>
+        <span style="font-size:11.5px;color:#64748b;">7일 보관 후 자동 파기 정책으로 미발매 데모 및 자작곡의 보안 보장</span>
+      </div>
+    </div>
+
+    <h3 style="font-size:15px;margin:16px 0 8px;">🔗 지금 바로 확인할 수 있는 완성 샘플 및 테스트 환경</h3>
+    <div class="card" style="background:#f8fafc;border:1.5px solid #cbd5e1;">
+      <table style="margin-bottom:0;">
+        <thead>
+          <tr>
+            <th style="width:25%;">구분</th>
+            <th>상세 내용 및 접속 방법</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>테스트 접속 링크</strong></td>
+            <td>
+              <strong>https://api.201.n-e.kr/playground</strong><br>
+              <span style="font-size:11px;color:#64748b;">(로컬 프론트엔드 환경: http://localhost:3000)</span>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>테스트 전용 초대 코드</strong></td>
+            <td>
+              <code style="background:#e0e7ff;color:#4338ca;padding:2px 8px;border-radius:4px;font-weight:700;">ZCUC-9WG7</code>
+              <span style="font-size:11.5px;color:#64748b;">(1번 화면에 입력 후 [코드 확인] 클릭)</span>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>사전 탑재 샘플곡</strong></td>
+            <td>
+              <strong>샘플곡 1 (인디 록) · 샘플곡 2 (드림팝) · 샘플곡 3 (어쿠스틱)</strong><br>
+              <span style="font-size:11.5px;color:#64748b;">음원을 올리지 않아도 AI가 완성한 앨범 커버 3종, 15초 숏폼 비주얼라이저, 채널별 카피, 영/한 피칭 메일을 즉시 확인 가능합니다.</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card card-highlight" style="margin-top:16px;">
+      <h4 style="color:#4338ca;">📞 피드백 수렴 및 문의 창구</h4>
+      <p style="font-size:12.5px;color:#3730a3;line-height:1.6;">
+        서비스 이용 중 불편한 점, 사운드 해석의 어색함, 시각적 퀄리티에 대한 개선 의견은 언제든 자유롭게 전달해 주시면 감사하겠습니다. 현장의 목소리를 적극 반영하여 가장 실용적인 서비스로 완성하겠습니다.
+      </p>
+      <div style="margin-top:10px;font-size:12px;color:#4338ca;font-weight:600;">
+        • 프로젝트 문의: Codyssey M2-1 팀 (Product Lead 최다인 / Testers Lead 김지은)<br>
+        • 백엔드 배포 서버: https://api.201.n-e.kr
+      </div>
+    </div>
+
+    <div class="page-footer">
+      <span>Indie Album Studio Project Proposal</span>
+      <span>Page 6</span>
+    </div>
+  </section>
+
+</body>
+</html>
