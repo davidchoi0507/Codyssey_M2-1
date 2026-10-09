@@ -289,6 +289,24 @@
     </div>
   </section>
 
+  <section class="card hide" id="community">
+    <h2>5. 커뮤니티에 올리기 <span class="hint">— <a href="/community" target="_blank">커뮤니티 보기</a> (10/9 새 기능, 임시 화면)</span></h2>
+    <div id="commNow" class="hint"></div>
+    <label>어떻게 들려줄까요?</label>
+    <div class="row"><label style="flex:0 0 auto"><input type="radio" name="commMode" value="highlight" checked> 하이라이트만 (노트에서 고른 15초)</label>
+      <label style="flex:0 0 auto"><input type="radio" name="commMode" value="full"> 전곡</label></div>
+    <label>들은 사람의 의견은?</label>
+    <div class="row"><label style="flex:0 0 auto"><input type="radio" name="commPub" value="1" checked> 공개 (곡 페이지에 보임)</label>
+      <label style="flex:0 0 auto"><input type="radio" name="commPub" value="0"> 나만 보기</label></div>
+    <label>한 줄 소개 (선택, 비우면 곡 소개)</label><input type="text" id="commIntro" maxlength="500">
+    <div class="consent" style="margin-top:8px">
+      <label><input type="checkbox" id="cc1"> (필수) 내가 만든 곡이거나 공개할 권리가 있어요.</label>
+      <label><input type="checkbox" id="cc2"> (필수) 커뮤니티에 공개하고, 직접 내릴 때까지 보관하는 데 동의해요. (작업의 7일 삭제와 별도)</label>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="primary" id="commPublish">커뮤니티에 올리기</button></div>
+    <div id="commErr" class="err hide"></div>
+  </section>
+
   <section class="card"><h2>호출 기록</h2><div class="log" id="log"></div></section>
 </main>
 
@@ -424,7 +442,7 @@ document.querySelectorAll("[data-job]").forEach(a => a.onclick = (e) => { e.prev
 function openJob(id) {
   jobId = id; $("jobid").value = id; $("jobLabel").textContent = id;
   rememberJob(id);
-  ["note", "result"].forEach(s => show(s, false));
+  ["note", "result", "community"].forEach(s => show(s, false));
   show("progress"); poll();
 }
 
@@ -623,6 +641,7 @@ async function loadPackage(stage) {
       <div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 더 짧게)" data-req="${c.item_id}"><button style="flex:0 0 auto" data-regen="${c.item_id}" ${c.regenerate_remaining ? "" : "disabled"}>다시 쓰기 · ${c.regenerate_remaining}회 남음</button></div>`;
   }).join("");
   renderRelease(p);
+  loadCommunity();
   $("pitch").innerHTML = Object.keys(p.pitch).length ? "<h2>피칭 메일 <span class='hint'>(선택 — 웹진·라디오·해외 큐레이터)</span></h2>" + Object.entries(p.pitch).map(([lang, m]) =>
     `<label>${lang === "en" ? "영어" : "한국어"}${m.v > 1 ? ` · ${m.v}번째 버전` : ""} — 제목: ${esc(m.subject)}</label><div class="copy">${esc(m.body).replace(/(\[[^\]]+\])/g, '<mark>$1</mark>')}</div>
      <div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 더 짧고 캐주얼하게)" data-req="${m.item_id}"><button style="flex:0 0 auto" data-regen="${m.item_id}" ${m.regenerate_remaining ? "" : "disabled"}>다시 쓰기 · ${m.regenerate_remaining}회 남음</button></div>`).join("") : "";
@@ -704,6 +723,30 @@ function coverName(id) { return id === "cover-own" ? "직접 올린 사진" : `�
 function ratioName(r) { const [w, h] = r.split(/[x:]/).map(Number); const kind = w === h ? "정사각" : w < h ? "세로" : "가로"; return h ? `${kind} ${w}:${h}` : r; }
 // AI가 쓴 글·밴드 입력은 전부 esc를 거쳐 innerHTML에 넣는다 (속성값에도 쓰므로 따옴표까지)
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
+// ---------- 5. 커뮤니티 (10/9) ----------
+function commShow(t) {
+  const full = location.origin + t.manage_url;
+  $("commNow").innerHTML = `<b>올라가 있어요</b> — ${t.listen_mode === "highlight" ? "하이라이트 " + Math.round(t.clip_sec) + "초" : "전곡"} · 의견 ${t.comments_public ? "공개" : "나만 보기"} · 재생 ${t.plays} · 반응 ${t.stats.reactions}<br>
+    <a href="/community#${t.track_id}" target="_blank">커뮤니티에서 보기</a> · <a href="${esc(full)}" target="_blank">내 곡 반응 보기 (관리 링크 — 따로 저장해 두세요)</a>`;
+  document.querySelector(`input[name=commMode][value=${t.listen_mode}]`).checked = true;
+  document.querySelector(`input[name=commPub][value="${t.comments_public ? 1 : 0}"]`).checked = true;
+  $("commPublish").textContent = "설정 바꾸기";
+}
+async function loadCommunity() {
+  show("community");
+  try { commShow(await api("GET", `/jobs/${jobId}/community`)); }
+  catch (e) { $("commNow").textContent = "아직 올리지 않았어요."; $("commPublish").textContent = "커뮤니티에 올리기"; }
+}
+$("commPublish").onclick = async () => {
+  show("commErr", false);
+  try {
+    commShow(await api("POST", `/jobs/${jobId}/community`, {
+      listen_mode: document.querySelector("input[name=commMode]:checked").value,
+      comments_public: document.querySelector("input[name=commPub]:checked").value === "1",
+      intro: $("commIntro").value.trim() || null, consent_rights: $("cc1").checked, consent_public: $("cc2").checked }));
+  } catch (e) { alertBox("commErr", e.message || "올리지 못했어요."); }
+};
+
 function alertBox(id, msg) { const el = $(id); el.textContent = msg; show(id); }
 </script>
 <div id="zoom" class="hide"><img alt=""><div><a download>다운로드</a> · <span style="color:#ccc">아무 데나 누르거나 Esc로 닫기</span></div></div>

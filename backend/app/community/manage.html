@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>내 곡 반응 — 들어봐</title>
+<!-- 임시 화면 (백엔드 확인용). 주소: /community/manage?t=<track_id>#key=<owner_key> — 키는 # 뒤라 서버로 안 감 -->
+<style>
+  :root { --bg:#f6f5f2; --card:#fff; --ink:#1d1d1f; --sub:#6b6b70; --line:#e4e2dd; --accent:#e0533c; --chip:#f0eee9; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141416; --card:#1f1f23; --ink:#f2f2f2; --sub:#9a9aa2; --line:#2e2e34; --accent:#ff7a5c; --chip:#2a2a30; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  .wrap { max-width:720px; margin:0 auto; padding:24px 16px 80px; }
+  .box { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; margin-top:14px; }
+  .head { display:flex; gap:16px; align-items:center; }
+  .head img { width:96px; height:96px; border-radius:10px; object-fit:cover; }
+  h1 { margin:0; font-size:22px; } h2 { margin:0 0 10px; font-size:16px; }
+  .sub { color:var(--sub); font-size:13px; }
+  .nums { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; text-align:center; }
+  .nums b { display:block; font-size:24px; }
+  .barrow { display:flex; align-items:center; gap:8px; font-size:13px; margin:4px 0; }
+  .barrow span:first-child { width:110px; flex:none; }
+  .track { flex:1; background:var(--chip); border-radius:5px; height:10px; overflow:hidden; }
+  .track i { display:block; height:100%; background:var(--accent); }
+  .fb { border-top:1px solid var(--line); padding:10px 0; font-size:14px; }
+  .fb.hidden { opacity:.45; }
+  .fb small { color:var(--sub); }
+  .link { background:none; border:none; color:var(--sub); text-decoration:underline; cursor:pointer; font:inherit; font-size:12px; padding:0; }
+  label.opt { display:flex; gap:8px; align-items:flex-start; margin:8px 0; cursor:pointer; }
+  input[type=text] { width:100%; font:inherit; color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
+  button.main { padding:9px 16px; border:none; border-radius:10px; background:var(--ink); color:var(--bg); font:inherit; cursor:pointer; }
+  button.danger { padding:9px 16px; border:1px solid #d93025; border-radius:10px; background:none; color:#d93025; font:inherit; cursor:pointer; }
+  .err { color:#d93025; } .ok { color:#1f9d55; }
+  code { background:var(--chip); padding:2px 6px; border-radius:6px; font-size:12px; word-break:break-all; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="sub"><a href="/community" style="color:inherit">← 들어봐 커뮤니티</a></div>
+  <div id="err" class="err"></div>
+  <div id="app" hidden>
+    <div class="box head">
+      <img id="cover" alt="">
+      <div><h1 id="title"></h1><div class="sub" id="artist"></div><div class="sub" id="mode"></div></div>
+    </div>
+
+    <div class="box">
+      <div class="nums">
+        <div><b id="plays">0</b><span class="sub">재생</span></div>
+        <div><b id="reactions">0</b><span class="sub">반응</span></div>
+        <div><b id="avg">-</b><span class="sub">평균 별점</span></div>
+      </div>
+    </div>
+
+    <div class="box"><h2>들은 사람들이 고른 것</h2><div id="tagBars"></div><h2 style="margin-top:16px">별점 분포</h2><div id="ratingBars"></div></div>
+
+    <div class="box"><h2>받은 의견 <span class="sub" id="pubNote"></span></h2><div id="feedback"></div></div>
+
+    <div class="box">
+      <h2>설정</h2>
+      <div class="sub">어떻게 들려줄까요?</div>
+      <label class="opt"><input type="radio" name="mode" value="highlight"> <span><b>하이라이트만</b> — A&R 노트에서 고른 15초 구간</span></label>
+      <label class="opt"><input type="radio" name="mode" value="full"> <span><b>전곡</b></span></label>
+      <div class="sub" style="margin-top:12px">의견은 누가 볼까요?</div>
+      <label class="opt"><input type="radio" name="pub" value="1"> <span><b>공개</b> — 곡 페이지에 의견과 별점이 보여요</span></label>
+      <label class="opt"><input type="radio" name="pub" value="0"> <span><b>나만 보기</b> — 들은 사람의 의견은 여기서만 볼 수 있어요</span></label>
+      <div class="sub" style="margin-top:12px">한 줄 소개</div>
+      <input type="text" id="intro" maxlength="500">
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center"><button class="main" id="save">저장</button><span id="saveMsg"></span></div>
+    </div>
+
+    <div class="box">
+      <h2>관리 링크</h2>
+      <div class="sub">이 페이지 주소가 곧 열쇠예요. 다른 사람에게 보내지 말고 따로 저장해 두세요.</div>
+      <p><code id="manageUrl"></code></p>
+      <button class="main" id="copy">주소 복사</button>
+    </div>
+
+    <div class="box">
+      <h2>곡 내리기</h2>
+      <div class="sub">음원·커버·받은 반응이 모두 지워지고 되돌릴 수 없어요.</div>
+      <p><button class="danger" id="del">곡 내리기</button> <span id="delMsg"></span></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const tid = new URLSearchParams(location.search).get('t');
+const key = new URLSearchParams(location.hash.slice(1)).get('key');
+const api = async (path, opt = {}) => {
+  const r = await fetch(path, { ...opt, headers: { 'Content-Type': 'application/json', 'X-Owner-Key': key || '', ...(opt.headers || {}) } });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.message || '문제가 생겼어요');
+  return d;
+};
+const bars = (box, entries, max) => box.replaceChildren(...entries.map(([k, n]) =>
+  el('div', { className: 'barrow' }, el('span', { textContent: k }),
+    el('div', { className: 'track' }, el('i', { style: `width:${max ? n / max * 100 : 0}%` })), el('span', { textContent: n }))));
+
+function render(t) {
+  $('#app').hidden = false;
+  $('#cover').src = t.cover_url; $('#title').textContent = t.title; $('#artist').textContent = t.artist;
+  $('#mode').textContent = (t.listen_mode === 'highlight' ? `하이라이트 ${Math.round(t.clip_sec)}초 공개` : '전곡 공개') + ' · 의견 ' + (t.comments_public ? '공개' : '나만 보기');
+  $('#plays').textContent = t.plays; $('#reactions').textContent = t.stats.reactions;
+  $('#avg').textContent = t.stats.rating_avg ? '★' + t.stats.rating_avg : '-';
+  const tags = Object.entries(t.stats.tags).sort((a, b) => b[1] - a[1]);
+  bars($('#tagBars'), tags, Math.max(...tags.map(x => x[1]), 1));
+  const dist = [5, 4, 3, 2, 1].map(i => [`★${i}`, t.stats.rating_dist[i]]);
+  bars($('#ratingBars'), dist, Math.max(...dist.map(x => x[1]), 1));
+  $('#pubNote').textContent = t.comments_public ? '(곡 페이지에 공개 중)' : '(나만 보는 중)';
+  const fb = $('#feedback'); fb.replaceChildren();
+  if (!t.feedback.length) fb.append(el('div', { className: 'sub', textContent: '아직 받은 반응이 없어요. 커뮤니티 주소를 친구들에게도 알려 보세요.' }));
+  for (const f of t.feedback) {
+    const hideBtn = el('button', { className: 'link', textContent: f.hidden ? '다시 보이기' : '숨기기' });
+    hideBtn.onclick = async () => { await api(`/community/tracks/${tid}/feedback/${f.id}/hide`, { method: 'POST', body: JSON.stringify({ hidden: !f.hidden }) }); load(); };
+    fb.append(el('div', { className: 'fb' + (f.hidden ? ' hidden' : '') },
+      el('div', {}, el('b', { textContent: f.nickname }), ' ', el('small', { textContent: (f.rating ? '★' + f.rating + ' · ' : '') + new Date(f.created_at).toLocaleString('ko-KR') }), ' ', hideBtn),
+      ...(f.tags.length ? [el('div', { className: 'sub', textContent: f.tags.join(' · ') })] : []),
+      ...(f.comment ? [el('div', { textContent: f.comment })] : [])));
+  }
+  document.querySelector(`input[name=mode][value=${t.listen_mode}]`).checked = true;
+  document.querySelector(`input[name=pub][value="${t.comments_public ? 1 : 0}"]`).checked = true;
+  $('#intro').value = t.intro;
+  $('#manageUrl').textContent = location.href;
+}
+async function load() {
+  try { render(await api(`/community/tracks/${tid}/owner`)); }
+  catch (e) { $('#err').textContent = e.message; }
+}
+$('#save').onclick = async () => {
+  const msg = $('#saveMsg'); msg.className = ''; msg.textContent = '저장 중…';
+  try {
+    render(await api(`/community/tracks/${tid}`, { method: 'PATCH', body: JSON.stringify({
+      listen_mode: document.querySelector('input[name=mode]:checked').value,
+      comments_public: document.querySelector('input[name=pub]:checked').value === '1', intro: $('#intro').value }) }));
+    msg.className = 'ok'; msg.textContent = '저장했어요';
+  } catch (e) { msg.className = 'err'; msg.textContent = e.message; }
+};
+$('#copy').onclick = () => navigator.clipboard.writeText(location.href).then(() => $('#copy').textContent = '복사했어요');
+let armed = false;
+$('#del').onclick = async () => {
+  if (!armed) { armed = true; $('#del').textContent = '정말 내릴게요 (한 번 더 누르기)'; return; }
+  try { await api(`/community/tracks/${tid}`, { method: 'DELETE' }); $('#app').hidden = true; $('#err').className = 'ok'; $('#err').textContent = '곡을 내렸어요.'; }
+  catch (e) { $('#delMsg').textContent = e.message; }
+};
+if (!tid || !key) $('#err').textContent = '관리 링크가 올바르지 않아요. 곡을 올릴 때 받은 주소 전체로 열어 주세요.';
+else load();
+</script>
+</body>
+</html>

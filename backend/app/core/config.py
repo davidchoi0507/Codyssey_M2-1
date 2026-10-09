@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     retention_days: int = 7
     keep_job_ids: str = ""  # 쉼표 구분 — 7일 삭제에서 빼는 작업 (팀 공유 샘플 등)
 
+    # 커뮤니티 (곡 공개·반응)
+    community_enabled: bool = True     # /community 페이지와 API
+    community_daily_publish_per_client: int = 5
+    feedback_daily_per_client: int = 30        # 접속 IP별 하루 반응 수 (전체 곡 합)
+    feedback_daily_per_client_track: int = 3   # 한 곡에 같은 IP가 하루 남길 수 있는 반응 수
+
     # 미디어
     font_path: Path = Path("./app/fonts/NotoSansKR-Bold.ttf")
     highlight_sec: float = 15.0
@@ -92,6 +98,10 @@ class Settings(BaseSettings):
     @property
     def jobs_dir(self) -> Path:
         return self.data_dir / "jobs"
+
+    @property
+    def community_dir(self) -> Path:
+        return self.data_dir / "community"
 
 
 @lru_cache

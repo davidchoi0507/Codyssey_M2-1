@@ -44,6 +44,43 @@ CREATE TABLE IF NOT EXISTS consents (
     job_id  TEXT PRIMARY KEY,
     record  TEXT NOT NULL         -- JSON (동의 항목, 문구 버전, 시각, Gemini 티어)
 );
+
+-- 커뮤니티 (DECISIONS #31): 작업에서 꺼내 공개한 곡. 작업(7일 삭제)과 따로 data/community/<track_id>/ 에 보관
+CREATE TABLE IF NOT EXISTS tracks (
+    track_id        TEXT PRIMARY KEY,
+    job_id          TEXT UNIQUE,       -- 작업이 7일 뒤 지워져도 곡은 남는다 (작업당 한 곡)
+    title           TEXT NOT NULL,
+    artist          TEXT NOT NULL,
+    genre           TEXT NOT NULL DEFAULT '',
+    intro           TEXT NOT NULL DEFAULT '',
+    listen_mode     TEXT NOT NULL,     -- full | highlight
+    clip_start      REAL,              -- highlight일 때 원곡 기준 구간
+    clip_sec        REAL NOT NULL,     -- 공개 음원 길이
+    comments_public INTEGER NOT NULL,  -- 1: 의견을 누구나 봄, 0: 올린 사람만
+    colors          TEXT NOT NULL DEFAULT '[]',
+    moods           TEXT NOT NULL DEFAULT '[]',
+    plays           INTEGER NOT NULL DEFAULT 0,
+    status          TEXT NOT NULL DEFAULT 'live',  -- live | hidden(운영자가 내림)
+    band_code       TEXT,
+    client          TEXT,
+    consent         TEXT NOT NULL,     -- JSON (공개 동의 항목, 문구 버전, 시각)
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS tracks_created ON tracks(status, created_at);
+
+CREATE TABLE IF NOT EXISTS feedback (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    track_id  TEXT NOT NULL,
+    ts        TEXT NOT NULL,
+    nickname  TEXT,
+    rating    INTEGER,            -- 1~5, 없을 수 있음
+    tags      TEXT NOT NULL,      -- JSON 목록 (정해진 반응 태그)
+    comment   TEXT,
+    client    TEXT,               -- 접속 IP — 남용 제한용, 화면엔 안 나감
+    hidden    INTEGER NOT NULL DEFAULT 0  -- 올린 사람·운영자가 숨김
+);
+CREATE INDEX IF NOT EXISTS feedback_track ON feedback(track_id, id);
 """
 
 _initialized: set[Path] = set()

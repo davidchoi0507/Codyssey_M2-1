@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
-from app.api import band, files, jobs, note, package
+from app.api import band, community, files, jobs, note, package
 from app.db import import_legacy_files
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -81,7 +81,7 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-for r in (band.router, jobs.router, note.router, package.router, files.router):
+for r in (band.router, jobs.router, note.router, package.router, files.router, community.router):
     app.include_router(r)
 
 if settings.playground_enabled:
