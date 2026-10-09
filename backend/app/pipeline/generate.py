@@ -1,27 +1,31 @@
 """생성 파이프라인 (노트 수락 후): 비주얼 디렉터 → 커버 3장 + 카피라이터 채널 4종 + 피칭 메일(영·한).
 
-- 비주얼 디렉터·카피라이터·피칭은 병렬. 커버 3장도 동시에 생성 (이미지 API 동시 호출 수는 세마포어로 제한).
+- 비주얼 디렉터·카피라이터·피칭은 병렬. 커버는 방향마다 후보 cover_candidates장(기본 2)을 동시에 만들어 마감(finish_cover)한 뒤
+  Gemini Flash Lite가 하나를 고른다 (이미지 API 동시 호출 수는 세마포어로 제한, 고르기 실패 시 첫 후보).
 - 결과는 버전 번호를 붙여 저장하고, 다시 실행하면 이미 있는 파일은 건너뛴다 (실패한 항목부터 재실행).
 - 끝나면 awaiting_cover (사용자가 커버를 고르면 숏폼·채널 이미지 렌더링 — 10/7·10/9).
 """
 import asyncio
 import logging
+import shutil
 import time
+from pathlib import Path
 
 from app.adapters.codyssey_image import CodysseyImage
 from app.agents.copywriter import write_copy
+from app.agents.cover_judge import pick_cover
 from app.agents.pitch import write_pitch
 from app.agents.visual import plan_covers
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import Stage
-from app.media.images import save_png, upscale
+from app.media.images import finish_cover, save_png, upscale
 from app.pipeline.jobfiles import JobFiles, now_iso
 from app.schemas.note import ARNote
-from app.schemas.package import CHANNELS, VisualPlan
+from app.schemas.package import CHANNELS, CoverPrompt, VisualPlan
 
 log = logging.getLogger(__name__)
-IMAGE_CONCURRENCY = 3
+IMAGE_CONCURRENCY = 4  # 후보까지 방향당 2장 → 6장. 장당 15초 안팎
 
 
 def accepted_note(jf: JobFiles) -> ARNote:
@@ -56,22 +60,40 @@ async def _covers(settings: Settings, jf: JobFiles, note: ARNote, song: dict, li
 
     image = CodysseyImage(settings)
     sem = asyncio.Semaphore(IMAGE_CONCURRENCY)
+    n = settings.cover_candidates
 
-    async def one(idx: int, prompt: str, direction_id: str) -> None:
-        png_path, big_path = jf.cover(idx, 1), jf.cover(idx, 1, "_3000")
-        if not png_path.exists():
+    async def candidate(idx: int, k: int, cover: CoverPrompt) -> Path:
+        path = jf.cover(idx, 1, f"_cand{k}") if n > 1 else jf.cover(idx, 1)
+        if not path.exists():
             async with sem:
                 t = time.monotonic()
-                png, meta = await image.generate(prompt)
-            size = await asyncio.to_thread(save_png, png, png_path)
-            jf.event("cover_generated", item=f"cover-{idx}", direction_id=direction_id, v=1, size=list(size),
-                     sec=round(time.monotonic() - t, 1), **meta)
+                png, meta = await image.generate(cover.prompt)
+            size = await asyncio.to_thread(save_png, png, path)
+            await asyncio.to_thread(finish_cover, path, note.colors, cover.finish)
+            jf.event("cover_generated", item=f"cover-{idx}", direction_id=cover.direction_id, v=1, cand=k,
+                     size=list(size), sec=round(time.monotonic() - t, 1), recipe=cover.recipe, finish=cover.finish,
+                     **meta)
+        return path
+
+    async def one(idx: int, cover: CoverPrompt) -> None:
+        png_path, big_path = jf.cover(idx, 1), jf.cover(idx, 1, "_3000")
+        if not png_path.exists():
+            got = await asyncio.gather(*(candidate(idx, k, cover) for k in range(1, n + 1)), return_exceptions=True)
+            paths = [g for g in got if isinstance(g, Path)]
+            if not paths:
+                raise next(g for g in got if isinstance(g, Exception))
+            if n > 1:
+                # 후보가 하나만 살아남았거나 고르기가 실패하면 첫 후보 — 고르기 때문에 작업이 멈추지 않게
+                picked = await pick_cover(settings, note, cover.direction_id, paths) if len(paths) > 1 else None
+                best = picked[0] if picked else 0
+                shutil.copyfile(paths[best], png_path)
+                jf.event("cover_judged", item=f"cover-{idx}", direction_id=cover.direction_id, candidates=len(paths),
+                         chosen=paths[best].stem.rsplit("_cand", 1)[-1], **(picked[1] if picked else {"fallback": True}))
         if not big_path.exists():
             await asyncio.to_thread(upscale, png_path, big_path, 3000)
 
     order = {c.id: i for i, c in enumerate(note.cover_directions, 1)}
-    results = await asyncio.gather(*(one(order[c.direction_id], c.prompt, c.direction_id) for c in plan.covers),
-                                   return_exceptions=True)
+    results = await asyncio.gather(*(one(order[c.direction_id], c) for c in plan.covers), return_exceptions=True)
     errors = [r for r in results if isinstance(r, Exception)]
     if errors:
         for e in errors:

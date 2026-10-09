@@ -83,7 +83,7 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
     models: set[str] = set()
     for e in events:
         if e.get("model") and e["event"] in ("cover_generated", "visual_meta", "copy_meta", "pitch_meta", "note_meta",
-                                            "item_regenerated"):
+                                            "item_regenerated", "cover_judged"):
             models.add(e["model"])
     if jf.listening.exists():
         models.add("gemini:" + jf.read_json(jf.listening)["meta"]["model"])

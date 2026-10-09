@@ -19,7 +19,7 @@ from app.analysis.labels import display_energy, display_key
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import Stage
-from app.media.images import save_png, upscale
+from app.media.images import finish_cover, save_png, upscale
 from app.pipeline.generate import accepted_note, song_duration
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.render import SHORT_TEMPLATE, cover_file
@@ -52,12 +52,14 @@ async def regenerate(settings: Settings, jf: JobFiles, item_id: str, request: st
     if kind == "cover":
         idx = int(key)
         plan = VisualPlan.model_validate(jf.read_json(jf.cover_prompts(1)))
-        prompt = next(c.prompt for c in plan.covers if c.direction_id == f"c{idx}")
+        cover = next(c for c in plan.covers if c.direction_id == f"c{idx}")
+        prompt = cover.prompt
         if request:
             prompt += f"\n\nRevision request from the band (may be Korean, follow it): {request}"
         v = (jf.latest_version(lambda i: jf.cover(idx, i)) or 0) + 1
         png, meta = await CodysseyImage(settings).generate(prompt)
         save_png(png, jf.cover(idx, v))
+        finish_cover(jf.cover(idx, v), note.colors, cover.finish)
         upscale(jf.cover(idx, v), jf.cover(idx, v, "_3000"), 3000)
     elif kind == "copy":
         prev_v = jf.latest_version(lambda i: jf.channel_copy(key, i)) or 0

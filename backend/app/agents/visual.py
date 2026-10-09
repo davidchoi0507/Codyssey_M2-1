@@ -6,6 +6,8 @@ from app.prompts import load_prompt
 from app.schemas.note import ARNote
 from app.schemas.package import VisualPlan
 
+OVERUSED = {"film_snapshot", "painterly", "swiss_graphic"}  # 방향이 사진·일러스트·그래픽일 때 늘 이것만 고르는 경향
+
 
 async def plan_covers(settings: Settings, note: ARNote, song: dict, listening: dict | None) -> tuple[VisualPlan, dict]:
     ids = [c.id for c in note.cover_directions]
@@ -22,9 +24,21 @@ async def plan_covers(settings: Settings, note: ARNote, song: dict, listening: d
         if listening else None,
     }
 
+    soft_asked = False
+
     def check(p: VisualPlan) -> list[str]:
+        nonlocal soft_asked
         got = [c.direction_id for c in p.covers]
-        return [] if sorted(got) == sorted(ids) else [f"covers의 direction_id가 {ids}와 맞지 않음: {got}"]
+        if sorted(got) != sorted(ids):
+            return [f"covers의 direction_id가 {ids}와 맞지 않음: {got}"]
+        # 레시피 다양성은 한 번만 다시 쓰게 한다 (두 번째에도 같으면 그대로 씀 — 작업을 실패시키지 않게)
+        recipes = [c.recipe for c in p.covers]
+        defaults = [r for r in recipes if r in OVERUSED]
+        if not soft_asked and (len(set(recipes)) < len(recipes) or len(defaults) > 1):
+            soft_asked = True
+            return [f"recipe가 겹치거나 기본 레시피({', '.join(sorted(OVERUSED))})를 2개 이상 썼음: {recipes}. "
+                    "곡의 분위기에 맞는 다른 레시피로 바꿔서 다시 써 줘"]
+        return []
 
     plan, usage = await ask_json(chat_model(settings), load_prompt("visual_director"), payload, VisualPlan,
                                  check=check, what="커버 방향")

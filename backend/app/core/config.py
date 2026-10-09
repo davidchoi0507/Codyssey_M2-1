@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     band_code_required: bool = False  # true면 곡을 올릴 때 초대 코드(X-Band-Code) 필수 — 밴드 테스트 때 켬
     note_edits_per_job: int = 5
     cover_regen_per_job: int = 3
+    cover_candidates: int = Field(default=2, ge=1, le=3)  # 방향마다 만들 후보 수 — 2 이상이면 Gemini가 하나 고름, 1이면 끔
+    cover_judge_model: str = "gemini-3.5-flash-lite"  # 커버 고르기 전용 (하루 500회 — 듣기용 상위 모델 한도를 안 씀)
     retention_days: int = 7
     keep_job_ids: str = ""  # 쉼표 구분 — 7일 삭제에서 빼는 작업 (팀 공유 샘플 등)
 

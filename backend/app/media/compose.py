@@ -69,8 +69,9 @@ def _wrap(draw: ImageDraw.ImageDraw, text: str, f: ImageFont.FreeTypeFont, max_w
 
 
 def draw_text(img: Image.Image, text: str, *, font_path: Path, size: int, y: int, max_width: int | None = None,
-              color=(255, 255, 255), opacity: float = 1.0, max_lines: int = 2, x_center: int | None = None) -> int:
-    """가운데 정렬 글자 + 은은한 그림자. 반환: 마지막 줄 아래 y.
+              color=(255, 255, 255), opacity: float = 1.0, max_lines: int = 2, x_center: int | None = None,
+              x_left: int | None = None) -> int:
+    """가운데 정렬 글자 + 은은한 그림자 (x_left를 주면 왼쪽 정렬). 반환: 마지막 줄 아래 y.
 
     max_lines에 안 들어가면 글자를 60%까지 줄이고, 그래도 넘치면 마지막 줄 끝을 "…"로 줄인다 (긴 제목이 말없이 잘리던 문제).
     """
@@ -97,7 +98,7 @@ def draw_text(img: Image.Image, text: str, *, font_path: Path, size: int, y: int
     alpha = int(255 * opacity)
     for i, line in enumerate(lines):
         w = d.textlength(line, font=f)
-        pos = (cx - w / 2, y + i * line_h)
+        pos = (cx - w / 2 if x_left is None else x_left, y + i * line_h)
         d.text((pos[0] + 2, pos[1] + 3), line, font=f, fill=(0, 0, 0, int(alpha * 0.45)))
         d.text(pos, line, font=f, fill=(*color, alpha))
     img.alpha_composite(layer) if img.mode == "RGBA" else img.paste(layer, (0, 0), layer)
@@ -146,21 +147,41 @@ def channel_image(cover: Image.Image, size: tuple[int, int], layout: str, *, fon
     return img.convert("RGB")
 
 
-def title_cover(cover: Image.Image, *, font_path: Path, title: str, artist: str, accent) -> Image.Image:
-    """발매용 3000px 커버에 제목·아티스트를 얹은 버전 (url_title). 원본(글자 없음)도 따로 남는다."""
+def title_cover(cover: Image.Image, *, font_path: Path, title: str, artist: str, accent,
+                layout: str = "bottom") -> Image.Image:
+    """발매용 3000px 커버에 제목·아티스트를 얹은 버전 (url_title). 원본(글자 없음)도 따로 남는다.
+
+    layout은 비주얼 디렉터가 그림의 빈 자리를 보고 고른다: bottom(아래 가운데) | bottom_left | top_left.
+    """
     s = cover.width
     img = cover.convert("RGBA")
+    if layout in ("bottom_left", "top_left"):
+        x, w = int(s * 0.07), int(s * 0.72)
+        if layout == "top_left":
+            _bottom_gradient(img, int(s * 0.30), top=True)
+            y = int(s * 0.07)
+        else:
+            _bottom_gradient(img, int(s * 0.30))
+            y = int(s * 0.84)
+        y = draw_text(img, title, font_path=font_path, size=int(s * 0.048), y=y, color=accent, max_lines=1,
+                      max_width=w, x_left=x)
+        draw_text(img, artist, font_path=font_path, size=int(s * 0.028), y=y + int(s * 0.004), opacity=0.85,
+                  max_lines=1, max_width=w, x_left=x)
+        return img.convert("RGB")
     _bottom_gradient(img, int(s * 0.32))
     y = draw_text(img, title, font_path=font_path, size=int(s * 0.055), y=int(s * 0.835), color=accent, max_lines=1)
     draw_text(img, artist, font_path=font_path, size=int(s * 0.032), y=y + int(s * 0.004), opacity=0.85, max_lines=1)
     return img.convert("RGB")
 
 
-def _bottom_gradient(img: Image.Image, height: int) -> None:
+def _bottom_gradient(img: Image.Image, height: int, top: bool = False) -> None:
+    """글자 뒤를 은은하게 어둡게 (top=True면 위쪽에서 아래로)."""
     grad = Image.new("L", (1, height))
     for i in range(height):
         grad.putpixel((0, i), int(200 * (i / height) ** 1.6))
     mask = grad.resize((img.width, height))
+    if top:
+        mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
     shade = Image.new("RGBA", (img.width, height), (0, 0, 0, 255))
     shade.putalpha(mask)
-    img.alpha_composite(shade, (0, img.height - height))
+    img.alpha_composite(shade, (0, 0 if top else img.height - height))

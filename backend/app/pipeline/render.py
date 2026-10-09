@@ -22,6 +22,7 @@ from app.media import compose
 from app.media.video import render_canvas, render_short
 from app.pipeline.generate import accepted_note
 from app.pipeline.jobfiles import JobFiles, now_iso
+from app.schemas.package import VisualPlan
 
 log = logging.getLogger(__name__)
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
@@ -93,6 +94,15 @@ def _swap_renders(jf: JobFiles, prev_key: str, new_key: str) -> None:
         shutil.rmtree(cached, ignore_errors=True)
 
 
+def _title_layout(jf: JobFiles, item_id: str) -> str:
+    """비주얼 디렉터가 고른 제목 자리 (직접 올린 사진·예전 작업은 bottom)."""
+    kind, _, key = item_id.partition("-")
+    if kind != "cover" or not jf.cover_prompts(1).exists():
+        return "bottom"
+    plan = VisualPlan.model_validate(jf.read_json(jf.cover_prompts(1)))
+    return next((c.title_layout for c in plan.covers if c.direction_id == f"c{key}"), "bottom")
+
+
 async def run_render(settings: Settings, jf: JobFiles) -> None:
     sel = jf.read_json(jf.selected_cover)
     note = accepted_note(jf)
@@ -103,6 +113,7 @@ async def run_render(settings: Settings, jf: JobFiles) -> None:
     tiktok = jf.latest_version(lambda v: jf.channel_copy("tiktok", v))
     hook = (jf.read_json(jf.channel_copy("tiktok", tiktok)).get("hook") if tiktok else None) or " · ".join(note.mood_keywords[:2])
     src_cover = cover_file(jf, sel["item_id"], sel["v"])
+    title_layout = _title_layout(jf, sel["item_id"])
     original = jf.find_original()
 
     jf.set_status(Stage.RENDERING, step="render")
@@ -135,8 +146,8 @@ async def run_render(settings: Settings, jf: JobFiles) -> None:
                                                   title=title, artist=artist, accent=accent).save(out, optimize=True)
                 titled = src_cover.with_name(src_cover.name.replace("_3000", "_title"))
                 if not titled.exists():
-                    compose.title_cover(cover, font_path=font, title=title, artist=artist,
-                                        accent=accent).save(titled, optimize=True)
+                    compose.title_cover(cover, font_path=font, title=title, artist=artist, accent=accent,
+                                        layout=title_layout).save(titled, optimize=True)
 
             await asyncio.to_thread(stills)
             sel_range = note.highlight.selected

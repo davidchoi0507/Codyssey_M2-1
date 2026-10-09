@@ -71,7 +71,11 @@ class Package(BaseModel):
 
 class CoverPrompt(BaseModel):
     direction_id: str = Field(description="커버 방향 id (c1~c3)")
+    recipe: str | None = Field(default=None, description="고른 레시피 이름 (예: film_snapshot)")
     prompt: str = Field(description="이미지 생성 프롬프트 (영어)")
+    finish: Literal["film", "print", "clean"] = Field(default="film", description="후처리: film | print | clean")
+    title_layout: Literal["bottom", "top_left", "bottom_left"] = Field(
+        default="bottom", description="발매용 커버에서 제목 자리: bottom | top_left | bottom_left")
 
 
 class VisualPlan(BaseModel):
