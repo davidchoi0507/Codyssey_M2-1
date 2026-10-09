@@ -8,10 +8,12 @@ import yaml
 from app.core.config import Settings, get_settings
 from app.core.stages import ANALYSIS_STEPS, QUEUED_LABEL, STAGE_LABELS, Stage
 from app.pipeline.jobfiles import JobFiles
-from app.pipeline.render import SHORT_TEMPLATE, TEMPLATES
+from app.pipeline.release import release_plan, submission_check
+from app.pipeline.render import SHORT_TEMPLATE, TEMPLATES, cover_file_or_none
 from app.schemas.common import AIGenerated, ErrorInfo
 from app.schemas.job import EarlyResult, JobStatus, StepStatus
-from app.schemas.package import CHANNELS, ChannelOut, CoverItem, CoverVersion, Package, PitchOut, VideoItem
+from app.schemas.package import (CHANNELS, ChannelOut, CoverItem, CoverVersion, EditorialOut, Package, PitchOut,
+                                  VideoItem)
 
 _STEP_PROGRESS = {"measure": 0.15, "listen": 0.45, "note": 0.8}
 VIDEO_CHANNELS = ("tiktok", "instagram")  # 숏폼(9:16)을 올리는 채널 — 틱톡, 인스타 릴스
@@ -83,7 +85,7 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
     models: set[str] = set()
     for e in events:
         if e.get("model") and e["event"] in ("cover_generated", "visual_meta", "copy_meta", "pitch_meta", "note_meta",
-                                            "item_regenerated", "cover_judged"):
+                                            "item_regenerated", "cover_judged", "editorial_meta"):
             models.add(e["model"])
     if jf.listening.exists():
         models.add("gemini:" + jf.read_json(jf.listening)["meta"]["model"])
@@ -136,6 +138,19 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
             videos.append(VideoItem(item_id=f"short-{template}" if kind == "short" else "canvas", kind=kind,
                                     template=template, url=url_for(jf.video(name)), duration=duration))
 
+    editorial = None
+    ev = jf.latest_version(jf.editorial)
+    if ev:
+        d = jf.read_json(jf.editorial(ev))
+        editorial = EditorialOut(spotify_ko=d["spotify_ko"], spotify_en=d["spotify_en"], dsp_intro_ko=d["dsp_intro_ko"],
+                                 tags=d["tags"], v=ev, request=requests.get(("editorial", ev)),
+                                 regenerate_remaining=regen_remaining(settings, jf, "editorial", events))
+
+    song = jf.read_json(jf.song)
+    duration = float(jf.read_json(jf.features)["duration_sec"]) if jf.features.exists() else 0.0
+    check = submission_check(jf, song, sel, cover_file_or_none(jf, sel["item_id"], sel["v"]) if sel else None, duration)
+
     return Package(job_id=jf.job_id, stage=st["stage"], covers=covers, videos=videos, channels=channels, pitch=pitch,
                    zip_url=zip_url if st["stage"] == Stage.DONE else None,
-                   ai_generated=AIGenerated(notice="이 결과물은 AI로 생성되었습니다.", models=sorted(models)))
+                   ai_generated=AIGenerated(notice="이 결과물은 AI로 생성되었습니다.", models=sorted(models)),
+                   editorial=editorial, release_plan=release_plan(song), submission_check=check)

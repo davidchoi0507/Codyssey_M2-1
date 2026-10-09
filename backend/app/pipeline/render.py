@@ -15,6 +15,7 @@ from pathlib import Path
 import yaml
 from PIL import Image
 
+from app.agents.cover_inspect import inspect_cover
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import Stage
@@ -94,6 +95,16 @@ def _swap_renders(jf: JobFiles, prev_key: str, new_key: str) -> None:
         shutil.rmtree(cached, ignore_errors=True)
 
 
+async def _inspect(settings: Settings, jf: JobFiles, sel: dict, cover: Path) -> None:
+    """고른 커버(글자 없는 3000px)를 유통사 기준으로 검사해 둔다. 실패해도 렌더링은 계속 (검수 목록에 '직접 확인')."""
+    result = await inspect_cover(settings, cover)
+    if result is None:
+        jf.event("cover_inspect_failed", item=sel["item_id"], v=sel["v"])
+        return
+    jf.write_json(jf.cover_inspection(sel["item_id"], sel["v"]), result.model_dump())
+    jf.event("cover_inspected", item=sel["item_id"], v=sel["v"], model="gemini:" + settings.cover_judge_model)
+
+
 def _title_layout(jf: JobFiles, item_id: str) -> str:
     """비주얼 디렉터가 고른 제목 자리 (직접 올린 사진·예전 작업은 bottom)."""
     kind, _, key = item_id.partition("-")
@@ -160,6 +171,8 @@ async def run_render(settings: Settings, jf: JobFiles) -> None:
             if not jf.video("canvas").exists():
                 jobs.append(render_canvas(bg=tmp / "canvas_bg.png", cover=tmp / "cover_c.png", tpl=canvas_tpl,
                                           out=jf.video("canvas")))
+            if not jf.cover_inspection(sel["item_id"], sel["v"]).exists():
+                jobs.append(_inspect(settings, jf, sel, src_cover))
             await asyncio.gather(*jobs)
     except AppError as e:
         jf.fail(e.to_dict())

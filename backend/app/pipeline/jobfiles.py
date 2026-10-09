@@ -94,6 +94,14 @@ class JobFiles:
     def pitch(self, lang: str, version: int) -> Path:
         return self.root / "pitch" / f"pitch_{lang}_v{version}.json"
 
+    def cover_inspection(self, item_id: str, version: int) -> Path:
+        """고른 커버의 유통사 검수 결과 (Gemini) — 제출 전 검수에서 읽는다."""
+        return self.root / "covers" / f"inspect_{item_id}_v{version}.json"
+
+    def editorial(self, version: int) -> Path:
+        """Spotify 에디토리얼 피칭·국내 음원 사이트 소개글 (item_id = editorial)."""
+        return self.root / "editorial" / f"editorial_v{version}.json"
+
     @property
     def song(self) -> Path:
         return self.root / "song.json"

@@ -267,16 +267,26 @@
   <section class="card hide" id="result">
     <h2>4. 결과물 <span class="hint" id="resultHint"></span></h2>
     <div id="working" class="working hide"><div class="spinner"></div><span id="workingText">작업 중…</span></div>
-    <div class="covers" id="covers"></div>
-    <div class="row" style="margin-top:10px">
-      <div><label>직접 올린 사진으로 (jpg·png, 800px 이상 — 정사각으로 잘림)</label><input type="file" id="ownFile" accept="image/*"></div>
-      <div style="flex:0 0 auto;align-self:flex-end"><button id="ownUpload">사진 올리기</button></div>
-    </div>
-    <div id="videos" style="margin-top:14px"></div>
-    <div class="row" style="margin-top:10px"><a id="zip" class="hide" href="#"><button class="primary">ZIP 다운로드</button></a><span class="hint" id="zipInfo" style="cursor:help"></span></div>
     <div id="resultErr" class="err hide"></div>
-    <div id="channels" style="margin-top:14px"></div>
-    <div id="pitch" style="margin-top:14px"></div>
+    <!-- 순서(10/9 방향 논의): 하이라이트 숏폼·홍보 세트 → 발매 준비(에디토리얼 피칭·캘린더·검수) → 커버 → 피칭 메일(선택).
+         커버를 골라야 영상을 만들 수 있으므로 커버 선택 전에는 커버를 맨 위로 올린다 (loadPackage). -->
+    <div id="resultBody" style="display:flex;flex-direction:column">
+      <div id="coverBlock" style="order:7;margin-top:14px">
+        <h2 id="coverTitle">커버</h2>
+        <div class="covers" id="covers"></div>
+        <div class="row" style="margin-top:10px">
+          <div><label>직접 올린 사진으로 (jpg·png, 800px 이상 — 정사각으로 잘림)</label><input type="file" id="ownFile" accept="image/*"></div>
+          <div style="flex:0 0 auto;align-self:flex-end"><button id="ownUpload">사진 올리기</button></div>
+        </div>
+      </div>
+      <div id="videos" style="order:1;margin-top:14px"></div>
+      <div class="row" style="order:2;margin-top:10px"><a id="zip" class="hide" href="#"><button class="primary">ZIP 다운로드</button></a><span class="hint" id="zipInfo" style="cursor:help"></span></div>
+      <div id="channels" style="order:3;margin-top:14px"></div>
+      <div id="editorial" style="order:4;margin-top:14px"></div>
+      <div id="plan" style="order:5;margin-top:14px"></div>
+      <div id="check" style="order:6;margin-top:14px"></div>
+      <div id="pitch" style="order:8;margin-top:14px"></div>
+    </div>
   </section>
 
   <section class="card"><h2>호출 기록</h2><div class="log" id="log"></div></section>
@@ -578,11 +588,16 @@ $("hlPlay").onclick = () => {
 };
 
 // ---------- 4. 결과 ----------
+let stage_now = null;
 async function loadPackage(stage) {
+  stage_now = stage;
   const p = await api("GET", `/jobs/${jobId}/package`);
   show("result");
   $("resultHint").textContent = stage === "awaiting_cover" ? "— 커버를 하나 고르면 숏폼·Canvas·채널 이미지를 만들어요"
     : stage === "rendering" ? "— 영상·이미지 만드는 중 (40초 안팎, 위쪽 진행 상태에서 확인)… 끝나면 자동으로 바뀌어요" : "— 완료";
+  const choosing = stage === "awaiting_cover";
+  $("coverBlock").style.order = choosing ? 0 : 7;
+  $("coverTitle").textContent = choosing ? "커버 고르기 — 하나 고르면 숏폼·채널 이미지를 만들어요" : "커버 (발매용 3000px)";
   $("covers").innerHTML = p.covers.map(c => {
     const v = c.versions[c.versions.length - 1];
     const picked = c.selected ? ` · <b>선택됨</b>` : "";
@@ -595,7 +610,7 @@ async function loadPackage(stage) {
   document.querySelectorAll("[data-select]").forEach(b => b.onclick = () => selectCover(b.dataset.select, parseInt(b.dataset.v)));
   document.querySelectorAll("[data-regen]").forEach(b => b.onclick = () => regen(b.dataset.regen, b));
 
-  $("videos").innerHTML = p.videos.length ? "<h2>영상</h2><div class='row' style='align-items:flex-start'>" + p.videos.map(v =>
+  $("videos").innerHTML = p.videos.length ? "<h2>하이라이트 숏폼 · Canvas</h2><div class='row' style='align-items:flex-start'>" + p.videos.map(v =>
     `<div style="flex:0 0 240px"><video src="${API + v.url}" controls ${v.kind === "canvas" ? "loop muted autoplay" : ""} style="width:240px;border-radius:8px"></video><div class="hint">${v.kind === "short" ? "숏폼 " + v.duration + "초" : "Spotify Canvas " + v.duration + "초 (무음 반복)"}</div></div>`).join("") + "</div>" : "";
   if (p.zip_url) { $("zip").href = API + p.zip_url; show("zip"); } else show("zip", false);
   $("zipInfo").textContent = p.zip_files ? `${p.zip_files.length}개 파일, 약 ${(p.zip_size_bytes / 1048576).toFixed(1)}MB` : "";
@@ -607,12 +622,52 @@ async function loadPackage(stage) {
     return `<label>${CH_NAME[ch] || ch}${c.v > 1 ? ` · ${c.v}번째 버전` : ""}${c.hook ? ` — 훅: “${esc(c.hook)}”` : ""}</label><div class="copy">${esc(c.text)}${c.hashtags ? "\n\n" + esc(c.hashtags.join(" ")) : ""}</div>${vid}${imgs}
       <div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 더 짧게)" data-req="${c.item_id}"><button style="flex:0 0 auto" data-regen="${c.item_id}" ${c.regenerate_remaining ? "" : "disabled"}>다시 쓰기 · ${c.regenerate_remaining}회 남음</button></div>`;
   }).join("");
-  $("pitch").innerHTML = Object.keys(p.pitch).length ? "<h2>피칭 메일</h2>" + Object.entries(p.pitch).map(([lang, m]) =>
+  renderRelease(p);
+  $("pitch").innerHTML = Object.keys(p.pitch).length ? "<h2>피칭 메일 <span class='hint'>(선택 — 웹진·라디오·해외 큐레이터)</span></h2>" + Object.entries(p.pitch).map(([lang, m]) =>
     `<label>${lang === "en" ? "영어" : "한국어"}${m.v > 1 ? ` · ${m.v}번째 버전` : ""} — 제목: ${esc(m.subject)}</label><div class="copy">${esc(m.body).replace(/(\[[^\]]+\])/g, '<mark>$1</mark>')}</div>
      <div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 더 짧고 캐주얼하게)" data-req="${m.item_id}"><button style="flex:0 0 auto" data-regen="${m.item_id}" ${m.regenerate_remaining ? "" : "disabled"}>다시 쓰기 · ${m.regenerate_remaining}회 남음</button></div>`).join("") : "";
-  document.querySelectorAll("#channels [data-regen], #pitch [data-regen]").forEach(b => b.onclick = () => regen(b.dataset.regen, b));
+  document.querySelectorAll("#channels [data-regen], #pitch [data-regen], #editorial [data-regen]").forEach(b => b.onclick = () => regen(b.dataset.regen, b));
   log(`AI 사용 모델: ${p.ai_generated.models.join(", ")}`);
   show("resultErr", false);
+}
+
+// ---------- 발매 준비 (10/9): 에디토리얼 피칭 · 발매 캘린더 · 제출 전 검수 ----------
+const CHECK_MARK = { ok: ["✓", "#2b8a3e"], warn: ["!", "#e67700"], fail: ["✕", "#c92a2a"], todo: ["□", "#868e96"] };
+const CHECK_GROUP = { meta: "곡 정보", audio: "음원", cover: "커버", rights: "권리 (직접 확인)", extra: "유통과 별개로 챙길 것" };
+function renderRelease(p) {
+  const e = p.editorial;
+  const req = (id, ph) => `<div class="row" style="margin-top:4px"><input type="text" placeholder="${ph}" data-req="${id}">`;
+  $("editorial").innerHTML = "<h2>에디토리얼 피칭 <span class='hint'>— 발매 전 플랫폼에 내는 글</span></h2>" + (e ? `
+    <label>Spotify for Artists 곡 설명 · 한국어 (${e.spotify_ko.length}/500자)${e.v > 1 ? ` · ${e.v}번째 버전` : ""}</label><div class="copy">${esc(e.spotify_ko)}</div>
+    <label>Spotify for Artists 곡 설명 · English (${e.spotify_en.length}/500)</label><div class="copy">${esc(e.spotify_en)}</div>
+    <div class="hint">피칭 화면에서 고를 항목 추천 — ${Object.entries(e.tags).filter(([, v]) => v.length).map(([k, v]) => `${{ genres: "장르", moods: "무드", instruments: "악기" }[k] || esc(k)}: ${v.map(esc).join(", ")}`).join(" · ")}</div>
+    <label>국내 음원 사이트 소개글 (유통사 제출용)</label><div class="copy">${esc(e.dsp_intro_ko).replace(/(\[[^\]]+\])/g, "<mark>$1</mark>")}</div>
+    ${req("editorial", "요청 (예: 더 담백하게)")}<button style="flex:0 0 auto" data-regen="editorial" ${e.regenerate_remaining ? "" : "disabled"}>다시 쓰기 · ${e.regenerate_remaining}회 남음</button></div>`
+    : p.covers.length ? `<div class="hint">이 작업은 기능이 생기기 전에 만들어졌어요.</div>${req("editorial", "요청 (선택)")}<button style="flex:0 0 auto" data-regen="editorial">에디토리얼 피칭 만들기</button></div>` : "");
+
+  const plan = p.release_plan;
+  $("plan").innerHTML = plan ? `<h2>발매 캘린더</h2>
+    <div class="row"><div style="flex:0 0 auto"><label>발매일</label><input type="date" id="relDate" value="${esc(plan.release_date || "")}"></div>
+      <div style="flex:0 0 auto;align-self:flex-end"><button id="relSave">발매일 저장</button></div></div>
+    ${plan.warnings.map(w => `<div class="hint" style="color:#e67700;margin-top:6px">⚠ ${esc(w)}</div>`).join("")}
+    <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:14px">${plan.steps.map(s => `
+      <tr style="border-top:1px solid var(--line);${s.status === "past" ? "opacity:.5" : ""}${s.status === "today" ? "background:#fff9db" : ""}">
+        <td style="padding:6px 8px 6px 0;white-space:nowrap;vertical-align:top"><b>${esc(s.label)}</b><br><span class="hint">${esc(s.date || "")}</span></td>
+        <td style="padding:6px 0"><b>${esc(s.title)}</b><br><span class="hint">${esc(s.detail)}</span></td></tr>`).join("")}</table>` : "";
+  if ($("relSave")) $("relSave").onclick = async () => {
+    const d = $("relDate").value;
+    if (!d) return alertBox("resultErr", "발매일을 골라 주세요.");
+    try { await api("PATCH", `/jobs/${jobId}/info`, { release_date: d }); await loadPackage(stage_now); }
+    catch (err) { alertBox("resultErr", `[${err.code}] ${err.message}`); }
+  };
+
+  const c = p.submission_check;
+  $("check").innerHTML = c ? `<h2>유통사 제출 전 검수 <span class="hint">통과 ${c.counts.ok} · 확인 필요 ${c.counts.warn} · 고쳐야 함 ${c.counts.fail} · 직접 확인 ${c.counts.todo}</span></h2>
+    <div class="hint">${esc(c.notice)}</div>` + Object.entries(CHECK_GROUP).map(([g, name]) => {
+      const rows = c.items.filter(i => i.group === g);
+      return rows.length ? `<label>${name}</label>` + rows.map(i => `<div style="display:flex;gap:8px;margin:3px 0;font-size:14px">
+        <b style="color:${CHECK_MARK[i.status][1]};flex:0 0 14px">${CHECK_MARK[i.status][0]}</b><div><b>${esc(i.label)}</b> <span class="hint">${esc(i.detail)}</span></div></div>`).join("") : "";
+    }).join("") : "";
 }
 
 async function selectCover(itemId, v) {

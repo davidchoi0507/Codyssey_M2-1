@@ -54,6 +54,49 @@ class PitchOut(BaseModel):
     request: str | None = Field(default=None, description="최신 버전(v)을 다시 만들 때 밴드가 쓴 요청 한 줄 (첫 버전·요청 없이 재생성은 null)")
 
 
+class EditorialOut(BaseModel):
+    item_id: str = "editorial"
+    spotify_ko: str = Field(description="Spotify for Artists 에디토리얼 피칭 곡 설명 (한국어, 500자 이내)")
+    spotify_en: str = Field(description="같은 내용 영어판 (500자 이내)")
+    dsp_intro_ko: str = Field(description="국내 음원 사이트 앨범 소개글 — [작사/작곡/편곡: ] 자리표시는 직접 채움")
+    tags: dict[str, list[str]] = Field(description="Spotify 피칭 화면에서 고를 항목 추천: genres·moods·instruments (영어)")
+    v: int = 1
+    regenerate_remaining: int | None = None
+    request: str | None = None
+
+
+class ReleaseStep(BaseModel):
+    d: int = Field(description="발매일 기준 일수 (-28 = 4주 전, 0 = 발매일)")
+    label: str = Field(description="D-28 / D-day / D+7")
+    date: str | None = Field(default=None, description="실제 날짜 YYYY-MM-DD (발매일이 있을 때)")
+    title: str
+    detail: str
+    items: list[str] = Field(default_factory=list, description="이 단계에서 쓰는 결과물 item_id (editorial, short, copy-x 등)")
+    status: Literal["past", "today", "upcoming"] | None = Field(default=None, description="발매일이 있을 때 오늘 기준")
+
+
+class ReleasePlan(BaseModel):
+    release_date: str | None = None
+    today: str
+    steps: list[ReleaseStep]
+    warnings: list[str] = Field(default_factory=list)
+
+
+class CheckItem(BaseModel):
+    group: Literal["meta", "audio", "cover", "rights", "extra"] = Field(
+        description="meta 곡 정보 · audio 음원 · cover 커버 · rights 권리(직접 확인) · extra 유통과 별개")
+    id: str
+    label: str
+    status: Literal["ok", "warn", "fail", "todo"] = Field(description="ok 통과 · warn 확인 필요 · fail 고쳐야 함 · todo 직접 확인")
+    detail: str
+
+
+class SubmissionCheck(BaseModel):
+    items: list[CheckItem]
+    counts: dict[str, int]
+    notice: str
+
+
 class Package(BaseModel):
     job_id: str
     stage: str
@@ -65,6 +108,10 @@ class Package(BaseModel):
     zip_files: list[str] | None = Field(default=None, description="ZIP에 들어갈 파일 (done일 때)")
     zip_size_bytes: int | None = Field(default=None, description="ZIP 대략 용량 (done일 때, 압축 전 합계)")
     ai_generated: AIGenerated
+    editorial: EditorialOut | None = Field(default=None, description="(10/9 추가) 에디토리얼 피칭 — 예전 작업은 null, "
+                                                                    "regenerate item_id=editorial로 만들 수 있음")
+    release_plan: ReleasePlan | None = Field(default=None, description="(10/9 추가) 발매 캘린더 — 발매일(PATCH /info)로 계산")
+    submission_check: SubmissionCheck | None = Field(default=None, description="(10/9 추가) 유통사 제출 전 검수")
 
 
 # ---- 에이전트 출력 (내부) ----
@@ -96,6 +143,19 @@ class PitchMail(BaseModel):
 class PitchSet(BaseModel):
     en: PitchMail = Field(description="영어 메일 (해외 큐레이터용)")
     ko: PitchMail = Field(description="한국어 메일 (국내 큐레이터·블로그·라디오용)")
+
+
+class EditorialTags(BaseModel):
+    genres: list[str] = Field(default_factory=list, description="장르 1~3개 (영어)")
+    moods: list[str] = Field(default_factory=list, description="무드 1~3개 (영어)")
+    instruments: list[str] = Field(default_factory=list, description="들린 악기 1~5개 (영어)")
+
+
+class EditorialSet(BaseModel):
+    spotify_ko: str = Field(description="Spotify for Artists 에디토리얼 피칭 곡 설명 (한국어, 500자 이내)")
+    spotify_en: str = Field(description="같은 내용 영어판 (500자 이내)")
+    dsp_intro_ko: str = Field(description="국내 음원 사이트 앨범 소개글 (한국어)")
+    tags: EditorialTags
 
 
 class CopySet(BaseModel):

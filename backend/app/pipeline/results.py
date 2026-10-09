@@ -1,6 +1,6 @@
 """결과 화면 동작: 항목 재생성, 직접 올린 사진, ZIP.
 
-- 재생성은 항목 하나만 새 버전으로 만들고 이전 버전은 남긴다 (cover-1~3, copy-<채널>, pitch-<언어>).
+- 재생성은 항목 하나만 새 버전으로 만들고 이전 버전은 남긴다 (cover-1~3, copy-<채널>, pitch-<언어>, editorial).
   항목마다 COVER_REGEN_PER_JOB회. 요청 한 줄(request)을 반영한다.
 - 직접 올린 사진(cover-own)은 정사각으로 잘라 3000px로 저장하고, 커버처럼 골라서 렌더링한다 (AI 생성 아님).
 - ZIP은 요청할 때 만든다 (채널별 폴더 + 릴리즈 브리프, AI 생성 표기 포함).
@@ -14,6 +14,7 @@ from PIL import Image, ImageOps
 
 from app.adapters.codyssey_image import CodysseyImage
 from app.agents.copywriter import write_copy
+from app.agents.editorial import write_editorial
 from app.agents.pitch import write_pitch
 from app.analysis.labels import display_energy, display_key
 from app.core.config import Settings
@@ -41,7 +42,7 @@ async def regenerate(settings: Settings, jf: JobFiles, item_id: str, request: st
         raise AppError("INVALID_REQUEST", "요청은 200자 이내로 써 주세요.", False, http_status=422)
     kind, _, key = item_id.partition("-")
     if not ((kind == "cover" and key in ("1", "2", "3")) or (kind == "copy" and key in CHANNELS)
-            or (kind == "pitch" and key in ("en", "ko"))):
+            or (kind == "pitch" and key in ("en", "ko")) or (kind == "editorial" and not key)):
         raise AppError("ITEM_NOT_FOUND", "다시 만들 수 없는 항목이에요.", False, http_status=404)
     if regen_remaining(settings, jf, item_id) <= 0:
         raise AppError("REGEN_LIMIT", "이 항목은 더 이상 다시 만들 수 없어요.", False, http_status=429)
@@ -67,6 +68,13 @@ async def regenerate(settings: Settings, jf: JobFiles, item_id: str, request: st
         copyset, meta = await write_copy(settings, note, song, song_duration(jf), request=request, previous=prev)
         v = prev_v + 1
         jf.write_json(jf.channel_copy(key, v), getattr(copyset, key).model_dump())
+    elif kind == "editorial":
+        prev_v = jf.latest_version(jf.editorial) or 0  # 예전 작업(v0)이면 첫 버전을 만든다
+        prev = jf.read_json(jf.editorial(prev_v)) if prev_v else None
+        listening = jf.read_json(jf.listening)["result"] if jf.listening.exists() else None
+        out, meta = await write_editorial(settings, note, song, listening, request=request, previous=prev)
+        v = prev_v + 1
+        jf.write_json(jf.editorial(v), out.model_dump())
     else:
         prev_v = jf.latest_version(lambda i: jf.pitch(key, i)) or 0
         prev = jf.read_json(jf.pitch(key, prev_v)) if prev_v else None
@@ -140,6 +148,16 @@ def zip_entries(jf: JobFiles, package, models: list[str]) -> tuple[str, list[tup
         entries += [(f"{ch}/{p.name}", p) for p in sorted((jf.root / "channels" / ch).glob("image_*.png"))]
     for lang, m in package.pitch.items():
         entries.append((f"pitch/pitch_{lang}.txt", f"Subject: {m.subject}\n\n{m.body}"))
+    if e := package.editorial:
+        tags = "\n".join(f"- {k}: {', '.join(v)}" for k, v in e.tags.items() if v)
+        entries += [("release/spotify_pitch.txt", f"[한국어 · {len(e.spotify_ko)}자]\n{e.spotify_ko}\n\n"
+                                                  f"[English · {len(e.spotify_en)} chars]\n{e.spotify_en}\n\n"
+                                                  f"[피칭 화면에서 고를 항목 추천]\n{tags}\n"),
+                    ("release/dsp_intro_ko.txt", e.dsp_intro_ko)]
+    if package.release_plan:
+        entries.append(("release/RELEASE_PLAN.md", _plan_md(package.release_plan)))
+    if package.submission_check:
+        entries.append(("release/SUBMISSION_CHECK.md", _check_md(package.submission_check)))
     entries.append(("RELEASE_BRIEF.md", _brief(song, note, models)))
     return prefix, [(arc, src) for arc, src in entries if isinstance(src, str) or src.exists()]
 
@@ -171,6 +189,23 @@ def _safe(name: str) -> str:
     return "".join(ch for ch in name if ch not in '\\/:*?"<>|').strip()[:80]
 
 
+def _plan_md(plan) -> str:
+    lines = ["# 발매 캘린더", "", f"발매일: {plan.release_date or '(미정 — 정하면 날짜가 채워져요)'}", ""]
+    lines += [f"> {w}" for w in plan.warnings] + ([""] if plan.warnings else [])
+    for s in plan.steps:
+        lines += [f"## {s.label}{f' ({s.date})' if s.date else ''} — {s.title}", s.detail, ""]
+    return "\n".join(lines)
+
+
+def _check_md(check) -> str:
+    mark = {"ok": "[v] 통과", "warn": "[!] 확인 필요", "fail": "[x] 고쳐야 함", "todo": "[ ] 직접 확인"}
+    groups = {"meta": "곡 정보", "audio": "음원", "cover": "커버", "rights": "권리 (직접 확인)", "extra": "유통과 별개로 챙길 것"}
+    lines = ["# 유통사 제출 전 검수", "", check.notice, ""]
+    for g, name in groups.items():
+        lines += [f"## {name}"] + [f"- {mark[i.status]} **{i.label}** — {i.detail}" for i in check.items if i.group == g] + [""]
+    return "\n".join(lines)
+
+
 def _brief(song: dict, note, models: list[str]) -> str:
     sel = note.highlight.selected
     lines = [
@@ -187,7 +222,8 @@ def _brief(song: dict, note, models: list[str]) -> str:
               "- cover/ : 발매용 3000px 커버 (글자 없음 / 제목 얹은 버전)",
               "- video/ : 하이라이트 숏폼 15초(9:16), Spotify Canvas 8초(무음 반복)",
               "- instagram/ tiktok/ threads/ x/ : 채널별 글(post.txt)과 이미지",
-              "- pitch/ : 큐레이터 피칭 메일 (영어·한국어). [대괄호] 부분은 직접 채워 주세요",
+              "- release/ : 발매 캘린더, 유통사 제출 전 검수, Spotify 에디토리얼 피칭(한·영), 국내 음원 사이트 소개글",
+              "- pitch/ : 큐레이터 피칭 메일 (영어·한국어, 선택). [대괄호] 부분은 직접 채워 주세요",
               "", "## AI 생성 표기",
               "이 패키지의 해석·이미지·글은 AI로 생성되었습니다. 플랫폼에 올릴 때 AI 생성 표기 정책을 확인해 주세요.",
               f"사용 모델: {', '.join(models)}", ""]

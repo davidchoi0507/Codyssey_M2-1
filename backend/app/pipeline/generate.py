@@ -1,4 +1,5 @@
-"""생성 파이프라인 (노트 수락 후): 비주얼 디렉터 → 커버 3장 + 카피라이터 채널 4종 + 피칭 메일(영·한).
+"""생성 파이프라인 (노트 수락 후): 비주얼 디렉터 → 커버 3장 + 카피라이터 채널 4종 + 피칭 메일(영·한)
++ 에디토리얼 피칭(Spotify 한·영, 국내 음원 사이트 소개글).
 
 - 비주얼 디렉터·카피라이터·피칭은 병렬. 커버는 방향마다 후보 cover_candidates장(기본 2)을 동시에 만들어 마감(finish_cover)한 뒤
   Gemini Flash Lite가 하나를 고른다 (이미지 API 동시 호출 수는 세마포어로 제한, 고르기 실패 시 첫 후보).
@@ -14,6 +15,7 @@ from pathlib import Path
 from app.adapters.codyssey_image import CodysseyImage
 from app.agents.copywriter import write_copy
 from app.agents.cover_judge import pick_cover
+from app.agents.editorial import write_editorial
 from app.agents.pitch import write_pitch
 from app.agents.visual import plan_covers
 from app.core.config import Settings
@@ -120,6 +122,20 @@ async def _pitch(settings: Settings, jf: JobFiles, note: ARNote, song: dict, lis
     jf.event("pitch_meta", **meta)
 
 
+async def _editorial(settings: Settings, jf: JobFiles, note: ARNote, song: dict, listening: dict | None) -> None:
+    """나중에 더한 항목이라 실패해도 생성 전체를 멈추지 않는다 — 결과 화면에서 '다시 만들기'로 만들 수 있다."""
+    if jf.editorial(1).exists():
+        return
+    try:
+        out, meta = await write_editorial(settings, note, song, listening)
+    except Exception as e:
+        log.warning("에디토리얼 피칭 생성 실패 (건너뜀): %r", e)
+        jf.event("editorial_failed", message=repr(e)[:300])
+        return
+    jf.write_json(jf.editorial(1), out.model_dump())
+    jf.event("editorial_meta", **meta)
+
+
 async def run_generation(settings: Settings, jf: JobFiles) -> None:
     note = accepted_note(jf)
     song = jf.read_json(jf.song)
@@ -129,7 +145,8 @@ async def run_generation(settings: Settings, jf: JobFiles) -> None:
     t = time.monotonic()
     try:
         results = await asyncio.gather(_covers(settings, jf, note, song, listening), _copy(settings, jf, note, song),
-                                       _pitch(settings, jf, note, song, listening), return_exceptions=True)
+                                       _pitch(settings, jf, note, song, listening),
+                                       _editorial(settings, jf, note, song, listening), return_exceptions=True)
         for r in results:
             if isinstance(r, Exception):
                 raise r
