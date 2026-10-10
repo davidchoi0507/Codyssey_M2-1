@@ -3,7 +3,7 @@
   python -m scripts.cleanup            # 삭제
   python -m scripts.cleanup --dry-run  # 지울 대상만 보기
 
-커뮤니티 반응·신고의 접속 IP는 FEEDBACK_IP_RETENTION_DAYS(기본 30일) 뒤 지우고, 만료된 로그인 세션도 지운다.
+커뮤니티 반응·신고의 접속 IP는 FEEDBACK_IP_RETENTION_DAYS(기본 7일) 뒤 지우고, 만료된 로그인 세션도 지운다.
 KEEP_JOB_IDS(쉼표 구분)에 적은 작업은 남긴다 (팀 공유 샘플). 음원·결과물·곡 정보·동의 기록·DB 레코드를 지운다. 결과보고서용 지표는 개인정보와 자유 입력(수정 문장, 요청,
 에러 원문)을 빼고 data/metrics_archive.jsonl 에 한 줄씩 남긴다.
 """

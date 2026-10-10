@@ -218,7 +218,7 @@ async function newJob() {
     <label class="field"><span>가사 <em>선택 — 있으면 AI가 더 잘 해석해요</em></span><textarea name="lyrics" maxlength="5000"></textarea></label>
     <div class="notice">
       <b>동의 (동의서 ${CONSENT_VERSION})</b>
-      <label class="check"><input type="checkbox" name="c1" required><span>[필수] 개인정보 수집·이용 — 곡 정보·음원·접속 IP, 업로드 7일 뒤 자동 삭제</span></label>
+      <label class="check"><input type="checkbox" name="c1" required><span>[필수] 만 14세 이상이에요. 개인정보 수집·이용 — 곡 정보·음원·접속 IP, 업로드 7일 뒤 자동 삭제 (<a href="/privacy" target="_blank">개인정보처리방침</a>)</span></label>
       <label class="check"><input type="checkbox" name="c2" required><span>[필수] 외부 AI 전송 — 음원은 Google Gemini(무료 등급, 학습에 쓰일 수 있음), 글·이미지는 코디세이 API로 처리</span></label>
       <label class="check"><input type="checkbox" name="c3" required><span>[필수] 직접 만든 곡이거나 올릴 권리가 있어요. AI 결과물은 저작권이 인정되지 않을 수 있어요</span></label>
       <label class="check"><input type="checkbox" name="c4"><span>[선택] 결과물을 서비스 개선·발표 자료에 써도 돼요</span></label>
@@ -556,7 +556,7 @@ async function stepShare(p) {
         <p class="muted small">발매 전 곡은 하이라이트만 공개하는 걸 권장해요. 공개된 음원은 다른 사람이 녹음할 수 있어요.</p></div>
       <div><b>반응 공개</b><div class="chips" style="margin-top:8px" data-g="pub"><button type="button" class="chip on" data-v="true">모두에게 공개</button><button type="button" class="chip" data-v="false">나만 보기</button></div></div>
       <label class="field"><span>한 줄 소개 <em>선택 — SNS·음원 링크 넣어도 돼요</em></span><input type="text" name="intro" maxlength="500"></label>
-      <label class="check"><input type="checkbox" name="c1"><span>[필수] 직접 만든 곡이거나 공개할 권리가 있어요</span></label>
+      <label class="check"><input type="checkbox" name="c1"><span>[필수] 만 14세 이상이고, 직접 만든 곡이거나 공개할 권리가 있어요</span></label>
       <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응이 모여요</span></label>
       <button class="btn primary block" id="pubBtn">커뮤니티에 올리기</button>
     </form>`;
@@ -603,8 +603,8 @@ async function quick() {
     <div><b>들려줄 범위</b><div class="chips" style="margin-top:8px" data-g="mode"><button type="button" class="chip on" data-v="highlight">하이라이트 15초 (가장 에너지 큰 구간)</button><button type="button" class="chip" data-v="full">전곡</button></div></div>
     <div><b>반응 공개</b><div class="chips" style="margin-top:8px" data-g="pub"><button type="button" class="chip on" data-v="true">모두에게 공개</button><button type="button" class="chip" data-v="false">나만 보기</button></div></div>
     <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
-    <label class="check"><input type="checkbox" name="c1"><span>[필수] 직접 만든 곡이거나 공개할 권리가 있어요</span></label>
-    <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응과 접속 IP(도배 방지용)가 모여요</span></label>
+    <label class="check"><input type="checkbox" name="c1"><span>[필수] 만 14세 이상이고, 직접 만든 곡이거나 공개할 권리가 있어요</span></label>
+    <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응과 접속 IP(도배 방지용, 7일 보관)가 모여요</span></label>
     <p class="err" id="qErr"></p>
     <button class="btn primary block" id="qBtn">바로 공개하기</button>
   </form>
@@ -694,7 +694,7 @@ async function trackView(id) {
         <textarea name="comment" maxlength="500" placeholder="한마디 (선택) — 욕설·광고·링크는 등록되지 않아요"></textarea>
         <div class="row"><input type="text" name="nickname" maxlength="20" placeholder="닉네임 (선택)" style="max-width:200px"><span class="sp"></span><button class="btn primary" id="fbBtn">남기기</button></div>
         <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
-        <p class="muted small">로그인 없이 남길 수 있어요. 도배 방지를 위해 접속 IP를 일정 기간 보관하고 화면에는 표시하지 않아요.</p>
+        <p class="muted small">로그인 없이 남길 수 있어요. 도배 방지를 위해 접속 IP를 7일 동안 보관하고 화면에는 표시하지 않아요.</p>
         <p class="err" id="fbErr"></p>
       </form>
       <div id="fbList" style="margin-top:8px">${t.feedback.map((f, i, a) => fbItem(f, i, a, t.track_id)).join("")}</div>

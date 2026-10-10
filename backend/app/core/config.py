@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     feedback_cooldown_sec: int = 30    # 같은 IP 반응 간격
     feedback_burst_per_min: int = 3    # 1분에 이보다 많으면 burst_block_min분 차단
     burst_block_min: int = 10
-    feedback_ip_retention_days: int = 30  # 반응·신고에 남긴 접속 IP를 지우는 기한 (화면에는 안 나감)
+    feedback_ip_retention_days: int = 7  # 반응·신고에 남긴 접속 IP를 지우는 기한 (화면에는 안 나감)
     # 신고 (DECISIONS #33)
     report_hide_threshold: int = 3     # 서로 다른 접속에서 이만큼 신고되면 자동 숨김
     telegram_bot_token: str | None = None  # 운영자 알림 (없으면 로그만)
