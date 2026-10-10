@@ -18,13 +18,17 @@ import numpy as np
 
 from app import db
 from app.analysis.audio_io import CONVERT_TIMEOUT_SEC, input_args, run_ffmpeg
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 
 log = logging.getLogger(__name__)
 MATCH_BER = 0.25           # 이보다 작으면 같은 녹음으로 본다
 MIN_OVERLAP = 70           # 비교할 최소 겹침 (지문 값 약 7.4개/초 → 약 10초)
 ACOUSTID_URL = "https://api.acoustid.org/v2/lookup"
 ACOUSTID_MIN_SCORE = 0.8
+
+
+def _fpcalc() -> str | None:
+    return shutil.which(get_settings().fpcalc_path)
 
 
 @lru_cache
@@ -37,7 +41,7 @@ def _ffmpeg_has_chromaprint() -> bool:
 
 
 def available() -> bool:
-    return _ffmpeg_has_chromaprint() or shutil.which("fpcalc") is not None
+    return _ffmpeg_has_chromaprint() or _fpcalc() is not None
 
 
 def compute(src: Path, ext: str | None = None) -> dict | None:
@@ -51,12 +55,12 @@ def compute(src: Path, ext: str | None = None) -> dict | None:
                                                *input_args(src, ext)], 30).stdout)["format"]["duration"])
             arr = np.frombuffer(raw[: len(raw) // 4 * 4], dtype="<i4").astype(np.int64).tolist()
             return {"raw": arr, "b64": b64, "duration": dur} if arr else None
-        if shutil.which("fpcalc"):
+        if fpcalc := _fpcalc():
             # fpcalc는 파일 형식을 내용으로 판단 — 업로드는 check_magic으로 mp3·wav임을 이미 확인했다
-            out = subprocess.run(["fpcalc", "-length", "0", "-json", str(src)], capture_output=True, text=True,
+            out = subprocess.run([fpcalc, "-length", "0", "-json", str(src)], capture_output=True, text=True,
                                  timeout=CONVERT_TIMEOUT_SEC, check=True).stdout
             d = json.loads(out)
-            raw = subprocess.run(["fpcalc", "-length", "0", "-raw", "-json", str(src)], capture_output=True, text=True,
+            raw = subprocess.run([fpcalc, "-length", "0", "-raw", "-json", str(src)], capture_output=True, text=True,
                                  timeout=CONVERT_TIMEOUT_SEC, check=True).stdout
             return {"raw": json.loads(raw)["fingerprint"], "b64": d["fingerprint"], "duration": float(d["duration"])}
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError, KeyError, OSError) as e:

@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     # 신고 (DECISIONS #33)
     report_hide_threshold: int = 3     # 서로 다른 접속에서 이만큼 신고되면 자동 숨김
     report_hide_threshold_stolen: int = 1  # '남의 곡 무단 업로드' 곡 신고는 1번이면 먼저 숨기고 운영자가 확인 (#40)
+    fpcalc_path: str = "fpcalc"            # ffmpeg에 chromaprint가 없을 때 쓰는 fpcalc (서버: ~/apps/indie-studio/bin/fpcalc)
     acoustid_api_key: str | None = None    # 알려진 곡 조회 (acoustid.org 앱 키, 비상업 무료). 없으면 이 검사만 건너뜀
     telegram_bot_token: str | None = None  # 운영자 알림 (없으면 로그만)
     telegram_chat_id: str | None = None
