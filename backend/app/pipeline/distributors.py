@@ -8,6 +8,7 @@
 입력한다. 그래서 제출 준비표는 "웹 화면에 옮겨 적을 값"을 그 화면 순서대로 정리한 것이다.
 - DistroKid: 공식 도움말에 업로드 화면 18개 구역·트랙 14개 항목·크레딧·가사 형식·AI 표기가 공개돼 그 순서 그대로.
 - 뮤즈플랫폼: 입력 항목은 로그인 뒤 '앨범관리' 화면에만 있어 확인 못 함 → 공개된 범위(가사 칸, 요청사항 칸)와 일반 항목으로.
+  로그인 뒤 첫 화면 '레이블 이름 설정'은 사용자가 캡처로 확인(docs/part2/IMG_4390.webp, 2026-10-10) → 준비표 맨 앞에 넣는다.
 """
 import csv
 import io
@@ -19,6 +20,10 @@ from app.schemas.package import CheckItem
 from app.schemas.release import DistributorProfile, ReleaseInfo
 
 CHECKED_AT = "2026-10-10"
+# 뮤즈플랫폼 로그인 뒤 첫 화면 (회원정보 > 레이블 이름 설정, 화면 캡처로 확인)
+LABEL_SETUP = ("가입하고 로그인하면 먼저 '레이블 이름 설정'을 해요: 레이블(필수, 앨범 등록·정산에 쓰이고 한 번 정하면 바꿀 수 없음 — "
+               "레이블이 여럿이면 계정을 따로 만들어야 함), 레이블(국내, 해외와 다르게 표시할 때만), 레이블 로고(선택, 1000×1000 이상 "
+               "정사각 JPG/PNG), 레이블 소개(비트포트로 발매하면 영문), 이름·휴대전화(필수), 주소 [공식 화면].")
 PROFILES: dict[str, DistributorProfile] = {
     "muzeplatform": DistributorProfile(
         id="muzeplatform", name="뮤즈플랫폼", kind="국내 · 셀프 등록형",
@@ -32,6 +37,7 @@ PROFILES: dict[str, DistributorProfile] = {
         cover="공식 규격 문서를 확인하지 못함 [확인 필요] — 3000×3000 정사각 JPG(RGB)로 준비하면 안전해요",
         ai_policy="공식 안내를 확인하지 못함 [확인 필요]",
         extras="등록 5단계: 회원가입 → 전자계약서 동의 → 앨범/트랙 정보 등록 → 발매 요청 → 결제 [공식]. "
+               f"{LABEL_SETUP} "
                "입력은 로그인 뒤 '앨범관리' 화면(가사 칸·요청사항 칸 있음) — 전체 항목은 공개 자료로 확인 못 함. "
                "방송심의 대행(11개 방송사, 165,000원) 등 부가 서비스. 정산: 발매 2개월 뒤부터 월별 리포트, 누적 5만 원 이상 지급 [공식]. "
                "문의: muzeplatform@gmail.com, 카카오톡 채널, 070-8845-6242(10~19시)",
@@ -180,6 +186,11 @@ def evaluate(dist_id: str, info: ReleaseInfo, ctx: dict, today: date | None = No
         add("lyrics", "가사", "ok" if info.lyrics.strip() else "warn",
             "가사 텍스트가 있어요. 앨범관리 화면의 가사 칸에 붙여 넣어요." if info.lyrics.strip()
             else "앨범관리 화면에 가사 칸이 있어요. 가사를 넣어 주세요.")
+    if dist_id == "muzeplatform":
+        add("label", "레이블 이름 (처음 한 번)", "todo",
+            "로그인하면 첫 화면에서 레이블 이름을 정해요. 한 번 정하면 바꿀 수 없고 모든 앨범·정산에 쓰여요. "
+            "따로 레이블이 없으면 아티스트명이나 앞으로 계속 쓸 1인 레이블 이름으로 정하세요"
+            f"{f' (예: {info.artist})' if info.artist.strip() else ''}. 이름·휴대전화도 필수예요.")
     # AI
     ai = rights.get("ai_audio")
     if ai == "generated":
@@ -247,7 +258,17 @@ def _rows_generic(dist_id: str, info: ReleaseInfo, files: dict[str, str]) -> lis
     """입력 항목이 공개되지 않은 유통사 (뮤즈플랫폼): 일반적인 항목 순서."""
     p = PROFILES[dist_id]
     lang = {"ko": "한국어", "en": "영어", "ja": "일본어", "instrumental": "연주곡(가사 없음)"}.get(info.language, info.language)
-    return [
+    first = "가입 후 첫 화면 (레이블 이름 설정)"
+    label_rows = [
+        (first, "레이블 *", info.artist, "한 번 정하면 바꿀 수 없음. 앨범 등록·정산에 쓰임. 레이블이 없으면 아티스트명이나 계속 쓸 1인 레이블 이름"),
+        (first, "레이블(국내)", "", "국내 발매용 레이블명을 해외와 다르게 표시할 때만 — 같으면 비움"),
+        (first, "레이블 로고", "", "선택 — 1000×1000 이상 정사각 JPG 또는 PNG"),
+        (first, "레이블 소개", "", "선택 — 비트포트로 발매하려면 영문으로"),
+        (first, "이름 *", "", "계정 주인(정산 받을 사람) 이름"),
+        (first, "전화 *", "", "휴대전화 번호 (없으면 유선)"),
+        (first, "주소", "", "선택"),
+    ] if dist_id == "muzeplatform" else []
+    return label_rows + [
         ("앨범", "앨범명", info.album or info.title, "싱글이면 곡 제목과 같게"),
         ("앨범", "앨범 아티스트", info.artist, "기존 발매와 같은 철자"),
         ("앨범", "발매일", info.release_date or "", p.lead_time),
@@ -272,7 +293,7 @@ def _rows_generic(dist_id: str, info: ReleaseInfo, files: dict[str, str]) -> lis
         ("파일", "음원", files.get("audio", ""), p.audio),
         ("파일", "커버", files.get("cover", ""), p.cover),
         ("요청사항 칸", "요청사항", "", "앨범관리 화면에 요청사항 칸이 있음 — 발매 시각·표기 요청 등"),
-        ("참고", "유통사", p.name, "입력 항목 전체 목록은 로그인 뒤 화면에만 있어 확인 못 함. 일반 항목 순서로 정리. "
+        ("참고", "유통사", p.name, "레이블 설정은 로그인 뒤 첫 화면 그대로. 앨범 입력 항목 전체는 확인 못 해 일반 항목 순서로 정리. "
                                  f"제출 양식 파일 없이 웹 화면에 직접 입력. 조사 기준일 {CHECKED_AT}"),
     ]
 

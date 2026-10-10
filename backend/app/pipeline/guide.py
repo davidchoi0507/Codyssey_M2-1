@@ -50,10 +50,12 @@ def recommend(req: GuideRecommendRequest) -> GuideRecommendation:
             reasons=["누구나 가입할 수 있고 심사가 없어서 처음 하는 사람에게 문턱이 낮아요.",
                      f"국내 5대 사이트와 해외 플랫폼까지 한 번에 보내요. {m.stores}",
                      "BASIC은 등록비 없이 시작할 수 있어요 (대신 수수료 20%).", m.lead_time],
-            cautions=cautions + ["음원·커버 공식 규격 문서는 확인하지 못했어요. WAV·3000px로 준비하면 안전해요."])
+            cautions=cautions + ["음원·커버 공식 규격 문서는 확인하지 못했어요. WAV·3000px로 준비하면 안전해요.",
+                                 "가입 후 처음 정하는 레이블 이름은 나중에 바꿀 수 없어요. 앞으로 계속 쓸 이름으로 정하세요."])
     return GuideRecommendation(
         plan=["muzeplatform", "distrokid"], title="국내는 뮤즈플랫폼 + 해외는 DistroKid",
         reasons=["국내 사이트는 국내 유통사가, 해외는 해외 유통사가 맡는 '나눠서 보내기'가 흔한 방법이에요.",
                  "DistroKid는 해외 반영이 빠르고, 뮤즈플랫폼은 멜론 등 국내 사이트에 보내요."],
         cautions=cautions + ["같은 곡을 두 유통사로 같은 플랫폼에 보내면 충돌이 생겨요. 뮤즈플랫폼에서 보낼 곳을 국내만 고를 수 있는지 먼저 확인하세요.",
-                             "한 곡의 ISRC가 두 개로 갈리지 않게, 먼저 받은 ISRC를 다른 유통사에 넣을 수 있는지 확인하세요."])
+                             "한 곡의 ISRC가 두 개로 갈리지 않게, 먼저 받은 ISRC를 다른 유통사에 넣을 수 있는지 확인하세요.",
+                             "뮤즈플랫폼은 가입 후 처음 정하는 레이블 이름을 나중에 바꿀 수 없어요. 앞으로 계속 쓸 이름으로 정하세요."])
