@@ -102,6 +102,12 @@ def studio_asset(name: str) -> FileResponse:
     return FileResponse(STUDIO / name, media_type=types[name], headers={"Cache-Control": "no-cache"})
 
 
+@app.get("/privacy", include_in_schema=False)
+def privacy() -> FileResponse:
+    """개인정보처리방침 (구글·카카오 로그인 동의 화면에 거는 공개 주소)."""
+    return FileResponse(STUDIO / "privacy.html", headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/", include_in_schema=False)
 def root() -> RedirectResponse:
     return RedirectResponse("/studio")

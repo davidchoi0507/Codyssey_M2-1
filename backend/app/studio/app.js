@@ -548,7 +548,7 @@ async function stepShare(p) {
     bindOwner(p, t);
     return;
   }
-  p.innerHTML = `
+  p.innerHTML = `${await endNotice()}
     <h2>커뮤니티에 올려 반응 받기</h2>
     <p class="lead">발매 전에도 다른 사람들의 별점·태그·한마디를 받아 볼 수 있어요.</p>
     <form class="card stack" id="pubForm">
@@ -590,7 +590,7 @@ function bindOwner(root, t) { $("#copyKey", root)?.addEventListener("click", () 
 
 async function quick() {
   const tok = await api("GET", "/community/form-token");
-  view.innerHTML = `
+  view.innerHTML = `${await endNotice()}
   <div class="panel"><div class="eyebrow">AI 분석 없이</div><h2>곡만 올려서 반응 받기</h2>
     <p class="lead">음원과 제목만 있으면 바로 커뮤니티에 올라가요. 원본 파일은 남기지 않고, 공개용 음원만 보관해요.</p></div>
   <form class="card stack" id="qForm">
@@ -639,8 +639,15 @@ function trackCard(t) {
     <div class="m">▶ ${t.plays} · 반응 ${t.reactions}${s?.rating_avg ? ` · ★ ${s.rating_avg}` : ""}</div></a>`;
 }
 
+let META = null;
+async function endNotice() {
+  // 서비스 종료일은 정해지면 서버 SERVICE_END_DATE에 넣고, 그때부터 화면에 미리 안내한다 (DECISIONS #35)
+  try { META = META || (await api("GET", "/community/meta")); } catch { return ""; }
+  return META.service_end_date ? `<div class="notice warn" style="margin-bottom:16px">이 서비스는 <b>${esc(META.service_end_date)}</b>에 종료돼요. 그날 커뮤니티에 공개된 곡과 반응이 모두 삭제돼요. 필요한 건 미리 받아 두세요.</div>` : "";
+}
+
 async function community() {
-  view.innerHTML = `
+  view.innerHTML = `${await endNotice()}
   <div class="panel"><div class="eyebrow">들어봐 (가칭)</div><h2>커뮤니티</h2><p class="lead">처음 만든 노래들이 올라와요. 들어 보고 별점·한마디로 응원해 주세요. 로그인 없이 반응을 남길 수 있어요.</p></div>
   <div class="row" style="margin-bottom:18px"><div class="tabs" id="sorts">${[["new", "최신"], ["popular", "인기"], ["random", "랜덤"]].map(([v, l]) => `<button class="tab ${FEED.sort === v ? "on" : ""}" data-v="${v}">${l}</button>`).join("")}</div>
     <span class="sp"></span><input type="search" id="q" placeholder="제목·아티스트 검색" value="${esc(FEED.q)}" style="max-width:260px"><a class="btn primary small" href="#/quick">내 곡 올리기</a></div>
