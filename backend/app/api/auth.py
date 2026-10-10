@@ -1,4 +1,6 @@
 """로그인·내 곡: /auth/*, /me/* (DECISIONS #34). 곡 올리는 사람만 쓰는 선택 기능."""
+import hmac
+import logging
 from datetime import datetime
 from typing import Literal
 
@@ -16,6 +18,7 @@ from app.pipeline import community as c
 from app.pipeline.jobfiles import JobFiles
 
 router = APIRouter(tags=["로그인·내 곡"])
+log = logging.getLogger(__name__)
 Provider = Literal["kakao", "google"]
 
 
@@ -72,6 +75,28 @@ def _finish(s: Settings, user: dict, next_url: str) -> RedirectResponse:
 @router.get("/auth/providers", response_model=Providers, summary="쓸 수 있는 로그인 (키가 등록된 것만 true)")
 def providers(s: Settings = Depends(settings)) -> Providers:
     return Providers(**a.enabled(s))
+
+
+@router.api_route("/auth/kakao/unlink", methods=["GET", "POST"], include_in_schema=False)
+async def kakao_unlink(request: Request, s: Settings = Depends(settings)) -> JSONResponse:
+    """카카오 연결 해제 웹훅: 사용자가 카카오 쪽에서 앱 연결을 끊거나 카카오 계정을 지우면 카카오가 부른다.
+    헤더 Authorization: KakaoAK <어드민 키>, 값 app_id·user_id·referrer_type (GET 쿼리 또는 POST 폼).
+    로그인 정보만 지우고(탈퇴와 같음) 올린 곡은 관리 링크로 계속 관리된다. 카카오는 응답이 200이면 성공으로 본다."""
+    if not s.kakao_admin_key:
+        raise AppError("NOT_CONFIGURED", "웹훅이 설정되지 않았어요.", False, http_status=503)
+    if not hmac.compare_digest(request.headers.get("authorization", ""), f"KakaoAK {s.kakao_admin_key}"):
+        raise AppError("UNAUTHORIZED", "인증에 실패했어요.", False, http_status=401)
+    data = dict(request.query_params)
+    if request.method == "POST":
+        data |= {k: str(v) for k, v in (await request.form()).items()}
+    if s.kakao_app_id and data.get("app_id") != s.kakao_app_id:
+        raise AppError("WRONG_APP", "다른 앱의 요청이에요.", False, http_status=400)
+    uid = (data.get("user_id") or "").strip()
+    if not uid:
+        raise AppError("INVALID_REQUEST", "user_id가 없어요.", False, http_status=400)
+    removed = a.unlink_by_provider("kakao", uid)
+    log.info("카카오 연결 해제 웹훅: referrer=%s, 지움=%s", data.get("referrer_type"), removed)
+    return JSONResponse({"ok": True})
 
 
 @router.get("/auth/dev/login", include_in_schema=False)  # /auth/{provider}/login 보다 먼저 (dev가 provider로 잡히지 않게)

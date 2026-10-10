@@ -76,6 +76,8 @@ class Settings(BaseSettings):
     # 로그인 (DECISIONS #34) — 곡 올리는 사람만. 키가 없으면 그 로그인 버튼은 꺼진다
     kakao_client_id: str | None = None      # REST API 키
     kakao_client_secret: str | None = None
+    kakao_admin_key: str | None = None      # 연결 해제 웹훅 확인용 (카카오가 Authorization: KakaoAK <어드민 키>로 보냄)
+    kakao_app_id: str | None = None         # 웹훅의 app_id가 우리 앱인지 확인 (1603105)
     google_client_id: str | None = None
     google_client_secret: str | None = None
     auth_dev_login: bool = False            # 로컬 확인용 가짜 로그인 (/auth/dev/login) — 서버에서는 절대 켜지 않음
@@ -122,7 +124,7 @@ class Settings(BaseSettings):
         extra = [o.strip().rstrip("/") for o in self.auth_redirect_origins.split(",") if o.strip()]
         return list(dict.fromkeys([self.public_base_url.rstrip("/"), *self.cors_origin_list, *extra]))
 
-    @field_validator("kakao_client_id", "kakao_client_secret", "google_client_id", "google_client_secret",
+    @field_validator("kakao_client_id", "kakao_client_secret", "kakao_admin_key", "kakao_app_id", "google_client_id", "google_client_secret",
                      "telegram_bot_token", "telegram_chat_id", "service_end_date")
     @classmethod
     def _blank_optional(cls, v: str | None) -> str | None:

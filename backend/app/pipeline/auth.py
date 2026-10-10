@@ -203,3 +203,13 @@ def delete_user(user_id: str) -> None:
         conn.execute("UPDATE jobs SET user_id = NULL WHERE user_id = ?", (user_id,))
         conn.execute("UPDATE tracks SET user_id = NULL WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+
+
+def unlink_by_provider(provider: str, uid: str) -> bool:
+    """로그인 서비스 쪽에서 연결을 끊었을 때(카카오 연결 해제 웹훅): 그 사용자의 로그인 정보를 지운다. 없으면 False."""
+    with db.connect() as conn:
+        r = conn.execute("SELECT user_id FROM users WHERE provider = ? AND provider_uid = ?", (provider, uid)).fetchone()
+    if r is None:
+        return False
+    delete_user(r["user_id"])
+    return True
