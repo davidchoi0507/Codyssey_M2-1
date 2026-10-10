@@ -69,6 +69,8 @@ class Settings(BaseSettings):
     feedback_ip_retention_days: int = 7  # 반응·신고에 남긴 접속 IP를 지우는 기한 (화면에는 안 나감)
     # 신고 (DECISIONS #33)
     report_hide_threshold: int = 3     # 서로 다른 접속에서 이만큼 신고되면 자동 숨김
+    report_hide_threshold_stolen: int = 1  # '남의 곡 무단 업로드' 곡 신고는 1번이면 먼저 숨기고 운영자가 확인 (#40)
+    acoustid_api_key: str | None = None    # 알려진 곡 조회 (acoustid.org 앱 키, 비상업 무료). 없으면 이 검사만 건너뜀
     telegram_bot_token: str | None = None  # 운영자 알림 (없으면 로그만)
     telegram_chat_id: str | None = None
     service_end_date: str | None = None    # 서비스 종료일 YYYY-MM-DD (공개 곡 일괄 삭제일, DECISIONS #35) — 화면 안내용
@@ -125,7 +127,7 @@ class Settings(BaseSettings):
         return list(dict.fromkeys([self.public_base_url.rstrip("/"), *self.cors_origin_list, *extra]))
 
     @field_validator("kakao_client_id", "kakao_client_secret", "kakao_admin_key", "kakao_app_id", "google_client_id", "google_client_secret",
-                     "telegram_bot_token", "telegram_chat_id", "service_end_date")
+                     "telegram_bot_token", "telegram_chat_id", "service_end_date", "acoustid_api_key")
     @classmethod
     def _blank_optional(cls, v: str | None) -> str | None:
         v = (v or "").strip()

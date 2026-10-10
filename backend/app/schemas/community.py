@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 ListenMode = Literal["full", "highlight"]
+AIUsage = Literal["none", "tool", "generated"]
 MAX_INTRO = 500
 MAX_COMMENT = 500
 MAX_NICKNAME = 20
@@ -17,6 +18,10 @@ class PublishRequest(BaseModel):
     intro: str | None = Field(default=None, max_length=MAX_INTRO, description="목록에 보일 한 줄 소개. 없으면 업로드 때 곡 소개")
     consent_rights: bool = Field(description="자작곡이거나 공개할 권리가 있음 — 필수")
     consent_public: bool = Field(description="커뮤니티 공개, 직접 내릴 때까지 보관(작업의 7일 삭제와 별도) — 필수")
+    ai_usage: AIUsage | None = Field(default=None, description="(10/10 추가) 음원에 AI를 썼는지: none 안 씀 · tool 도구로만 · "
+                                                              "generated AI가 곡·목소리를 만듦 → 곡에 'AI 활용' 표시. 없으면 권리 자가진단 답")
+    confirm_original: bool = Field(default=False, description="(10/10 추가) 409 KNOWN_SONG_MATCH(알려진 곡과 비슷)를 받은 뒤 "
+                                                              "'직접 만든 곡이 맞다'고 확인하고 다시 보낼 때 true")
 
 
 class TrackPatch(BaseModel):
@@ -73,6 +78,7 @@ class Track(BaseModel):
     audio_url: str
     plays: int
     reactions: int
+    ai_usage: str = Field(default="none", description="(10/10 추가) none · tool · generated — generated면 화면에 'AI 활용' 표시")
     stats: FeedbackStats | None = Field(description="comments_public=false면 null (올린 사람 화면에는 항상 있음)")
     created_at: datetime
 

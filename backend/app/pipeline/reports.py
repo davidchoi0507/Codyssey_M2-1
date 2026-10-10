@@ -58,7 +58,9 @@ def report(s: Settings, track_id: str, feedback_id: int | None, reason: str, det
         n = conn.execute(f"SELECT count(DISTINCT client) FROM reports WHERE track_id = ? AND {target} AND resolved = 0",
                          (track_id, feedback_id)).fetchone()[0]
         hidden = False
-        if n >= s.report_hide_threshold:
+        # 남의 곡 무단 업로드는 저작권 문제라 먼저 내리고 확인한다 (#40)
+        threshold = s.report_hide_threshold_stolen if reason == "stolen" and feedback_id is None else s.report_hide_threshold
+        if n >= threshold:
             if feedback_id is None:
                 hidden = conn.execute("UPDATE tracks SET status = 'reported' WHERE track_id = ? AND status = 'live'",
                                       (track_id,)).rowcount > 0

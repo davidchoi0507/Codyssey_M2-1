@@ -24,7 +24,7 @@ from app.core.config import Settings
 from app.core.errors import AppError
 from app.pipeline.jobfiles import JobFiles, new_job_id, now_iso
 from app.pipeline.limits import _today_start_utc
-from app.pipeline import moderation, reports
+from app.pipeline import fingerprint, moderation, reports
 from app.pipeline.render import cover_file_or_none
 
 CONSENT_VERSION = "community-v1"
@@ -134,8 +134,38 @@ def check_public_text(title: str, artist: str, intro: str | None) -> None:
     moderation.check_text(intro, field="곡 소개", allow_links=True)
 
 
+def check_copy(s: Settings, src: Path, ext: str | None, *, user_id: str | None, client: str,
+               confirm_original: bool) -> tuple[dict | None, dict | None]:
+    """남의 곡 막기 (#40). (지문, AcoustID가 찾은 곡). 다른 사람이 이미 올린 곡이면 거절,
+    알려진 곡과 비슷하면 올린 사람이 '직접 만든 곡이 맞다'고 다시 확인해야(confirm_original) 올라가고 운영자에게 알린다."""
+    fp = fingerprint.compute(src, ext)
+    if fp is None:
+        return None, None
+    if dup := fingerprint.find_duplicate(fp, user_id=user_id, client=client):
+        reports.notify(f"이미 올라온 곡과 같은 녹음을 다른 사람이 올리려 해 막았어요: '{dup['artist']} — {dup['title']}'")
+        raise AppError("DUPLICATE_TRACK", f"커뮤니티에 이미 같은 곡이 있어요 ('{dup['artist']} — {dup['title']}'). "
+                       "다른 사람의 곡은 올릴 수 없어요. 내 곡인데 다른 사람이 올렸다면 그 곡을 '남의 곡' 사유로 신고해 주세요.",
+                       False, http_status=409)
+    known = fingerprint.lookup_known(s, fp)
+    if known and not confirm_original:
+        raise AppError("KNOWN_SONG_MATCH", f"알려진 곡 '{known['artist']} — {known['title']}'과(와) 비슷해요. 직접 만든 곡이 맞다면 "
+                       "확인을 체크하고 다시 올려 주세요. 다른 사람의 곡이면 올릴 수 없어요.", False, http_status=409)
+    return fp, known
+
+
+def _after_publish(track_id: str, fp: dict | None, known: dict | None, title: str, artist: str) -> None:
+    if fp is not None:
+        fingerprint.save(track_id, fp)
+    if known:
+        with db.connect() as conn:
+            conn.execute("UPDATE tracks SET known_match = ? WHERE track_id = ?", (json.dumps(known, ensure_ascii=False), track_id))
+        reports.notify(f"알려진 곡과 비슷하지만 올린 사람이 자작곡이라고 확인하고 올렸어요: '{artist} — {title}' ≈ "
+                       f"'{known['artist']} — {known['title']}' (점수 {known['score']}). 확인: python -m scripts.community feedback {track_id}")
+
+
 def publish(s: Settings, jf: JobFiles, *, listen_mode: str, comments_public: bool, intro: str | None,
-            client: str, band_code: str | None, user_id: str | None = None) -> dict:
+            client: str, band_code: str | None, user_id: str | None = None, ai_usage: str | None = None,
+            confirm_original: bool = False) -> dict:
     """작업의 곡을 공개한다. 이미 올렸으면 설정만 바꾼다 (공개 방식이 바뀌면 음원을 다시 만든다)."""
     song = jf.read_json(jf.song)
     check_public_text(song.get("title", ""), song.get("artist", ""),
@@ -149,6 +179,11 @@ def publish(s: Settings, jf: JobFiles, *, listen_mode: str, comments_public: boo
     if today >= s.community_daily_publish_per_client:
         raise AppError("DAILY_LIMIT", f"하루에 {s.community_daily_publish_per_client}곡까지 공개할 수 있어요.", False,
                        http_status=429)
+    src = jf.find_original()
+    fp, known = check_copy(s, src, None, user_id=user_id, client=client, confirm_original=confirm_original) if src else (None, None)
+    if ai_usage is None:  # 권리 자가진단에 답했으면 그 값
+        from app.pipeline import rights
+        ai_usage = rights.load(jf).get("ai_audio") or "none"
     note = _note(jf)
     track_id = new_job_id()
     tdir = track_dir(s, track_id)
@@ -162,16 +197,17 @@ def publish(s: Settings, jf: JobFiles, *, listen_mode: str, comments_public: boo
         with db.connect() as conn:
             conn.execute(
                 "INSERT INTO tracks (track_id, job_id, title, artist, genre, intro, listen_mode, clip_start, clip_sec, "
-                "comments_public, colors, moods, band_code, client, consent, created_at, updated_at, user_id) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "comments_public, colors, moods, band_code, client, consent, created_at, updated_at, user_id, ai_usage) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (track_id, jf.job_id, song.get("title", ""), song.get("artist", ""), song.get("genre") or "",
                  (intro if intro is not None else song.get("description")) or "", listen_mode, clip_start, clip_sec,
                  int(comments_public), json.dumps(note.get("colors", []) if note else []),
                  json.dumps(note.get("mood_keywords", []) if note else [], ensure_ascii=False),
-                 band_code, client, json.dumps(consent, ensure_ascii=False), now, now, user_id))
+                 band_code, client, json.dumps(consent, ensure_ascii=False), now, now, user_id, ai_usage))
     except Exception:
         shutil.rmtree(tdir, ignore_errors=True)
         raise
+    _after_publish(track_id, fp, known, song.get("title", ""), song.get("artist", ""))
     jf.event("community_published", track_id=track_id, listen_mode=listen_mode, comments_public=comments_public)
     return get_track(track_id)
 
@@ -207,6 +243,7 @@ def update(s: Settings, track_id: str, *, listen_mode: str | None = None, commen
 
 def remove(s: Settings, track_id: str) -> None:
     """곡·반응·파일을 모두 지운다 (올린 사람이 내릴 때)."""
+    fingerprint.delete(track_id)
     with db.connect() as conn:
         conn.execute("DELETE FROM feedback WHERE track_id = ?", (track_id,))
         conn.execute("DELETE FROM tracks WHERE track_id = ?", (track_id,))
@@ -373,7 +410,8 @@ def _title_colors(title: str) -> list[str]:
 
 def publish_direct(s: Settings, src: Path, *, filename: str, title: str, artist: str, genre: str, intro: str,
                    listen_mode: str, clip_start: float | None, comments_public: bool, client: str,
-                   user_id: str | None, image: bytes | None) -> dict:
+                   user_id: str | None, image: bytes | None, ai_usage: str = "none",
+                   confirm_original: bool = False) -> dict:
     """업로드한 음원을 AI 분석 없이 바로 공개. 원본은 남기지 않는다 (공개용 mp3·커버만 커뮤니티 폴더에)."""
     from app.analysis.audio_io import check_magic, probe_duration
     from app.pipeline.intake import ALLOWED_EXT
@@ -394,6 +432,7 @@ def publish_direct(s: Settings, src: Path, *, filename: str, title: str, artist:
     if today >= s.community_daily_publish_per_client:
         raise AppError("DAILY_LIMIT", f"하루에 {s.community_daily_publish_per_client}곡까지 공개할 수 있어요.", False,
                        http_status=429)
+    fp, known = check_copy(s, src, ext, user_id=user_id, client=client, confirm_original=confirm_original)
     track_id = new_job_id()
     tdir = track_dir(s, track_id)
     sec = s.highlight_sec
@@ -416,14 +455,15 @@ def publish_direct(s: Settings, src: Path, *, filename: str, title: str, artist:
         with db.connect() as conn:
             conn.execute(
                 "INSERT INTO tracks (track_id, job_id, title, artist, genre, intro, listen_mode, clip_start, clip_sec, "
-                "comments_public, colors, moods, band_code, client, consent, created_at, updated_at, user_id, source) "
-                "VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', NULL, ?, ?, ?, ?, ?, 'direct')",
+                "comments_public, colors, moods, band_code, client, consent, created_at, updated_at, user_id, source, ai_usage) "
+                "VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', NULL, ?, ?, ?, ?, ?, 'direct', ?)",
                 (track_id, title.strip(), artist.strip(), genre.strip(), intro.strip(), listen_mode, clip_start, clip_sec,
                  int(comments_public), json.dumps(colors), client, json.dumps(consent, ensure_ascii=False), now, now,
-                 user_id))
+                 user_id, ai_usage))
     except Exception:
         shutil.rmtree(tdir, ignore_errors=True)
         raise
+    _after_publish(track_id, fp, known, title, artist)
     return get_track(track_id)
 
 

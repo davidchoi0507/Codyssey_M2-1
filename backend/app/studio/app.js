@@ -548,6 +548,7 @@ async function stepShare(p) {
     bindOwner(p, t);
     return;
   }
+  const AI0 = J.rights?.answers?.ai_audio || "none";
   p.innerHTML = `${await endNotice()}
     <h2>커뮤니티에 올려 반응 받기</h2>
     <p class="lead">발매 전에도 다른 사람들의 별점·태그·한마디를 받아 볼 수 있어요.</p>
@@ -556,6 +557,11 @@ async function stepShare(p) {
         <p class="muted small">발매 전 곡은 하이라이트만 공개하는 걸 권장해요. 공개된 음원은 다른 사람이 녹음할 수 있어요.</p></div>
       <div><b>반응 공개</b><div class="chips" style="margin-top:8px" data-g="pub"><button type="button" class="chip on" data-v="true">모두에게 공개</button><button type="button" class="chip" data-v="false">나만 보기</button></div></div>
       <label class="field"><span>한 줄 소개 <em>선택 — SNS·음원 링크 넣어도 돼요</em></span><input type="text" name="intro" maxlength="500"></label>
+      <div><b>음원에 AI를 썼나요?</b><div class="chips" style="margin-top:8px" data-g="ai">
+        <button type="button" class="chip ${AI0 === "none" ? "on" : ""}" data-v="none">안 썼어요</button>
+        <button type="button" class="chip ${AI0 === "tool" ? "on" : ""}" data-v="tool">믹싱·보정 도구로만</button>
+        <button type="button" class="chip ${AI0 === "generated" ? "on" : ""}" data-v="generated">AI가 곡·목소리를 만들었어요</button></div>
+        <p class="muted small">'AI가 만들었어요'를 고르면 곡에 'AI 활용' 표시가 붙어요. 숨긴 게 드러나면 신고로 내려갈 수 있어요.</p></div>
       <label class="check"><input type="checkbox" name="c1"><span>[필수] 만 14세 이상이고, 직접 만든 곡이거나 공개할 권리가 있어요</span></label>
       <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응이 모여요</span></label>
       <button class="btn primary block" id="pubBtn">커뮤니티에 올리기</button>
@@ -564,9 +570,27 @@ async function stepShare(p) {
   $("#pubForm").onsubmit = (e) => { e.preventDefault(); const f = e.currentTarget;
     if (!f.c1.checked || !f.c2.checked) return toast("필수 동의 두 가지에 체크해 주세요.", true);
     guard($("#pubBtn"), async () => {
-      J.track = await api("POST", `/jobs/${J.id}/community`, { listen_mode: chipVal(p, "mode"), comments_public: chipVal(p, "pub") === "true", intro: f.intro.value.trim() || null, consent_rights: true, consent_public: true });
+      const body = { listen_mode: chipVal(p, "mode"), comments_public: chipVal(p, "pub") === "true", intro: f.intro.value.trim() || null, consent_rights: true, consent_public: true, ai_usage: chipVal(p, "ai") };
+      J.track = await publishWithConfirm((confirm) => api("POST", `/jobs/${J.id}/community`, { ...body, confirm_original: confirm }));
       renderJob(); toast("커뮤니티에 올렸어요!");
     }, "올리는 중"); };
+}
+
+/** 공개 요청이 409 KNOWN_SONG_MATCH(알려진 곡과 비슷)면 확인을 받고 confirm_original로 다시 보낸다. */
+async function publishWithConfirm(send) {
+  try { return await send(false); }
+  catch (e) {
+    if (e.code !== "KNOWN_SONG_MATCH") throw e;
+    const ok = await new Promise((resolve) => {
+      const m = modal(`<h3>알려진 곡과 비슷해요</h3><p>${esc(e.message)}</p>
+        <label class="check"><input type="checkbox" id="mOrig"><span>직접 만든 곡이 맞아요. 다른 사람의 곡이면 내려가고 이용이 제한될 수 있다는 걸 알아요.</span></label>
+        <div class="row" style="margin-top:14px"><span class="sp"></span><button class="btn" id="mCancel">취소</button><button class="btn primary" id="mGo">올리기</button></div>`);
+      $("#mCancel", m).onclick = () => { $("#modal").close(); resolve(false); };
+      $("#mGo", m).onclick = () => { if (!$("#mOrig", m).checked) return toast("확인에 체크해 주세요.", true); $("#modal").close(); resolve(true); };
+    });
+    if (!ok) throw new ApiError(409, { message: "올리기를 취소했어요." });
+    return await send(true);
+  }
 }
 
 function bindChips(root) { $$("[data-g]", root).forEach((box) => box.addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; $$(".chip", box).forEach((c) => c.classList.toggle("on", c === b)); })); }
@@ -576,7 +600,7 @@ function ownerSummary(t) {
   const s = t.stats;
   return `<div class="card"><div class="row" style="align-items:flex-start;gap:18px"><img src="${esc(t.cover_url)}" alt="" style="width:120px;border-radius:12px">
     <div class="sp"><h3>${esc(t.title)}</h3><div class="muted">${esc(t.artist)}</div>
-      <div class="row small" style="margin-top:8px"><span class="pill">${t.listen_mode === "full" ? "전곡" : "하이라이트"}</span><span class="pill">${t.comments_public ? "반응 공개" : "나만 보기"}</span>
+      <div class="row small" style="margin-top:8px"><span class="pill">${t.listen_mode === "full" ? "전곡" : "하이라이트"}</span><span class="pill">${t.comments_public ? "반응 공개" : "나만 보기"}</span>${t.ai_usage === "generated" ? `<span class="pill">AI 활용</span>` : ""}
       ${t.status && t.status !== "live" ? `<span class="pill fail">${t.status === "reported" ? "신고로 숨겨짐 — 운영자 확인 중" : "운영자가 내림"}</span>` : ""}</div>
       <div class="row" style="margin-top:10px"><b>재생 ${t.plays}</b><b>반응 ${s.reactions}</b>${s.rating_avg ? `<b>★ ${s.rating_avg}</b>` : ""}</div></div></div>
     <hr><b>관리 링크</b><p class="muted small">이 링크가 있어야 반응을 보고, 설정을 바꾸고, 곡을 내릴 수 있어요. ${ME ? "로그인했으니 '내 곡'에서도 열 수 있어요." : "꼭 저장해 두세요 (로그인하면 '내 곡'에서 다시 열 수 있어요)."}</p>
@@ -602,6 +626,11 @@ async function quick() {
     <label class="field"><span>한 줄 소개 <em>선택 — SNS·음원 링크 넣어도 돼요</em></span><input type="text" name="intro" maxlength="500"></label>
     <div><b>들려줄 범위</b><div class="chips" style="margin-top:8px" data-g="mode"><button type="button" class="chip on" data-v="highlight">하이라이트 15초 (가장 에너지 큰 구간)</button><button type="button" class="chip" data-v="full">전곡</button></div></div>
     <div><b>반응 공개</b><div class="chips" style="margin-top:8px" data-g="pub"><button type="button" class="chip on" data-v="true">모두에게 공개</button><button type="button" class="chip" data-v="false">나만 보기</button></div></div>
+    <div><b>음원에 AI를 썼나요?</b><div class="chips" style="margin-top:8px" data-g="ai">
+        <button type="button" class="chip on" data-v="none">안 썼어요</button>
+        <button type="button" class="chip " data-v="tool">믹싱·보정 도구로만</button>
+        <button type="button" class="chip " data-v="generated">AI가 곡·목소리를 만들었어요</button></div>
+        <p class="muted small">'AI가 만들었어요'를 고르면 곡에 'AI 활용' 표시가 붙어요. 숨긴 게 드러나면 신고로 내려갈 수 있어요.</p></div>
     <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
     <label class="check"><input type="checkbox" name="c1"><span>[필수] 만 14세 이상이고, 직접 만든 곡이거나 공개할 권리가 있어요</span></label>
     <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응과 접속 IP(도배 방지용, 7일 보관)가 모여요</span></label>
@@ -618,10 +647,15 @@ async function quick() {
     for (const k of ["title", "artist", "genre", "intro"]) fd.append(k, f[k].value.trim());
     fd.append("listen_mode", chipVal(view, "mode")); fd.append("comments_public", chipVal(view, "pub"));
     fd.append("consent_rights", "true"); fd.append("consent_public", "true");
-    fd.append("form_token", token); fd.append("website", f.website.value);
+    fd.append("website", f.website.value); fd.append("ai_usage", chipVal(view, "ai"));
     $("#qErr").textContent = "";
     guard($("#qBtn"), async () => {
-      const t = await api("POST", "/community/tracks", fd, { form: true });
+      const t = await publishWithConfirm(async (confirm) => {
+        const body = new FormData(); for (const [k, v] of fd.entries()) body.append(k, v);
+        if (confirm) { token = (await api("GET", "/community/form-token")).token; await sleep(3200); }
+        body.append("form_token", token); body.append("confirm_original", confirm);
+        return api("POST", "/community/tracks", body, { form: true });
+      });
       $("#qForm").remove();
       $("#qDone").innerHTML = `<div class="notice ok" style="margin-bottom:16px">공개했어요! 아래 관리 링크를 꼭 저장해 두세요.</div>${ownerSummary(t)}`;
       bindOwner($("#qDone"), t);
@@ -634,7 +668,7 @@ async function quick() {
 let FEED = { sort: "new", q: "" };
 function trackCard(t) {
   const s = t.stats;
-  return `<a class="track" href="#/track/${esc(t.track_id)}"><div class="cv"><img src="${esc(t.cover_url)}" alt="" loading="lazy">${t.listen_mode === "highlight" ? `<span class="pill accent">하이라이트</span>` : ""}</div>
+  return `<a class="track" href="#/track/${esc(t.track_id)}"><div class="cv"><img src="${esc(t.cover_url)}" alt="" loading="lazy">${t.listen_mode === "highlight" ? `<span class="pill accent">하이라이트</span>` : ""}${t.ai_usage === "generated" ? `<span class="pill" style="left:auto;right:8px">AI 활용</span>` : ""}</div>
     <div class="t">${esc(t.title)}</div><div class="a">${esc(t.artist)}${t.genre ? " · " + esc(t.genre) : ""}</div>
     <div class="m">▶ ${t.plays} · 반응 ${t.reactions}${s?.rating_avg ? ` · ★ ${s.rating_avg}` : ""}</div></a>`;
 }
@@ -681,7 +715,7 @@ async function trackView(id) {
       <p class="muted small">${t.listen_mode === "highlight" ? `하이라이트 ${Math.round(t.clip_sec)}초만 공개된 곡이에요.` : "전곡 공개"} · ▶ <span id="plays">${t.plays}</span></p>
       <button class="linkbtn" id="repTrack">이 곡 신고하기</button></div>
     <div>
-      <div class="eyebrow">${esc(t.genre || "음악")}</div><h2 style="font-size:30px">${esc(t.title)}</h2><div class="muted" style="font-size:17px">${esc(t.artist)}</div>
+      <div class="eyebrow">${esc(t.genre || "음악")}${t.ai_usage === "generated" ? " · AI 활용" : ""}</div><h2 style="font-size:30px">${esc(t.title)}</h2><div class="muted" style="font-size:17px">${esc(t.artist)}</div>
       ${t.intro ? `<p style="white-space:pre-wrap">${linkify(t.intro)}</p>` : ""}
       ${t.moods.length ? `<div class="chips">${t.moods.map((m) => `<span class="pill">${esc(m)}</span>`).join("")}</div>` : ""}
       ${s ? `<div class="card" style="margin-top:18px"><div class="row"><h3>${s.rating_avg ? `★ ${s.rating_avg}` : "아직 별점 없음"}</h3><span class="muted small">반응 ${s.reactions} · 한마디 ${s.comments}</span></div>

@@ -53,7 +53,7 @@ def _track(t: dict, *, owner: bool = False) -> dict:
                 colors=json.loads(t["colors"]), moods=json.loads(t["moods"]),
                 cover_url=f"/community/tracks/{tid}/cover?v={t['updated_at']}",
                 audio_url=f"/community/tracks/{tid}/audio?v={t['updated_at']}",
-                plays=t["plays"], reactions=st["reactions"],
+                plays=t["plays"], reactions=st["reactions"], ai_usage=t.get("ai_usage") or "none",
                 stats=FeedbackStats(**st) if (owner or t["comments_public"]) else None,
                 created_at=datetime.fromisoformat(t["created_at"]))
 
@@ -91,7 +91,8 @@ def publish(body: PublishRequest, request: Request, jf: JobFiles = Depends(job_f
         raise AppError("CONSENT_REQUIRED", "공개하려면 필수 동의 두 가지에 모두 체크해 주세요.", False, http_status=422)
     user = current_user(request)
     t = c.publish(s, jf, listen_mode=body.listen_mode, comments_public=body.comments_public, intro=body.intro,
-                  client=client_ip(request), band_code=job_band(jf.job_id), user_id=user["user_id"] if user else None)
+                  client=client_ip(request), band_code=job_band(jf.job_id), user_id=user["user_id"] if user else None,
+                  ai_usage=body.ai_usage, confirm_original=body.confirm_original)
     link_track(t["track_id"], user)
     return _owner_view(s, t)
 
@@ -112,6 +113,8 @@ async def publish_direct(
     consent_rights: bool = Form(description="자작곡이거나 공개할 권리가 있음 — 필수"),
     consent_public: bool = Form(description="커뮤니티 공개·직접 내릴 때까지 보관·반응 수집 — 필수"),
     form_token: str | None = Form(None, max_length=100), website: str | None = Form(None, max_length=200),
+    ai_usage: Literal["none", "tool", "generated"] = Form("none", description="음원에 AI를 썼는지 — generated면 'AI 활용' 표시"),
+    confirm_original: bool = Form(False, description="409 KNOWN_SONG_MATCH 뒤 '직접 만든 곡이 맞다'고 확인하고 다시 보낼 때 true"),
     s: Settings = Depends(_enabled),
 ) -> OwnerView:
     if not (consent_rights and consent_public):
@@ -139,7 +142,8 @@ async def publish_direct(
         t = c.publish_direct(s, src, filename=file.filename or "", title=title, artist=artist, genre=genre,
                              intro=intro, listen_mode=listen_mode, clip_start=clip_start,
                              comments_public=comments_public, client=client,
-                             user_id=user["user_id"] if user else None, image=image)
+                             user_id=user["user_id"] if user else None, image=image, ai_usage=ai_usage,
+                             confirm_original=confirm_original)
     return _owner_view(s, t)
 
 

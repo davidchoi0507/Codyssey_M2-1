@@ -113,6 +113,13 @@ CREATE TABLE IF NOT EXISTS reports (
     resolved    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS reports_target ON reports(track_id, feedback_id);
+
+-- 소리 지문 (#40): 공개한 곡 원본 전체의 Chromaprint — 남의 곡·이미 올라온 곡 다시 올리기 막기
+CREATE TABLE IF NOT EXISTS track_fingerprints (
+    track_id TEXT PRIMARY KEY,
+    fp       TEXT NOT NULL,      -- JSON 정수 배열
+    duration REAL NOT NULL
+);
 """
 
 _initialized: set[Path] = set()
@@ -156,6 +163,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS tracks_user ON tracks(user_id)")
     if "source" not in tcols:
         conn.execute("ALTER TABLE tracks ADD COLUMN source TEXT NOT NULL DEFAULT 'job'")  # job | direct(AI 없이 바로 공개)
+    if "ai_usage" not in tcols:
+        conn.execute("ALTER TABLE tracks ADD COLUMN ai_usage TEXT NOT NULL DEFAULT 'none'")  # none | tool | generated (#40)
+    if "known_match" not in tcols:
+        conn.execute("ALTER TABLE tracks ADD COLUMN known_match TEXT")  # AcoustID가 찾은 비슷한 곡 JSON (올린 사람이 확인하고 올림)
     fcols = {r[1] for r in conn.execute("PRAGMA table_info(feedback)")}
     if "hidden_reason" not in fcols:
         conn.execute("ALTER TABLE feedback ADD COLUMN hidden_reason TEXT")  # owner | reported | spam | operator
