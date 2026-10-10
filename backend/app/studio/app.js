@@ -529,9 +529,9 @@ async function stepSubmit(p) {
       <div class="tabs">${dists.map((d) => `<button class="tab ${d.id === J.dist ? "on" : ""}" data-dist="${esc(d.id)}">${esc(d.name)}</button>`).join("")}<a class="btn small ghost" href="#/guide">어디가 맞을까?</a></div>
       <div class="row" style="margin-top:16px"><h3>${esc(dc.distributor.name)} <span class="muted small">${esc(dc.distributor.kind)}</span></h3><span class="sp"></span>${counts(dc.counts)}</div>
       ${checkList(dc.items)}
-      <div class="row" style="margin-top:14px"><a class="btn primary" href="${esc(dc.sheet_url)}">제출 준비표 받기 (CSV · 엑셀)</a>
+      <div class="row" style="margin-top:14px"><a class="btn primary" href="${esc(dc.sheet_url)}">입력 도우미 받기 (CSV · 엑셀)</a>
         ${pkg.zip_url ? `<a class="btn" href="${esc(pkg.zip_url)}">전체 패키지 ZIP</a>` : `<span class="muted small">ZIP은 커버를 고르고 영상까지 만들어지면 받을 수 있어요.</span>`}</div>
-      <p class="muted small" style="margin-top:10px">공식 제출 양식을 아직 못 구해서, 공개된 입력 항목 순서대로 정리한 표예요. 조사 기준일 ${esc(dc.distributor.checked_at)}.</p>
+      <p class="muted small" style="margin-top:10px">두 유통사 모두 내려받는 제출 양식 없이 웹 화면에 직접 입력해요. 이 표는 그 화면에 옮겨 적을 값이에요 — DistroKid는 실제 업로드 화면 순서, 뮤즈플랫폼은 입력 화면이 로그인 뒤에만 있어 공개 범위 기준이에요. 조사 기준일 ${esc(dc.distributor.checked_at)}.</p>
     </div>
     <div class="card"><h3>발매 일정</h3>${plan.warnings.map((w) => `<div class="notice warn small" style="margin-top:8px">${esc(w)}</div>`).join("")}
       <ul class="cal" style="margin-top:10px">${plan.steps.map((s) => `<li class="${s.status || ""}"><div><div class="lbl">${esc(s.label)}</div><div class="small muted">${esc(s.date || "")}</div></div>

@@ -163,9 +163,10 @@ def zip_entries(jf: JobFiles, package, models: list[str]) -> tuple[str, list[tup
     entries.append(("release/cover_3000.jpg", _cover_jpg(jf, cover)))
     info, _ = release_info.load(jf)
     files = {"audio": f"{prefix}.wav (처음 올린 마스터 WAV)", "cover": "release/cover_3000.jpg"}
+    ctx = distributors.job_context(jf)
     for dist_id, prof in distributors.PROFILES.items():
         entries.append((f"release/{prof.name}_제출준비표.csv",
-                        distributors.sheet_csv(dist_id, info, files).decode("utf-8")))
+                        distributors.sheet_csv(dist_id, info, files, ctx).decode("utf-8")))
     if answers := rights.load(jf):
         entries.append(("release/RIGHTS_CHECK.md", _rights_md(rights.evaluate(answers))))
     entries.append(("RELEASE_BRIEF.md", _brief(song, note, models)))

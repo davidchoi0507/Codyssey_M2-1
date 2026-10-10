@@ -3,7 +3,6 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
-from PIL import Image
 
 from app.api.deps import find_job, job_files, settings
 from app.core.config import Settings
@@ -11,8 +10,6 @@ from app.core.errors import AppError
 from app.core.tokens import make_token, read_token
 from app.pipeline import distributors, guide, release_info, rights
 from app.pipeline.jobfiles import JobFiles
-from app.pipeline.release import _probe_audio
-from app.pipeline.render import cover_file_or_none
 from app.schemas.release import (DistributorCheck, DistributorProfile, GuideRecommendation, GuideRecommendRequest,
                                  ReleaseInfo, ReleaseInfoView, RightsQuestion, RightsResult)
 
@@ -82,17 +79,6 @@ def put_rights(body: dict[str, str], jf: JobFiles = Depends(job_files)) -> Right
     return rights.evaluate(rights.save(jf, body))
 
 
-def _cover_px(jf: JobFiles) -> int | None:
-    if not jf.selected_cover.exists():
-        return None
-    sel = jf.read_json(jf.selected_cover)
-    p = cover_file_or_none(jf, sel["item_id"], sel["v"])
-    if p is None:
-        return None
-    with Image.open(p) as im:
-        return min(im.size)
-
-
 def sheet_files(info) -> dict[str, str]:
     base = f"{info.artist} - {info.title}".strip(" -") or "track"
     return {"audio": f"{base}.wav (처음 올린 마스터 WAV)", "cover": f"{base}_cover_3000.jpg (ZIP의 release 폴더)"}
@@ -100,7 +86,7 @@ def sheet_files(info) -> dict[str, str]:
 
 def distributor_check(jf: JobFiles, dist_id: str, s: Settings) -> DistributorCheck:
     info, _ = release_info.load(jf)
-    items = distributors.evaluate(dist_id, info, _probe_audio(jf), _cover_px(jf), rights.load(jf))
+    items = distributors.evaluate(dist_id, info, distributors.job_context(jf))
     counts = {k: sum(1 for i in items if i.status == k) for k in ("ok", "warn", "fail", "todo")}
     token = make_token(s.download_token_secret, jf.job_id, f"sheet/{dist_id}", s.download_token_ttl_sec)
     return DistributorCheck(distributor=distributors.PROFILES[dist_id], items=items, counts=counts,
@@ -122,5 +108,5 @@ def sheet(job_id: str, dist_id: str, t: str = Query(), s: Settings = Depends(set
         raise AppError("LINK_EXPIRED", "링크가 만료되었어요. 화면을 새로고침해 주세요.", False, http_status=403)
     info, _ = release_info.load(jf)
     name = f"{distributors.PROFILES[dist_id].name}_제출준비표.csv"
-    return Response(distributors.sheet_csv(dist_id, info, sheet_files(info)), media_type="text/csv; charset=utf-8",
+    return Response(distributors.sheet_csv(dist_id, info, sheet_files(info), distributors.job_context(jf)), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
