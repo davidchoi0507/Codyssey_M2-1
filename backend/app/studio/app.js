@@ -73,8 +73,8 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 저장 안 되는 브라우저 */ } },
 };
 function rememberJob(id, title) {
-  const list = store.get("recentJobs", []).filter((j) => j.id !== id);
-  list.unshift({ id, title, at: Date.now() }); store.set("recentJobs", list.slice(0, 10));
+  const list = store.get("studioRecentJobs", []).filter((j) => j.id !== id);
+  list.unshift({ id, title, at: Date.now() }); store.set("studioRecentJobs", list.slice(0, 10));
 }
 
 let ME = undefined; // undefined: 아직 모름, null: 로그인 안 함
@@ -767,7 +767,7 @@ function linkify(text) {
 async function me() {
   await loadMe();
   const cancelled = location.hash.includes("cancelled");
-  const recent = store.get("recentJobs", []);
+  const recent = store.get("studioRecentJobs", []);
   if (!ME) {
     const pv = await api("GET", "/auth/providers");
     const any = pv.kakao || pv.google || pv.dev;
