@@ -6,9 +6,9 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
-from app.api import band, community, files, jobs, note, package
+from app.api import auth, band, community, files, jobs, note, package, release
 from app.db import import_legacy_files
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -81,8 +81,31 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-for r in (band.router, jobs.router, note.router, package.router, files.router, community.router):
+for r in (band.router, jobs.router, note.router, package.router, files.router, community.router, release.router,
+          auth.router):
     app.include_router(r)
+
+STUDIO = Path(__file__).parent / "studio"
+
+
+@app.get("/studio", include_in_schema=False)
+def studio() -> FileResponse:
+    """전체 흐름 시안 화면 (10/10, 팀장 디자인 참고용). 발매 안내 → 곡 올리기 → … → 커뮤니티를 한 화면 앱으로."""
+    return FileResponse(STUDIO / "index.html", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/studio/{name}", include_in_schema=False)
+def studio_asset(name: str) -> FileResponse:
+    types = {"app.css": "text/css", "app.js": "text/javascript"}
+    if name not in types:
+        raise AppError("NOT_FOUND", "없는 주소예요.", False, http_status=404)
+    return FileResponse(STUDIO / name, media_type=types[name], headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse("/studio")
+
 
 if settings.playground_enabled:
     @app.get("/playground", include_in_schema=False)

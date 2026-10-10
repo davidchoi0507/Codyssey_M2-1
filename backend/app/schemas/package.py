@@ -83,8 +83,8 @@ class ReleasePlan(BaseModel):
 
 
 class CheckItem(BaseModel):
-    group: Literal["meta", "audio", "cover", "rights", "extra"] = Field(
-        description="meta 곡 정보 · audio 음원 · cover 커버 · rights 권리(직접 확인) · extra 유통과 별개")
+    group: Literal["meta", "audio", "cover", "rights", "extra", "dist"] = Field(
+        description="meta 곡 정보 · audio 음원 · cover 커버 · rights 권리 · extra 유통과 별개 · dist 유통사별 (10/10 추가)")
     id: str
     label: str
     status: Literal["ok", "warn", "fail", "todo"] = Field(description="ok 통과 · warn 확인 필요 · fail 고쳐야 함 · todo 직접 확인")

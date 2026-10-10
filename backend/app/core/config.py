@@ -59,6 +59,28 @@ class Settings(BaseSettings):
     community_daily_publish_per_client: int = 5
     feedback_daily_per_client: int = 30        # 접속 IP별 하루 반응 수 (전체 곡 합)
     feedback_daily_per_client_track: int = 3   # 한 곡에 같은 IP가 하루 남길 수 있는 반응 수
+    # 도배·욕설·광고 방지 (DECISIONS #32)
+    form_token_required: bool = True   # 화면이 받은 1회용 제출 토큰 없이는 반응·공개를 받지 않음 (매크로 방지)
+    form_min_sec: float = 3.0          # 화면을 연 뒤 이보다 빨리 제출하면 거절
+    form_token_ttl_sec: int = 600
+    feedback_cooldown_sec: int = 30    # 같은 IP 반응 간격
+    feedback_burst_per_min: int = 3    # 1분에 이보다 많으면 burst_block_min분 차단
+    burst_block_min: int = 10
+    feedback_ip_retention_days: int = 30  # 반응·신고에 남긴 접속 IP를 지우는 기한 (화면에는 안 나감)
+    # 신고 (DECISIONS #33)
+    report_hide_threshold: int = 3     # 서로 다른 접속에서 이만큼 신고되면 자동 숨김
+    telegram_bot_token: str | None = None  # 운영자 알림 (없으면 로그만)
+    telegram_chat_id: str | None = None
+    service_end_date: str | None = None    # 서비스 종료일 YYYY-MM-DD (공개 곡 일괄 삭제일, DECISIONS #35) — 화면 안내용
+
+    # 로그인 (DECISIONS #34) — 곡 올리는 사람만. 키가 없으면 그 로그인 버튼은 꺼진다
+    kakao_client_id: str | None = None      # REST API 키
+    kakao_client_secret: str | None = None
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    auth_dev_login: bool = False            # 로컬 확인용 가짜 로그인 (/auth/dev/login) — 서버에서는 절대 켜지 않음
+    session_ttl_days: int = 30
+    auth_redirect_origins: str = ""         # 로그인 후 돌아가도 되는 화면 주소 (쉼표). CORS_ORIGINS와 public_base_url은 기본 허용
 
     # 미디어
     font_path: Path = Path("./app/fonts/NotoSansKR-Bold.ttf")
@@ -94,6 +116,18 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def auth_origin_list(self) -> list[str]:
+        extra = [o.strip().rstrip("/") for o in self.auth_redirect_origins.split(",") if o.strip()]
+        return list(dict.fromkeys([self.public_base_url.rstrip("/"), *self.cors_origin_list, *extra]))
+
+    @field_validator("kakao_client_id", "kakao_client_secret", "google_client_id", "google_client_secret",
+                     "telegram_bot_token", "telegram_chat_id", "service_end_date")
+    @classmethod
+    def _blank_optional(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        return None if not v or v.startswith("#") else v
 
     @property
     def jobs_dir(self) -> Path:

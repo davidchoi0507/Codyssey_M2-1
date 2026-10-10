@@ -8,6 +8,7 @@ import yaml
 from app.core.config import Settings, get_settings
 from app.core.stages import ANALYSIS_STEPS, QUEUED_LABEL, STAGE_LABELS, Stage
 from app.pipeline.jobfiles import JobFiles
+from app.pipeline import release_info, rights
 from app.pipeline.release import release_plan, submission_check
 from app.pipeline.render import SHORT_TEMPLATE, TEMPLATES, cover_file_or_none
 from app.schemas.common import AIGenerated, ErrorInfo
@@ -148,7 +149,11 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
 
     song = jf.read_json(jf.song)
     duration = float(jf.read_json(jf.features)["duration_sec"]) if jf.features.exists() else 0.0
-    check = submission_check(jf, song, sel, cover_file_or_none(jf, sel["item_id"], sel["v"]) if sel else None, duration)
+    info, saved = release_info.load(jf)
+    answers = rights.load(jf)
+    check = submission_check(jf, song, sel, cover_file_or_none(jf, sel["item_id"], sel["v"]) if sel else None, duration,
+                             release_info=release_info.checks(info) if saved else None,
+                             rights=rights.evaluate(answers) if answers else None)
 
     return Package(job_id=jf.job_id, stage=st["stage"], covers=covers, videos=videos, channels=channels, pitch=pitch,
                    zip_url=zip_url if st["stage"] == Stage.DONE else None,

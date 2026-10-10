@@ -3,6 +3,7 @@
   python -m scripts.cleanup            # 삭제
   python -m scripts.cleanup --dry-run  # 지울 대상만 보기
 
+커뮤니티 반응·신고의 접속 IP는 FEEDBACK_IP_RETENTION_DAYS(기본 30일) 뒤 지우고, 만료된 로그인 세션도 지운다.
 KEEP_JOB_IDS(쉼표 구분)에 적은 작업은 남긴다 (팀 공유 샘플). 음원·결과물·곡 정보·동의 기록·DB 레코드를 지운다. 결과보고서용 지표는 개인정보와 자유 입력(수정 문장, 요청,
 에러 원문)을 빼고 data/metrics_archive.jsonl 에 한 줄씩 남긴다.
 """
@@ -58,7 +59,13 @@ def main() -> int:
             shutil.rmtree(jf.root, ignore_errors=True)
     for name in orphans:
         shutil.rmtree(s.jobs_dir / name, ignore_errors=True)
-    print(f"삭제 완료. 지표는 {archive}에 보관")
+    # 커뮤니티 반응·신고에 남긴 접속 IP는 FEEDBACK_IP_RETENTION_DAYS 뒤 지운다 (동의서 v1.3 초안 제7조)
+    ip_cutoff = (datetime.now(timezone.utc) - timedelta(days=s.feedback_ip_retention_days)).isoformat(timespec="seconds")
+    with db.connect() as conn:
+        n_fb = conn.execute("UPDATE feedback SET client = NULL WHERE client IS NOT NULL AND ts < ?", (ip_cutoff,)).rowcount
+        n_rp = conn.execute("UPDATE reports SET client = NULL WHERE client IS NOT NULL AND ts < ?", (ip_cutoff,)).rowcount
+        conn.execute("DELETE FROM sessions WHERE expires_at < ?", (datetime.now(timezone.utc).isoformat(timespec="seconds"),))
+    print(f"삭제 완료. 지표는 {archive}에 보관. 지난 접속 IP 정리: 반응 {n_fb}건, 신고 {n_rp}건")
     return 0
 
 

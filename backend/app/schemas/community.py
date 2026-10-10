@@ -32,6 +32,11 @@ class FeedbackRequest(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=6, description="GET /community/meta 의 tags 중에서")
     comment: str | None = Field(default=None, max_length=MAX_COMMENT)
     nickname: str | None = Field(default=None, max_length=MAX_NICKNAME, description="없으면 '익명'")
+    form_token: str | None = Field(default=None, max_length=100,
+                                   description="(10/10 추가) GET /community/form-token 으로 받은 1회용 토큰 — 반응 입력칸을 열 때 받고, "
+                                               "보낼 때마다 새로 받는다. 받은 뒤 3초 안에 보내면 거절(매크로 방지)")
+    website: str | None = Field(default=None, max_length=200,
+                                description="(10/10 추가) 함정 칸 — 화면에 안 보이게 두고 항상 비워 보낸다. 값이 있으면 봇으로 보고 거절")
 
 
 class FeedbackStats(BaseModel):
@@ -83,6 +88,8 @@ class TrackDetail(Track):
 
 class OwnerView(Track):
     """올린 사람 화면: 비공개 의견까지 전부 + 관리 링크."""
+    status: str = Field(default="live", description="(10/10 추가) live 공개 중 · reported 신고 누적으로 숨겨짐(운영자 확인 중) · "
+                                                    "hidden 운영자가 내림")
     job_id: str | None
     feedback: list[Feedback]
     stats: FeedbackStats
@@ -95,3 +102,23 @@ class CommunityMeta(BaseModel):
     tags: list[str]
     listen_modes: dict[str, str]
     consent_version: str
+    report_reasons: dict[str, str] = Field(default_factory=dict, description="(10/10 추가) 신고 사유 값 → 화면 문구")
+    service_end_date: str | None = Field(default=None, description="(10/10 추가) 서비스 종료일 — 이날 공개 곡을 모두 지움")
+
+
+class FormToken(BaseModel):
+    token: str
+    min_sec: float = Field(description="받은 뒤 이 시간이 지나야 보낼 수 있음")
+    ttl_sec: int
+
+
+class ReportRequest(BaseModel):
+    reason: Literal["abuse", "ad", "stolen", "other"] = Field(
+        description="abuse 욕설·비하 · ad 광고·도배 · stolen 남의 곡 무단 · other 기타")
+    detail: str | None = Field(default=None, max_length=300)
+
+
+class ReportResult(BaseModel):
+    reported: bool
+    hidden: bool = Field(description="이번 신고로 기준을 넘어 숨겨졌는지")
+    message: str

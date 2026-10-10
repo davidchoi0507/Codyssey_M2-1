@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>인디 앨범 스튜디오 — 발매부터 반응까지</title>
+<!-- 전체 흐름 시안 (2026-10-10, 백엔드). 팀장 디자인 참고용 — 어떤 화면이 필요한지 보려고 끝까지 동작하게 만든 것.
+     API 문서: /docs · 기획: docs/part2/03_기획서_작업계획서.md -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="/studio/app.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#/"><span class="logo">♪</span><span>인디 앨범 스튜디오<small>가칭</small></span></a>
+  <nav id="nav">
+    <a href="#/guide" data-nav="guide">발매 안내</a>
+    <a href="#/new" data-nav="new">발매 준비</a>
+    <a href="#/quick" data-nav="quick">바로 공개</a>
+    <a href="#/community" data-nav="community">커뮤니티</a>
+    <a href="#/me" data-nav="me" id="navMe">내 곡</a>
+  </nav>
+</header>
+<main id="view" aria-live="polite"></main>
+<div id="toast" role="status"></div>
+<dialog id="modal"><div id="modalBody"></div></dialog>
+<footer class="foot">
+  <p>시안 화면 — 화면 구성 확인용이에요. 실제 디자인은 팀장 화면으로 바뀌어요. · <a href="/docs" target="_blank" rel="noopener">API 문서</a></p>
+</footer>
+<script src="/studio/app.js"></script>
+</body>
+</html>

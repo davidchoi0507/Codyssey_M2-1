@@ -81,6 +81,38 @@ CREATE TABLE IF NOT EXISTS feedback (
     hidden    INTEGER NOT NULL DEFAULT 0  -- 올린 사람·운영자가 숨김
 );
 CREATE INDEX IF NOT EXISTS feedback_track ON feedback(track_id, id);
+
+-- 로그인 (DECISIONS #34): 곡 올리는 사람만. 카카오·구글이 주는 고유 식별값과 닉네임만 저장
+CREATE TABLE IF NOT EXISTS users (
+    user_id      TEXT PRIMARY KEY,
+    provider     TEXT NOT NULL,          -- kakao | google | dev
+    provider_uid TEXT NOT NULL,
+    nickname     TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    last_login   TEXT NOT NULL,
+    UNIQUE (provider, provider_uid)
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,         -- 세션 토큰의 sha256 (토큰 원문은 저장하지 않음)
+    user_id    TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+
+-- 신고 (DECISIONS #33): 서로 다른 접속에서 REPORT_HIDE_THRESHOLD번이면 자동 숨김
+CREATE TABLE IF NOT EXISTS reports (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    track_id    TEXT NOT NULL,
+    feedback_id INTEGER,                 -- 반응 신고면 반응 id, 곡 신고면 NULL
+    reason      TEXT NOT NULL,           -- abuse | ad | stolen | other
+    detail      TEXT,
+    client      TEXT,                    -- 접속 IP — 같은 사람 중복 신고 막기, FEEDBACK_IP_RETENTION_DAYS 뒤 삭제
+    ts          TEXT NOT NULL,
+    resolved    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS reports_target ON reports(track_id, feedback_id);
 """
 
 _initialized: set[Path] = set()
@@ -115,6 +147,18 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "band_code" not in cols:
         conn.execute("ALTER TABLE jobs ADD COLUMN band_code TEXT")  # 올린 밴드 (초대 코드) — 밴드별 한도·통계
         conn.execute("CREATE INDEX IF NOT EXISTS jobs_band ON jobs(band_code, created_at)")
+    if "user_id" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN user_id TEXT")  # 로그인해서 올린 사람 — '내 곡'
+        conn.execute("CREATE INDEX IF NOT EXISTS jobs_user ON jobs(user_id, created_at)")
+    tcols = {r[1] for r in conn.execute("PRAGMA table_info(tracks)")}
+    if "user_id" not in tcols:
+        conn.execute("ALTER TABLE tracks ADD COLUMN user_id TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS tracks_user ON tracks(user_id)")
+    if "source" not in tcols:
+        conn.execute("ALTER TABLE tracks ADD COLUMN source TEXT NOT NULL DEFAULT 'job'")  # job | direct(AI 없이 바로 공개)
+    fcols = {r[1] for r in conn.execute("PRAGMA table_info(feedback)")}
+    if "hidden_reason" not in fcols:
+        conn.execute("ALTER TABLE feedback ADD COLUMN hidden_reason TEXT")  # owner | reported | spam | operator
 
 
 def import_legacy_files(jobs_dir: Path) -> int:

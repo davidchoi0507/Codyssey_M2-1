@@ -6,7 +6,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile
 
-from app.api.deps import file_url, job_files, runner, settings
+from app.api.auth import link_job
+from app.api.deps import current_user, file_url, job_files, runner, settings
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.pipeline.intake import create_job
@@ -77,6 +78,7 @@ async def create(
         jf = create_job(s, tmp_path, filename=file.filename or "", song=song, consent=consent, source="api")
         _recent_uploads[dup_key] = (jf.job_id, time.monotonic())
     record_client(jf.job_id, client, band)
+    link_job(jf.job_id, current_user(request))  # 로그인했으면 '내 곡'에 (선택)
     r.start_analysis(jf)
     return JobCreated(job_id=jf.job_id, status_url=f"/jobs/{jf.job_id}")
 

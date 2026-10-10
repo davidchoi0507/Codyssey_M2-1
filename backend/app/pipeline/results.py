@@ -21,6 +21,7 @@ from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import Stage
 from app.media.images import finish_cover, save_png, upscale
+from app.pipeline import distributors, release_info, rights
 from app.pipeline.generate import accepted_note, song_duration
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.render import SHORT_TEMPLATE, cover_file
@@ -158,6 +159,15 @@ def zip_entries(jf: JobFiles, package, models: list[str]) -> tuple[str, list[tup
         entries.append(("release/RELEASE_PLAN.md", _plan_md(package.release_plan)))
     if package.submission_check:
         entries.append(("release/SUBMISSION_CHECK.md", _check_md(package.submission_check)))
+    # 유통사 제출용 (10/10): JPG 커버, 유통사별 제출 준비표, 권리 자가진단
+    entries.append(("release/cover_3000.jpg", _cover_jpg(jf, cover)))
+    info, _ = release_info.load(jf)
+    files = {"audio": f"{prefix}.wav (처음 올린 마스터 WAV)", "cover": "release/cover_3000.jpg"}
+    for dist_id, prof in distributors.PROFILES.items():
+        entries.append((f"release/{prof.name}_제출준비표.csv",
+                        distributors.sheet_csv(dist_id, info, files).decode("utf-8")))
+    if answers := rights.load(jf):
+        entries.append(("release/RIGHTS_CHECK.md", _rights_md(rights.evaluate(answers))))
     entries.append(("RELEASE_BRIEF.md", _brief(song, note, models)))
     return prefix, [(arc, src) for arc, src in entries if isinstance(src, str) or src.exists()]
 
@@ -183,6 +193,23 @@ def build_zip(jf: JobFiles, package, models: list[str]) -> Path:
     tmp.replace(out)
     jf.event("zip_built", size_mb=round(out.stat().st_size / 1024 / 1024, 1))
     return out
+
+
+def _cover_jpg(jf: JobFiles, cover: Path) -> Path:
+    """유통사는 JPG(RGB)를 받는 곳이 많다 — 고른 3000px 커버를 JPG로 (커버가 바뀌면 다시)."""
+    out = jf.root / "covers" / "selected_3000.jpg"
+    if cover.exists() and (not out.exists() or out.stat().st_mtime < cover.stat().st_mtime):
+        Image.open(cover).convert("RGB").save(out, "JPEG", quality=95)
+    return out
+
+
+def _rights_md(r) -> str:
+    mark = {"ok": "[v]", "warn": "[!]", "fail": "[x]", "todo": "[ ]"}
+    lines = ["# 권리 자가진단", "", "법률 자문이 아니라 흔한 반려·분쟁 사유를 미리 짚는 점검이에요.", ""]
+    lines += [f"- {mark[i.status]} **{i.label}** — {i.detail}" for i in r.items]
+    if r.documents:
+        lines += ["", "## 챙겨 둘 서류·기록"] + [f"- {d}" for d in r.documents]
+    return "\n".join(lines) + "\n"
 
 
 def _safe(name: str) -> str:

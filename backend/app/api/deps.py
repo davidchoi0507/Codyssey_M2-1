@@ -7,6 +7,7 @@ from fastapi import Header, Request
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError
 from app.core.tokens import make_token
+from app.pipeline.auth import user_for_token
 from app.pipeline.bands import check_attempts, job_band, normalize, record_fail
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.limits import client_ip
@@ -69,3 +70,23 @@ def file_url(jf: JobFiles, path: Path) -> str:
     token = make_token(s.download_token_secret, jf.job_id, path.relative_to(jf.root).as_posix(),
                        s.download_token_ttl_sec)
     return f"/files/{token}"
+
+
+def session_token(request: Request) -> str | None:
+    """같은 주소 화면은 쿠키, 다른 주소 화면(팀장 화면)은 Authorization: Bearer."""
+    auth = request.headers.get("authorization") or ""
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip() or None
+    return request.cookies.get("sid")
+
+
+def current_user(request: Request) -> dict | None:
+    """로그인했으면 사용자, 아니면 None (로그인은 선택)."""
+    return user_for_token(session_token(request))
+
+
+def require_user(request: Request) -> dict:
+    user = current_user(request)
+    if user is None:
+        raise AppError("LOGIN_REQUIRED", "로그인이 필요해요.", False, http_status=401)
+    return user

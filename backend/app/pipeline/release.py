@@ -99,9 +99,13 @@ def _name_problems(value: str) -> list[str]:
 def _probe_audio(jf: JobFiles) -> dict | None:
     """원본 음원 형식 (패키지 조회마다 부르므로 한 번 읽고 analysis/audio_info.json에 둔다)."""
     cached = jf.root / "analysis" / "audio_info.json"
-    if cached.exists():
-        return jf.read_json(cached)
     src = jf.find_original()
+    if cached.exists():
+        info = jf.read_json(cached)
+        if "true_peak" not in info and src is not None:  # 10/10 이전에 만든 기록 — 음량만 더 잰다
+            info |= _loudness(src)
+            jf.write_json(cached, info)
+        return info
     if src is None:
         return None
     try:
@@ -117,8 +121,25 @@ def _probe_audio(jf: JobFiles) -> dict | None:
     info |= _silence(src, float(json.loads(run_ffmpeg(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                                                       "-of", "json", *input_args(src)], PROBE_TIMEOUT_SEC).stdout)
                                 ["format"]["duration"]))
+    info |= _loudness(src)
     jf.write_json(cached, info)
     return info
+
+
+def _loudness(src) -> dict:
+    """통합 음량(LUFS)·트루 피크(dBTP) — ffmpeg ebur128. 읽지 못하면 빈 값 (검사는 '직접 확인'으로)."""
+    try:
+        err = run_ffmpeg(["ffmpeg", "-hide_banner", "-nostats", *input_args(src), "-af", "ebur128=peak=true",
+                          "-f", "null", "-"], 300).stderr
+    except subprocess.CalledProcessError:
+        return {"true_peak": None, "lufs": None}
+    summary = err[err.rfind("Summary:"):]
+    i = re.search(r"I:\s+(-?[\d.]+|-inf) LUFS", summary)
+    pk = re.search(r"Peak:\s+(-?[\d.]+|-inf) dBFS", summary)
+
+    def num(m):
+        return None if not m or m.group(1) == "-inf" else float(m.group(1))
+    return {"true_peak": num(pk), "lufs": num(i)}
 
 
 def _silence(src, duration: float) -> dict:
@@ -143,14 +164,28 @@ def _own_upload_size(jf: JobFiles, v: int) -> int | None:
 
 
 def submission_check(jf: JobFiles, song: dict, selected: dict | None, cover_path, duration: float,
-                     today: date | None = None) -> SubmissionCheck:
+                     today: date | None = None, *, release_info=None, rights=None) -> SubmissionCheck:
+    """release_info: 발매 정보를 저장했으면 그 칸별 검사로 곡 정보를 본다 (10/10).
+    rights: 권리 자가진단 결과(RightsResult) — 답한 항목은 '직접 확인' 대신 그 결과로."""
     today = today or today_kst()
     items: list[CheckItem] = []
 
     def add(group, id_, label, status, detail):
         items.append(CheckItem(group=group, id=id_, label=label, status=status, detail=detail))
 
-    # 곡 정보 (메타데이터 — 오타가 곧 반려 사유)
+    if release_info is not None:
+        items += release_info
+    else:
+        _meta_from_song(add, song, today)
+    _audio_cover_rights(jf, add, items, selected, cover_path, duration, rights)
+    counts = {s: sum(1 for i in items if i.status == s) for s in ("ok", "warn", "fail", "todo")}
+    return SubmissionCheck(items=items, counts=counts,
+                           notice="흔히 반려되는 항목을 미리 걸러 주는 점검이에요. 유통사마다 기준이 조금씩 달라서 통과를 "
+                                  "보장하지는 않아요. 최종 기준은 이용하는 유통사 안내를 확인하세요.")
+
+
+def _meta_from_song(add, song: dict, today: date) -> None:
+    """발매 정보를 아직 안 넣었을 때: 업로드 때 곡 정보로 본다 (10/9 방식)."""
     for key, name in (("title", "곡 제목"), ("artist", "아티스트 이름")):
         value = song.get(key) or ""
         if not value.strip():
@@ -179,6 +214,9 @@ def submission_check(jf: JobFiles, song: dict, selected: dict | None, cover_path
     add("meta", "album", "앨범명", "todo", "싱글도 앨범명이 필요해요. 보통 곡 제목과 같게 써요.")
     add("meta", "explicit", "19금(Explicit) 여부", "todo", "욕설·선정적 가사가 있으면 표시해야 해요. 빠뜨리면 반려·삭제될 수 있어요.")
 
+
+def _audio_cover_rights(jf: JobFiles, add, items: list, selected: dict | None, cover_path, duration: float,
+                        rights) -> None:
     # 음원
     a = _probe_audio(jf)
     if a is None:
@@ -192,6 +230,23 @@ def submission_check(jf: JobFiles, song: dict, selected: dict | None, cover_path
         add("audio", "format", "음원 형식", "ok" if ok else "fail",
             f"무손실 원본 ({sr / 1000:g}kHz{f' / {bits}bit' if bits else ''}). 유통사에는 처음 올린 WAV를 그대로 내세요."
             if ok else f"{sr / 1000:g}kHz{f' / {bits}bit' if bits else ''} — 44.1kHz·16bit 이상이어야 해요.")
+    if a and a.get("ext") != ".mp3" and a.get("channels"):
+        add("audio", "channels", "채널", "ok" if a["channels"] == 2 else "warn",
+            "스테레오(2채널)." if a["channels"] == 2
+            else f"{a['channels']}채널 — 유통사는 보통 스테레오 파일을 받아요. 마스터를 스테레오로 내보내세요.")
+    if a and a.get("true_peak") is not None:
+        tp = a["true_peak"]
+        add("audio", "true_peak", "트루 피크", "ok" if tp <= -1.0 else "warn",
+            f"{tp:+.1f} dBTP — 여유가 있어요." if tp <= -1.0
+            else f"{tp:+.1f} dBTP — " + ("0dB를 넘어 소리가 깨질(클리핑) 수 있어요. " if tp >= 0 else "")
+            + "플랫폼이 음량을 맞추거나 압축할 때 찌그러지지 않게 -1dBTP 아래로 마스터링하는 걸 권장해요 (Spotify 권고).")
+    elif a and a.get("ext") != ".mp3":
+        add("audio", "true_peak", "트루 피크", "todo", "피크를 재지 못했어요. 마스터링 때 -1dBTP 아래인지 확인하세요.")
+    if a and a.get("lufs") is not None:
+        add("audio", "loudness", "음량 (LUFS)", "ok",
+            f"{a['lufs']:.1f} LUFS — 참고: Spotify는 기본 -14 LUFS 근처로 음량을 맞춰 재생해요. 이보다 크게 만들어도 "
+            "더 크게 들리지 않고 줄어들기만 해요." if a["lufs"] > -14 else
+            f"{a['lufs']:.1f} LUFS — 참고: Spotify는 기본 -14 LUFS 근처로 음량을 맞춰 재생해요.")
     if a and "silence_head" in a:
         head, tail = a["silence_head"], a["silence_tail"]
         long_ = head > 2 or tail > 5
@@ -241,7 +296,11 @@ def submission_check(jf: JobFiles, song: dict, selected: dict | None, cover_path
                  if found else "AI 검사에서 글자·워터마크·로고·URL·선정적 이미지를 찾지 못했어요. 그래도 크게 열어 한 번 보세요.")
                 + (" (제목 얹은 버전을 쓰면 글자가 입력한 제목·아티스트와 같아요.)" if not found else ""))
 
-    # 권리 — 직접 확인
+    # 권리 — 자가진단에 답했으면 그 결과, 아니면 직접 확인 목록
+    answered = {i.id for i in rights.items} if rights is not None else set()
+    if rights is not None:
+        items += rights.items
+    covered = {"own_song": "song_type", "samples": "samples", "ai_music": "ai_audio", "cover_rights": "cover_image"}
     for id_, label, detail in (
         ("credits", "크레딧", "작사·작곡·편곡자 실명, ©(저작권자)·℗(음원 권리자) 표기를 정리해 두세요."),
         ("codes", "ISRC·UPC", "곡 코드(ISRC)·발매 코드(UPC)는 보통 유통사가 발급해요. 이미 받은 코드가 있으면 그대로 쓰세요."),
@@ -253,6 +312,8 @@ def submission_check(jf: JobFiles, song: dict, selected: dict | None, cover_path
         ("cover_rights", "커버 권리", "직접 올린 사진·그림이면 촬영자·작가의 사용 동의를 받아 두세요."),
         ("abuse", "금지 행위", "유명 아티스트 이름 사칭, 같은 음원 중복 등록, 재생수 부풀리기는 계정 정지 사유예요."),
     ):
+        if covered.get(id_) in answered or (id_ == "credits" and any(i.id == "credits" for i in items)):
+            continue
         add("rights", id_, label, "todo", detail)
 
     # 유통과 별개
@@ -264,8 +325,3 @@ def submission_check(jf: JobFiles, song: dict, selected: dict | None, cover_path
         ("synced_lyrics", "싱크 가사", "애플뮤직 싱크 가사는 Musixmatch에서 따로 등록해요."),
     ):
         add("extra", id_, label, "todo", detail)
-
-    counts = {s: sum(1 for i in items if i.status == s) for s in ("ok", "warn", "fail", "todo")}
-    return SubmissionCheck(items=items, counts=counts,
-                           notice="흔히 반려되는 항목을 미리 걸러 주는 점검이에요. 유통사마다 기준이 조금씩 달라서 통과를 "
-                                  "보장하지는 않아요. 최종 기준은 이용하는 유통사 안내를 확인하세요.")
