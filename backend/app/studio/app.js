@@ -3,7 +3,7 @@
    AI가 쓴 글·사용자 입력은 모두 esc()로 글자로만 넣는다 (HTML로 해석하지 않게). */
 "use strict";
 
-const CONSENT_VERSION = "v1.2";
+const CONSENT_VERSION = "v1.3";
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const view = $("#view");
@@ -218,9 +218,9 @@ async function newJob() {
     <label class="field"><span>가사 <em>선택 — 있으면 AI가 더 잘 해석해요</em></span><textarea name="lyrics" maxlength="5000"></textarea></label>
     <div class="notice">
       <b>동의 (동의서 ${CONSENT_VERSION})</b>
-      <label class="check"><input type="checkbox" name="c1" required><span>[필수] 만 14세 이상이에요. 개인정보 수집·이용 — 곡 정보·음원·접속 IP, 업로드 7일 뒤 자동 삭제 (<a href="/privacy" target="_blank">개인정보처리방침</a>)</span></label>
-      <label class="check"><input type="checkbox" name="c2" required><span>[필수] 외부 AI 전송 — 음원은 Google Gemini(무료 등급, 학습에 쓰일 수 있음), 글·이미지는 코디세이 API로 처리</span></label>
-      <label class="check"><input type="checkbox" name="c3" required><span>[필수] 직접 만든 곡이거나 올릴 권리가 있어요. AI 결과물은 저작권이 인정되지 않을 수 있어요</span></label>
+      <label class="check"><input type="checkbox" name="c1" required><span>[필수] 만 14세 이상이에요. 개인정보 수집·이용 — 곡 정보·음원·크레딧(참여자 이름)·발매 정보·접속 IP. 유통사 제출 준비표·ZIP도 이 정보로 만들어요. 업로드 7일 뒤 자동 삭제 (<a href="/privacy" target="_blank">개인정보처리방침</a>)</span></label>
+      <label class="check"><input type="checkbox" name="c2" required><span>[필수] 외부 AI 전송(미국) — 음원은 Google Gemini(무료 등급, 학습에 쓰일 수 있음), 글·이미지는 코디세이 API(OpenAI 모델, 학습 미사용)로 처리</span></label>
+      <label class="check"><input type="checkbox" name="c3" required><span>[필수] 직접 만든 곡이거나 올릴 권리가 있고, 크레딧에 넣는 참여자에게 동의를 받았어요. 규격 검사·권리 자가진단은 참고용이라 유통사 통과를 보장하지 않아요. AI 결과물은 저작권이 인정되지 않을 수 있어요</span></label>
       <label class="check"><input type="checkbox" name="c4"><span>[선택] 결과물을 서비스 개선·발표 자료에 써도 돼요</span></label>
     </div>
     <p class="err" id="upErr"></p>
@@ -563,7 +563,7 @@ async function stepShare(p) {
         <button type="button" class="chip ${AI0 === "generated" ? "on" : ""}" data-v="generated">AI가 곡·목소리를 만들었어요</button></div>
         <p class="muted small">'AI가 만들었어요'를 고르면 곡에 'AI 활용' 표시가 붙어요. 숨긴 게 드러나면 신고로 내려갈 수 있어요.</p></div>
       <label class="check"><input type="checkbox" name="c1"><span>[필수] 만 14세 이상이고, 직접 만든 곡이거나 공개할 권리가 있어요</span></label>
-      <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응이 모여요</span></label>
+      <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응이 모여요. 공개 음원은 녹음될 수 있으니 발매 전 곡은 하이라이트만 공개하길 권해요</span></label>
       <button class="btn primary block" id="pubBtn">커뮤니티에 올리기</button>
     </form>`;
   bindChips(p);
@@ -633,7 +633,7 @@ async function quick() {
         <p class="muted small">'AI가 만들었어요'를 고르면 곡에 'AI 활용' 표시가 붙어요. 숨긴 게 드러나면 신고로 내려갈 수 있어요.</p></div>
     <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
     <label class="check"><input type="checkbox" name="c1"><span>[필수] 만 14세 이상이고, 직접 만든 곡이거나 공개할 권리가 있어요</span></label>
-    <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응과 접속 IP(도배 방지용, 7일 보관)가 모여요</span></label>
+    <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응과 접속 IP(도배 방지용, 7일 보관)가 모여요. 공개 음원은 녹음될 수 있으니 발매 전 곡은 하이라이트만 공개하길 권해요</span></label>
     <p class="err" id="qErr"></p>
     <button class="btn primary block" id="qBtn">바로 공개하기</button>
   </form>
@@ -774,7 +774,7 @@ async function me() {
     view.innerHTML = `
     <div class="panel"><h2>내 곡</h2><p class="lead">곡을 올리는 사람만 로그인해요. 듣고 반응하는 데는 로그인이 필요 없어요.</p></div>
     <div class="grid2">
-      <div class="card stack"><h3>로그인</h3><p class="muted small">카카오·구글 계정의 고유 번호와 닉네임만 받아요. 이메일·비밀번호는 받지 않아요.</p>
+      <div class="card stack"><h3>로그인</h3><p class="muted small">카카오·구글 계정의 고유 번호와 닉네임, 로그인 일시만 받아요. 이메일·비밀번호는 받지 않아요. 탈퇴할 때까지 보관하고 서비스 종료일에 모두 지워요 (동의서 제5조, <a href="/privacy" target="_blank">개인정보처리방침</a>).</p>
         ${cancelled ? `<div class="notice warn">로그인을 취소했어요.</div>` : ""}
         ${pv.kakao ? `<a class="btn kakao block" href="/auth/kakao/login?next=${encodeURIComponent("/studio#/me")}">카카오로 시작하기</a>` : ""}
         ${pv.google ? `<a class="btn google block" href="/auth/google/login?next=${encodeURIComponent("/studio#/me")}">Google로 시작하기</a>` : ""}
