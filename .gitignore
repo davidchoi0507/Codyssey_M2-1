@@ -21,3 +21,15 @@ venv.bak/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Node / Frontend Build & Dependencies
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vite/
+
