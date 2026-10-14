@@ -169,7 +169,24 @@ export const api = {
   reportTrack: async (trackId, reason = 'stolen', detail = null) =>
     request(`/community/tracks/${trackId}/report`, json('POST', { reason, detail })),
 
-  // 7. Auth & User Profile
+  // 7. 마지막 설문·사용 기록 (10/14 회의: 피드백은 서버가 자동으로 파악하고 마지막에 짧게 묻는다)
+  // kind: 'job'(발매 준비 작업) | 'track'(바로 공개한 곡 — ownerKey 필요)
+  getSurvey: async (kind, id, ownerKey = null) =>
+    request(kind === 'job' ? `/jobs/${id}/survey` : `/community/tracks/${id}/survey`,
+      { headers: ownerKey ? { 'X-Owner-Key': ownerKey } : {} }),
+
+  saveSurvey: async (kind, id, answers, ownerKey = null) =>
+    request(kind === 'job' ? `/jobs/${id}/survey` : `/community/tracks/${id}/survey`,
+      { ...json('PUT', { answers }), headers: ownerKey ? { 'X-Owner-Key': ownerKey } : {} }),
+
+  // 화면에서만 일어나는 일(복사·유통사 사이트 열기 등). 결과를 기다리지 않고, 실패해도 무시한다
+  // event: copied_channel · copied_pitch · copied_field · opened_distributor · survey_shown · survey_closed ...
+  logUsage: (jobId, event, target = null) => {
+    if (!jobId || String(jobId).startsWith('demo')) return;
+    request(`/jobs/${jobId}/usage`, json('POST', { event, target })).catch(() => {});
+  },
+
+  // 8. Auth & User Profile
   getMe: async () => request('/auth/me'),
 
   getMyJobs: async () => request('/me/jobs'),

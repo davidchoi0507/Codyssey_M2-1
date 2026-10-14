@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { PackageCheck, Download, Copy, Check, Users, Sparkles, ExternalLink, ArrowLeft } from 'lucide-react';
 import { api, toFileUrl } from '../../services/api';
+import SurveyPanel from '../survey/SurveyPanel';
 
 export default function Step4Release({ jobData, onPrevStep, onGoToCommunity }) {
   const [copiedKey, setCopiedKey] = useState(null);
@@ -184,6 +185,7 @@ export default function Step4Release({ jobData, onPrevStep, onGoToCommunity }) {
             href={dist === 'distrokid' ? 'https://distrokid.com' : 'https://www.muzeplatform.com'}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => api.logUsage(jobData?.jobId, 'opened_distributor', dist === 'muse' ? 'muzeplatform' : dist)}
             className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 flex items-center gap-1"
           >
             <span>유통사 웹사이트 열기</span>
@@ -197,7 +199,7 @@ export default function Step4Release({ jobData, onPrevStep, onGoToCommunity }) {
               <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 w-1/3">{field.label}</span>
               <span className="text-xs font-bold text-zinc-900 dark:text-white flex-1 truncate">{field.value}</span>
               <button
-                onClick={() => handleCopy(field.value, idx)}
+                onClick={() => { handleCopy(field.value, idx); api.logUsage(jobData?.jobId, 'copied_field', field.label.split(' (')[0]); }}
                 className="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors flex-shrink-0 shadow-sm"
               >
                 {copiedKey === idx ? (
@@ -297,6 +299,9 @@ export default function Step4Release({ jobData, onPrevStep, onGoToCommunity }) {
           </div>
         </div>
       )}
+
+      {/* 마지막 1분 설문 — ZIP 이 준비됐거나 커뮤니티에 올린 뒤 */}
+      {!isDemo && (zipUrl || published) && <SurveyPanel kind="job" id={jobData.jobId} />}
 
       {/* Prev Navigation */}
       <div className="flex items-center justify-start pt-4 border-t border-zinc-200 dark:border-white/10">

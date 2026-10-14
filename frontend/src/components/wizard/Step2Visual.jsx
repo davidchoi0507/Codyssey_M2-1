@@ -47,6 +47,8 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
 
   const handleCopy = (text, type) => {
     navigator.clipboard.writeText(text);
+    if (type === 'promo') api.logUsage(jobData?.jobId, 'copied_channel', channel ? 'instagram' : null);
+    if (type === 'pitch') api.logUsage(jobData?.jobId, 'copied_pitch', 'ko');
     setCopiedType(type);
     setTimeout(() => setCopiedType(null), 2000);
   };

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, Star, PlusCircle, Sparkles, Send, ShieldAlert } from 'lucide-react';
 import { api, toFileUrl } from '../../services/api';
+import SurveyPanel from '../survey/SurveyPanel';
 
 const REPORT_REASONS = { stolen: '남의 곡을 허락 없이 올림', abuse: '욕설·비하·혐오', ad: '광고·도배', other: '기타' };
 
@@ -410,7 +411,7 @@ export default function CommunityFeed({ onStartNewRelease }) {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="glass-panel w-full max-w-lg rounded-2xl p-6 sm:p-8 space-y-5 bg-white dark:bg-[#121215] border-zinc-200 dark:border-white/10 shadow-xl"
+              className="glass-panel w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-6 sm:p-8 space-y-5 bg-white dark:bg-[#121215] border-zinc-200 dark:border-white/10 shadow-xl"
             >
               <div className="flex items-center justify-between border-b border-zinc-200 dark:border-white/10 pb-3">
                 <h3 className="font-extrabold text-lg text-zinc-900 dark:text-white">AI 분석 없이 곡 바로 올리기</h3>
@@ -431,6 +432,7 @@ export default function CommunityFeed({ onStartNewRelease }) {
                     <button type="button" onClick={() => navigator.clipboard.writeText(toFileUrl(quickDone.manage_url))} className="btn-secondary text-xs px-4 py-2">링크 복사</button>
                     <button type="button" onClick={closeQuick} className="btn-primary text-xs px-4 py-2">닫기</button>
                   </div>
+                  <SurveyPanel kind="track" id={quickDone.track_id} ownerKey={quickDone.owner_key} />
                 </div>
               ) : (
               <form onSubmit={handleQuickSubmit} className="space-y-4">
