@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, Star, PlusCircle, Sparkles, Send, ShieldAlert } from 'lucide-react';
 import { api, toFileUrl } from '../../services/api';
 
-const QUICK_TAGS = ['새벽감성', '비트맛집', '보컬독보적', '가사감동', '드라이브곡', '믹싱깔끔'];
+const REPORT_REASONS = { stolen: '남의 곡을 허락 없이 올림', abuse: '욕설·비하·혐오', ad: '광고·도배', other: '기타' };
 
 export default function CommunityFeed({ onStartNewRelease }) {
   const [tracks, setTracks] = useState([]);
@@ -20,14 +20,37 @@ export default function CommunityFeed({ onStartNewRelease }) {
   const [quickUploading, setQuickUploading] = useState(false);
 
   const [commentInput, setCommentInput] = useState({});
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState(null);
+  const [tags, setTags] = useState([]);           // 서버가 정한 반응 태그 (GET /community/meta)
+  const [notice, setNotice] = useState({});       // 곡별 안내 문구 {trackId: '...'}
+  const [reportFor, setReportFor] = useState(null); // 신고 사유를 고르는 곡
+  // 바로 공개: 들려줄 범위·반응 공개·AI 사용·필수 동의 (서버 /studio 와 같은 항목)
+  const [quickMode, setQuickMode] = useState('highlight');
+  const [quickPublic, setQuickPublic] = useState(true);
+  const [quickAi, setQuickAi] = useState('none');
+  const [quickConsent, setQuickConsent] = useState({ rights: false, public: false });
+  const [quickError, setQuickError] = useState(null);
+  const [quickDone, setQuickDone] = useState(null); // 공개한 곡 (manage_url)
+  const [quickKnown, setQuickKnown] = useState(null); // 409 KNOWN_SONG_MATCH 안내
+
+  // 곡별 안내 문구. 새 문구가 오면 이전 문구의 지우기 타이머는 취소한다
+  const noticeTimers = useRef({});
+  const say = (trackId, text) => {
+    clearTimeout(noticeTimers.current[trackId]);
+    setNotice((prev) => ({ ...prev, [trackId]: text }));
+    noticeTimers.current[trackId] = setTimeout(() => setNotice((prev) => ({ ...prev, [trackId]: null })), 6000);
+  };
 
   const fetchTracks = async (sortBy) => {
     setLoading(true);
+    setError(null);
     try {
       const res = await api.getCommunityTracks(sortBy, 20);
-      setTracks(res.tracks || res || []);
+      setTracks(res.tracks);
+      setTotal(res.total);
     } catch (err) {
-      console.error(err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -37,119 +60,112 @@ export default function CommunityFeed({ onStartNewRelease }) {
     fetchTracks(sort);
   }, [sort]);
 
+  useEffect(() => {
+    api.getCommunityMeta().then((m) => setTags(m.tags)).catch(() => {});
+  }, []);
+
   const togglePlay = (track) => {
-    const trackId = track.track_id || track.id;
+    const trackId = track.track_id;
     if (currentPlayingId === trackId) {
       audioObj?.pause();
       setCurrentPlayingId(null);
     } else {
       audioObj?.pause();
-      const soundUrl = toFileUrl(track.audio_url || track.preview_url);
-      const audio = new Audio(soundUrl);
-      audio.play().catch((err) => console.warn('Audio play error:', err));
+      const audio = new Audio(toFileUrl(track.audio_url));
+      audio.play().catch((err) => say(trackId, `재생하지 못했어요: ${err.message}`));
       audio.onended = () => setCurrentPlayingId(null);
       setAudioObj(audio);
       setCurrentPlayingId(trackId);
+      api.countPlay(trackId).catch(() => {}); // 같은 접속은 하루 한 번만 올라간다
     }
   };
 
-  const handleRate = async (trackId, rating) => {
+  // 반응은 1회용 토큰을 받고 3초 뒤에 보내야 해서 잠깐 걸린다 (매크로 방지)
+  const sendReaction = async (trackId, reaction, done) => {
+    say(trackId, '보내는 중...');
     try {
-      await api.rateTrack(trackId, rating);
+      await api.sendFeedback(trackId, reaction);
+      say(trackId, done);
       fetchTracks(sort);
     } catch (err) {
-      alert(err.message || '별점 등록 실패');
+      say(trackId, err.message);
     }
   };
+
+  const handleRate = (trackId, rating) => sendReaction(trackId, { rating }, `별점 ${rating}점을 남겼어요.`);
+  const handleTag = (trackId, tag) => sendReaction(trackId, { tags: [tag] }, `'${tag}' 반응을 남겼어요.`);
 
   const handleAddComment = async (trackId) => {
     const text = commentInput[trackId];
     if (!text?.trim()) return;
+    setCommentInput((prev) => ({ ...prev, [trackId]: '' }));
+    sendReaction(trackId, { comment: text.trim() }, '한마디를 남겼어요.');
+  };
 
+  const handleReport = async (trackId, reason) => {
+    setReportFor(null);
     try {
-      await api.rateTrack(trackId, 5, text);
-      setCommentInput((prev) => ({ ...prev, [trackId]: '' }));
-      fetchTracks(sort);
+      const r = await api.reportTrack(trackId, reason);
+      say(trackId, r.message);
+      if (r.hidden) fetchTracks(sort);
     } catch (err) {
-      alert(err.message || '댓글 등록 실패');
+      say(trackId, err.message);
     }
   };
 
-  const handleReport = async (trackId) => {
-    if (window.confirm('이 곡을 무단 도용/저작권 침해로 신고하시겠습니까?')) {
-      try {
-        await api.reportTrack(trackId);
-        alert('신고가 접수되었습니다.');
-        fetchTracks(sort);
-      } catch (err) {
-        alert(err.message || '신고 실패');
-      }
-    }
-  };
-
-  const handleQuickSubmit = async (e) => {
-    e.preventDefault();
+  const handleQuickSubmit = async (e, confirmOriginal = false) => {
+    e?.preventDefault();
     if (!quickFile || !quickTitle || !quickArtist) {
-      alert('음원 파일, 곡명, 아티스트명을 입력해 주세요.');
+      setQuickError('음원 파일, 곡명, 아티스트명을 입력해 주세요.');
+      return;
+    }
+    if (!quickConsent.rights || !quickConsent.public) {
+      setQuickError('필수 동의 두 가지에 체크해 주세요.');
       return;
     }
 
     setQuickUploading(true);
+    setQuickError(null);
     try {
       const formData = new FormData();
       formData.append('file', quickFile);
-      formData.append('title', quickTitle);
-      formData.append('artist', quickArtist);
-      formData.append('description', quickDesc);
-      formData.append('consent_version', 'v1.2');
+      formData.append('title', quickTitle.trim());
+      formData.append('artist', quickArtist.trim());
+      formData.append('intro', quickDesc.trim());
+      formData.append('listen_mode', quickMode);
+      formData.append('comments_public', quickPublic);
+      formData.append('ai_usage', quickAi);
+      formData.append('consent_rights', true);
+      formData.append('consent_public', true);
+      formData.append('confirm_original', confirmOriginal);
+      formData.append('website', ''); // 사람은 비워 두는 칸 (매크로 방지)
 
-      const jobRes = await api.createJob(formData);
-      const jobId = jobRes.job_id || jobRes.id;
-
-      await api.publishToCommunity({
-        job_id: jobId,
-        title: quickTitle,
-        artist: quickArtist,
-        genre: 'Indie',
-      });
-
-      setShowQuickModal(false);
+      const t = await api.publishQuick(formData);
+      setQuickKnown(null);
+      setQuickDone(t);
       setQuickTitle('');
       setQuickArtist('');
       setQuickDesc('');
       setQuickFile(null);
       fetchTracks('new');
     } catch (err) {
-      alert(err.message || '등록 실패');
+      if (err.code === 'KNOWN_SONG_MATCH') setQuickKnown(err.message);
+      else setQuickError(err.message);
     } finally {
       setQuickUploading(false);
     }
   };
 
-  const displayTracks = tracks.length > 0 ? tracks : [
-    {
-      id: 'demo-1',
-      title: '새벽 2시의 유영 (Night Drift)',
-      artist: '웨이브사운드 (WaveSound)',
-      genre: 'City Pop / Indie',
-      rating_avg: 4.8,
-      rating_count: 14,
-      cover_url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&q=80',
-      description: '보컬 녹음 끝내고 유통사 넣기 전에 피드백 받고 싶어서 올립니다! 믹싱 밸런스 어떤가요?',
-      tags: ['새벽감성', '믹싱깔끔'],
-    },
-    {
-      id: 'demo-2',
-      title: '비 내리는 성수동 골목길',
-      artist: '밍키 (Minki)',
-      genre: 'Acoustic / Lo-Fi',
-      rating_avg: 4.9,
-      rating_count: 22,
-      cover_url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80',
-      description: '통기타 원테이크로 녹음한 미발매곡입니다. 첫 싱글 발매 예정인데 많은 피드백 부탁드려요!',
-      tags: ['가사감동', '보컬독보적'],
-    },
-  ];
+  const closeQuick = () => {
+    setShowQuickModal(false);
+    setQuickDone(null);
+    setQuickError(null);
+    setQuickKnown(null);
+  };
+
+  const topTags = (track) => Object.entries(track.stats?.tags || {}).filter(([, n]) => n > 0).sort((x, y) => y[1] - x[1]).slice(0, 3);
+
+  const displayTracks = tracks;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -212,15 +228,22 @@ export default function CommunityFeed({ onStartNewRelease }) {
           </button>
         </div>
 
-        <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">총 {displayTracks.length}개의 미발매 트랙</span>
+        <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">총 {total}곡</span>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-300 text-sm">{error}</div>
+      )}
+      {!loading && !error && displayTracks.length === 0 && (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center py-10">아직 올라온 곡이 없어요. 첫 곡을 올려 보세요!</p>
+      )}
 
       {/* Tracks Feed List */}
       <div className="space-y-6">
         {displayTracks.map((track) => {
-          const trackId = track.track_id || track.id;
+          const trackId = track.track_id;
           const isPlaying = currentPlayingId === trackId;
-          const cover = toFileUrl(track.cover_url) || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&q=80';
+          const cover = toFileUrl(track.cover_url);
 
           return (
             <motion.div
@@ -251,8 +274,14 @@ export default function CommunityFeed({ onStartNewRelease }) {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
-                        {track.genre || 'Indie'}
+                        {track.genre || '장르 미입력'}
                       </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                        {track.listen_mode === 'highlight' ? `하이라이트 ${Math.round(track.clip_sec)}초` : '전곡'}
+                      </span>
+                      {track.ai_usage === 'generated' && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-50 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300">AI 활용</span>
+                      )}
                       {isPlaying && (
                         <span className="text-[10px] font-bold text-emerald-500 animate-pulse flex items-center gap-1">
                           ● 재생 중
@@ -270,12 +299,13 @@ export default function CommunityFeed({ onStartNewRelease }) {
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold">
                     <Star className="w-3.5 h-3.5 fill-current" />
-                    <span>{track.rating_avg ? Number(track.rating_avg).toFixed(1) : '5.0'}</span>
-                    <span className="text-zinc-400 dark:text-zinc-500 text-[10px]">({track.rating_count || 1})</span>
+                    <span>{track.stats?.rating_avg ? Number(track.stats.rating_avg).toFixed(1) : '-'}</span>
+                    <span className="text-zinc-400 dark:text-zinc-500 text-[10px]">({track.stats?.rating_count || 0})</span>
                   </div>
 
+                  <span className="text-[10px] text-zinc-400">재생 {track.plays} · 반응 {track.reactions}</span>
                   <button
-                    onClick={() => handleReport(trackId)}
+                    onClick={() => setReportFor(reportFor === trackId ? null : trackId)}
                     className="text-[11px] text-zinc-400 hover:text-rose-500 flex items-center gap-1 transition-colors"
                   >
                     <ShieldAlert className="w-3 h-3" />
@@ -284,10 +314,20 @@ export default function CommunityFeed({ onStartNewRelease }) {
                 </div>
               </div>
 
+              {/* 신고 사유 고르기 — 서로 다른 3명이 신고하면 자동으로 숨겨져요 */}
+              {reportFor === trackId && (
+                <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-xs">
+                  <span className="font-semibold text-rose-700 dark:text-rose-300">신고 사유</span>
+                  {Object.entries(REPORT_REASONS).map(([k, label]) => (
+                    <button key={k} onClick={() => handleReport(trackId, k)} className="px-2.5 py-1 rounded-full border border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-500/20">{label}</button>
+                  ))}
+                </div>
+              )}
+
               {/* Creator Description */}
-              {track.description && (
+              {track.intro && (
                 <p className="text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-[#121215] p-3 rounded-xl border border-zinc-200 dark:border-white/5 leading-relaxed">
-                  "{track.description}"
+                  "{track.intro}"
                 </p>
               )}
 
@@ -306,18 +346,37 @@ export default function CommunityFeed({ onStartNewRelease }) {
                   ))}
                 </div>
 
-                {/* Quick Feedback Tags */}
+                {/* 많이 받은 반응 태그 (반응 공개한 곡만) */}
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {(track.tags || QUICK_TAGS.slice(0, 3)).map((tag, idx) => (
+                  {topTags(track).map(([tag, n]) => (
                     <span
-                      key={idx}
+                      key={tag}
                       className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-white/5"
                     >
-                      #{tag}
+                      #{tag} {n}
                     </span>
                   ))}
                 </div>
               </div>
+
+              {/* 태그로 반응 남기기 */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {tags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => handleTag(trackId, tag)}
+                    className="px-2.5 py-1 rounded-full text-[11px] border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300"
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </div>
+              {!track.comments_public && (
+                <p className="text-[11px] text-zinc-400">올린 분이 반응을 '나만 보기'로 해 두었어요. 남긴 반응은 올린 분만 봐요.</p>
+              )}
+              {notice[trackId] && (
+                <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{notice[trackId]}</p>
+              )}
 
               {/* Comment Input */}
               <div className="flex items-center gap-2 pt-1">
@@ -356,13 +415,24 @@ export default function CommunityFeed({ onStartNewRelease }) {
               <div className="flex items-center justify-between border-b border-zinc-200 dark:border-white/10 pb-3">
                 <h3 className="font-extrabold text-lg text-zinc-900 dark:text-white">AI 분석 없이 곡 바로 올리기</h3>
                 <button
-                  onClick={() => setShowQuickModal(false)}
+                  onClick={closeQuick}
                   className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-lg font-bold"
                 >
                   ✕
                 </button>
               </div>
 
+              {quickDone ? (
+                <div className="space-y-3 text-xs text-zinc-700 dark:text-zinc-300">
+                  <p className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">공개했어요! 아래 관리 링크를 꼭 저장해 두세요.</p>
+                  <p>이 링크가 있어야 받은 반응(비공개 포함)을 보고, 설정을 바꾸고, 곡을 내릴 수 있어요.</p>
+                  <code className="block break-all p-2 rounded bg-zinc-100 dark:bg-zinc-900">{toFileUrl(quickDone.manage_url)}</code>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => navigator.clipboard.writeText(toFileUrl(quickDone.manage_url))} className="btn-secondary text-xs px-4 py-2">링크 복사</button>
+                    <button type="button" onClick={closeQuick} className="btn-primary text-xs px-4 py-2">닫기</button>
+                  </div>
+                </div>
+              ) : (
               <form onSubmit={handleQuickSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">음원 파일 (.mp3, .wav) *</label>
@@ -411,10 +481,49 @@ export default function CommunityFeed({ onStartNewRelease }) {
                   />
                 </div>
 
+                <div className="space-y-2 text-xs text-zinc-700 dark:text-zinc-300">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <b className="w-16">들려줄 범위</b>
+                    {[['highlight', '하이라이트 15초'], ['full', '전곡']].map(([v, l]) => (
+                      <button type="button" key={v} onClick={() => setQuickMode(v)} className={`px-3 py-1 rounded-full border ${quickMode === v ? 'bg-indigo-600 text-white border-indigo-600' : 'border-zinc-300 dark:border-white/10'}`}>{l}</button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <b className="w-16">반응 공개</b>
+                    {[[true, '모두에게 공개'], [false, '나만 보기']].map(([v, l]) => (
+                      <button type="button" key={l} onClick={() => setQuickPublic(v)} className={`px-3 py-1 rounded-full border ${quickPublic === v ? 'bg-indigo-600 text-white border-indigo-600' : 'border-zinc-300 dark:border-white/10'}`}>{l}</button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <b className="w-16">AI 사용</b>
+                    {[['none', '안 썼어요'], ['tool', '도구로만'], ['generated', 'AI가 곡·목소리를 만듦']].map(([v, l]) => (
+                      <button type="button" key={v} onClick={() => setQuickAi(v)} className={`px-3 py-1 rounded-full border ${quickAi === v ? 'bg-indigo-600 text-white border-indigo-600' : 'border-zinc-300 dark:border-white/10'}`}>{l}</button>
+                    ))}
+                  </div>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" checked={quickConsent.rights} onChange={(e) => setQuickConsent((c) => ({ ...c, rights: e.target.checked }))} className="mt-0.5" />
+                    <span>[필수] 만 14세 이상이고, 직접 만든 곡이거나 공개할 권리가 있어요</span>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" checked={quickConsent.public} onChange={(e) => setQuickConsent((c) => ({ ...c, public: e.target.checked }))} className="mt-0.5" />
+                    <span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응과 접속 IP(도배 방지용, 7일 보관)가 모여요. 공개 음원은 녹음될 수 있으니 발매 전 곡은 하이라이트만 공개하길 권해요</span>
+                  </label>
+                </div>
+
+                {quickError && <p className="text-xs text-rose-600 dark:text-rose-400">{quickError}</p>}
+                {quickKnown && (
+                  <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 space-y-2 text-xs">
+                    <p>{quickKnown}</p>
+                    <button type="button" onClick={() => handleQuickSubmit(null, true)} disabled={quickUploading} className="btn-secondary text-xs px-3 py-1.5">
+                      직접 만든 곡이 맞아요 — 올리기
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setShowQuickModal(false)}
+                    onClick={closeQuick}
                     className="btn-secondary text-xs px-4 py-2"
                   >
                     취소
@@ -428,6 +537,7 @@ export default function CommunityFeed({ onStartNewRelease }) {
                   </button>
                 </div>
               </form>
+              )}
             </motion.div>
           </div>
         )}

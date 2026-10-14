@@ -47,11 +47,11 @@ export default function App() {
       window.history.replaceState(null, '', window.location.pathname);
       // Fetch user profile
       api.getMe()
-        .then((res) => setUser(res.user || res))
+        .then(setUser)
         .catch(() => tokenStorage.clear());
     } else if (tokenStorage.get()) {
       api.getMe()
-        .then((res) => setUser(res.user || res))
+        .then(setUser)
         .catch(() => tokenStorage.clear());
     }
   }, []);
@@ -180,7 +180,7 @@ export default function App() {
         onSelectJob={(job) => {
           setJobData((prev) => ({
             ...prev,
-            jobId: job.id,
+            jobId: job.job_id,
             title: job.title,
             artist: job.artist,
           }));

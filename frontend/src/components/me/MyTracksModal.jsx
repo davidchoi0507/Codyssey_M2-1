@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, LogIn, LogOut, Disc3, ExternalLink } from 'lucide-react';
-import { api, tokenStorage } from '../../services/api';
+import { api, tokenStorage, toFileUrl } from '../../services/api';
 
 export default function MyTracksModal({ isOpen, onClose, user, setUser, onSelectJob }) {
   const [loading, setLoading] = useState(false);
@@ -16,9 +16,10 @@ export default function MyTracksModal({ isOpen, onClose, user, setUser, onSelect
   const fetchMyInfo = async () => {
     setLoading(true);
     try {
-      const res = await api.getMe();
-      setMyData(res);
-      setUser(res.user || res);
+      const me = await api.getMe();
+      const [jobs, tracks] = await Promise.all([api.getMyJobs(), api.getMyTracks()]);
+      setMyData({ jobs, tracks });
+      setUser(me);
     } catch (err) {
       console.error(err);
       tokenStorage.clear();
@@ -33,6 +34,7 @@ export default function MyTracksModal({ isOpen, onClose, user, setUser, onSelect
   };
 
   const handleLogout = () => {
+    api.logout().catch(() => {});
     tokenStorage.clear();
     setUser(null);
     setMyData(null);
@@ -75,12 +77,12 @@ export default function MyTracksModal({ isOpen, onClose, user, setUser, onSelect
 
             {/* My Tracks List */}
             <div className="space-y-2">
-              <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">내 발매 작업 기록</span>
+              <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">내 발매 작업 기록 (7일 뒤 삭제)</span>
               {myData?.jobs?.length > 0 ? (
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                   {myData.jobs.map((job) => (
                     <div
-                      key={job.id}
+                      key={job.job_id}
                       onClick={() => {
                         onSelectJob(job);
                         onClose();
@@ -92,13 +94,36 @@ export default function MyTracksModal({ isOpen, onClose, user, setUser, onSelect
                         <span className="text-xs font-bold text-zinc-900 dark:text-white truncate">{job.title || '작업 중인 곡'}</span>
                       </div>
                       <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        {job.stage || '진행 중'}
+                        {job.stage_label}
                       </span>
                     </div>
                   ))}
                 </div>
               ) : (
                 <p className="text-xs text-zinc-400 dark:text-zinc-500 py-6 text-center">아직 등록된 발매 작업이 없습니다.</p>
+              )}
+            </div>
+
+            {/* 커뮤니티에 올린 곡 — 관리 링크로 반응 보기·설정·내리기 */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">커뮤니티에 올린 곡</span>
+              {myData?.tracks?.length > 0 ? (
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {myData.tracks.map((t) => (
+                    <a
+                      key={t.track_id}
+                      href={toFileUrl(t.manage_url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-white/5 hover:border-indigo-500/50 flex items-center justify-between gap-3 transition-all"
+                    >
+                      <span className="text-xs font-bold text-zinc-900 dark:text-white truncate">{t.title}</span>
+                      <span className="text-[10px] text-zinc-500 flex items-center gap-1 flex-shrink-0">재생 {t.plays} · 반응 {t.reactions} <ExternalLink className="w-3 h-3" /></span>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 py-3 text-center">아직 올린 곡이 없습니다.</p>
               )}
             </div>
           </div>

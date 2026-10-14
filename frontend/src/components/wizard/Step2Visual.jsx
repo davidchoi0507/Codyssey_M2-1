@@ -4,39 +4,45 @@ import { Image, Video, FileText, Check, Copy, ArrowRight, Loader2, CheckCircle2 
 import { api, toFileUrl } from '../../services/api';
 
 export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevStep }) {
+  const isDemo = !jobData?.jobId || jobData.jobId.toString().startsWith('demo');
   const [selectedCover, setSelectedCover] = useState(jobData?.selectedCover || 0);
-  const [loadingAssets, setLoadingAssets] = useState(
-    Boolean(jobData?.jobId && !jobData?.jobId.toString().startsWith('demo'))
-  );
-  const [assets, setAssets] = useState(null);
+  const [loadingAssets, setLoadingAssets] = useState(!isDemo);
+  const [assets, setAssets] = useState(null); // 서버 Package
   const [copiedType, setCopiedType] = useState(null);
+  const [error, setError] = useState(null);
+  const [selecting, setSelecting] = useState(false);
 
+  // 노트 수락 뒤 커버 3종·글을 만드는 데 1~2분. 다 되면(awaiting_cover 이후) 패키지를 가져온다.
+  // 커버를 고른 뒤에는 영상(rendering)이 끝날 때까지 계속 새로 받아 Canvas 영상을 보여 준다.
   useEffect(() => {
-    if (!jobData?.jobId || jobData.jobId.toString().startsWith('demo')) {
-      setLoadingAssets(false);
-      return;
-    }
-
-    let interval = null;
+    if (isDemo) return;
+    let timer = null;
     const fetchAssets = async () => {
       try {
-        const res = await api.getJobStatus(jobData.jobId);
-        if (res.covers?.length > 0 || res.stage === 'awaiting_cover' || res.stage === 'done') {
-          setAssets(res);
+        const st = await api.getJobStatus(jobData.jobId);
+        if (st.stage === 'failed') {
+          setError(st.error?.message || '결과물을 만들지 못했어요.');
           setLoadingAssets(false);
-          if (interval) clearInterval(interval);
+          clearInterval(timer);
+          return;
+        }
+        if (['awaiting_cover', 'rendering', 'done'].includes(st.stage)) {
+          const pkg = await api.getPackage(jobData.jobId);
+          setAssets(pkg);
+          setLoadingAssets(false);
+          const sel = pkg.covers.findIndex((c) => c.selected);
+          if (sel >= 0) setSelectedCover(sel);
+          if (st.stage === 'done' || st.stage === 'awaiting_cover') clearInterval(timer);
         }
       } catch (err) {
-        console.error(err);
+        setError(err.message);
+        setLoadingAssets(false);
+        clearInterval(timer);
       }
     };
-
     fetchAssets();
-    interval = setInterval(fetchAssets, 3000);
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    timer = setInterval(fetchAssets, 3000);
+    return () => clearInterval(timer);
   }, [jobData?.jobId]);
 
   const handleCopy = (text, type) => {
@@ -45,24 +51,49 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
     setTimeout(() => setCopiedType(null), 2000);
   };
 
-  const handleProceed = () => {
+  const latest = (c) => c.versions[c.versions.length - 1];
+  const coverUrlOf = (c) => (c.selected ? c.versions.find((x) => x.v === c.selected_v) || latest(c) : latest(c)).url;
+
+  // 고른 커버를 서버에 알리면 숏폼·Canvas·채널 이미지 렌더링이 시작된다 (40초 안팎, 3단계 보는 동안 진행)
+  const handleProceed = async () => {
+    if (!isDemo) {
+      const c = assets?.covers?.[selectedCover];
+      if (!c) return setError('커버가 아직 준비되지 않았어요.');
+      if (!c.selected) {
+        setSelecting(true);
+        setError(null);
+        try {
+          await api.selectCover(jobData.jobId, c.item_id, latest(c).v);
+        } catch (err) {
+          setSelecting(false);
+          return setError(err.message);
+        }
+        setSelecting(false);
+      }
+    }
     setJobData((prev) => ({
       ...prev,
       selectedCover,
-      coverUrl: assets?.covers?.[selectedCover] || assets?.cover_url,
+      coverUrl: assets?.covers?.[selectedCover] ? coverUrlOf(assets.covers[selectedCover]) : null,
     }));
     onNextStep();
   };
 
-  const covers = assets?.covers || [
+  const covers = assets?.covers?.length ? assets.covers.map(coverUrlOf) : isDemo ? [
     'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80',
     'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&q=80',
     'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800&q=80',
-  ];
+  ] : [];
 
-  const canvasVideoUrl = assets?.canvas_url ? toFileUrl(assets.canvas_url) : null;
-  const promoCopy = assets?.promo_text || `${jobData?.artist || '아티스트'}의 새 싱글 [${jobData?.title || '곡 제목'}]이 발매되었습니다.\n밤의 잔향을 닮은 멜로디와 서정적인 노랫말이 담긴 이번 앨범은 전 세계 스트리밍 플랫폼에서 만나보실 수 있습니다.`;
-  const pitchingMail = assets?.pitch_mail || `안녕하세요, 음악 에디터님.\n싱어송라이터 ${jobData?.artist || '아티스트'}의 신곡 [${jobData?.title || '곡 제목'}]을 소개합니다.\n장르: 감성 인디 팝 / 발매일 맞춤 플레이리스트 피칭 자료를 전달드립니다.`;
+  const canvas = assets?.videos?.find((v) => v.kind === 'canvas');
+  const canvasVideoUrl = canvas ? toFileUrl(canvas.url) : null;
+  const channel = assets?.channels?.instagram || Object.values(assets?.channels || {})[0];
+  const pitch = assets?.pitch?.ko || Object.values(assets?.pitch || {})[0];
+  const promoCopy = channel ? channel.text + (channel.hashtags?.length ? `\n\n${channel.hashtags.join(' ')}` : '')
+    : isDemo ? `${jobData?.artist || '아티스트'}의 새 싱글 [${jobData?.title || '곡 제목'}]이 발매되었습니다.\n밤의 잔향을 닮은 멜로디와 서정적인 노랫말이 담긴 이번 앨범은 전 세계 스트리밍 플랫폼에서 만나보실 수 있습니다.` : '';
+  const pitchingMail = pitch ? `${pitch.subject}\n\n${pitch.body}`
+    : isDemo ? `안녕하세요, 음악 에디터님.\n싱어송라이터 ${jobData?.artist || '아티스트'}의 신곡 [${jobData?.title || '곡 제목'}]을 소개합니다.\n장르: 감성 인디 팝 / 발매일 맞춤 플레이리스트 피칭 자료를 전달드립니다.` : '';
+  const rendering = assets?.stage === 'rendering';
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -76,10 +107,14 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
         </p>
       </div>
 
+      {error && (
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-300 text-sm">{error}</div>
+      )}
+
       {loadingAssets && (
         <div className="p-4 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs flex items-center justify-center gap-3">
           <Loader2 className="w-4 h-4 animate-spin text-indigo-600 dark:text-indigo-400" />
-          <span>AI 앨범 커버 아트워크 3종 및 비주얼 에셋을 렌더링하고 있습니다...</span>
+          <span>AI가 커버 3종과 홍보 글을 만들고 있어요 (1~2분). 이 화면은 저절로 바뀌어요.</span>
         </div>
       )}
 
@@ -169,7 +204,7 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
                   <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-500/20 flex items-center justify-center mx-auto text-indigo-600 dark:text-indigo-400">
                     <Video className="w-4 h-4" />
                   </div>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Spotify 8초 루프 비주얼라이저</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">{rendering ? '영상을 만드는 중이에요 (40초 안팎)' : 'Spotify 8초 루프 비주얼라이저 — 커버를 고르면 만들어져요'}</p>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 font-semibold">
                     ZIP 패키지에 자동 포함
                   </span>
@@ -233,8 +268,10 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
 
         <button
           onClick={handleProceed}
-          className="btn-primary text-sm px-8 py-3 flex items-center gap-2 shadow-md"
+          disabled={selecting || (!isDemo && !covers.length)}
+          className="btn-primary text-sm px-8 py-3 flex items-center gap-2 shadow-md disabled:opacity-50"
         >
+          {selecting && <Loader2 className="w-4 h-4 animate-spin" />}
           <span>선택한 커버로 유통사 규격 검사하기</span>
           <ArrowRight className="w-4 h-4" />
         </button>

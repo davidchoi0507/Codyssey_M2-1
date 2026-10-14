@@ -1,7 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UploadCloud, Sparkles, CheckCircle2, AlertCircle, ArrowRight, Loader2, Volume2 } from 'lucide-react';
-import { api } from '../../services/api';
+import { api, CONSENT_VERSION, toFileUrl } from '../../services/api';
+
+const ACTIVE = ['uploaded', 'analyzing'];
+const NOTE_STAGES = ['note_ready', 'generating', 'awaiting_cover', 'rendering', 'done'];
+
+/** 서버 A&R 노트(ARNote) → 이 화면 카드에 쓰는 값 */
+function toCard(note) {
+  return {
+    bpm: Math.round(note.evidence?.bpm || 0) || null,
+    key: note.evidence?.key,
+    genre: note.genre_heard,
+    sound_characteristics: note.evidence?.energy_change,
+    mood: (note.mood_keywords || []).join(' / '),
+    colors: note.colors || [],
+    concept_summary: note.interpretation,
+  };
+}
 
 export default function Step1Upload({ jobData, setJobData, onNextStep }) {
   const [file, setFile] = useState(null);
@@ -11,8 +27,12 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
   const [songwriter, setSongwriter] = useState('');
   const [producer, setProducer] = useState('');
   const [lyrics, setLyrics] = useState('');
-  const [genreHint, setGenreHint] = useState('');
-  const [consentAgree, setConsentAgree] = useState(true);
+  const [genre, setGenre] = useState('');
+  // 동의 (서버 /studio 와 같은 항목 — 필수 3개는 미리 체크하지 않는다)
+  const [consents, setConsents] = useState({ privacy: false, external_ai: false, original: false, showcase: false });
+  const setConsent = (k, v) => setConsents((prev) => ({ ...prev, [k]: v }));
+  const consentAgree = consents.privacy && consents.external_ai && consents.original;
+  const [progress, setProgress] = useState(null); // 분석 중 진행 상태 문구
 
   // Status & Polling
   const [uploading, setUploading] = useState(false);
@@ -22,11 +42,13 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
   const [error, setError] = useState(null);
 
   const fileInputRef = useRef(null);
+  const pollRef = useRef(null);
 
   useEffect(() => {
-    if (jobData?.jobId) {
+    if (jobData?.jobId && !jobData.jobId.toString().startsWith('demo')) {
       pollJobStatus(jobData.jobId);
     }
+    return () => clearInterval(pollRef.current);
   }, [jobData?.jobId]);
 
   const handleFileChange = (e) => {
@@ -50,34 +72,36 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
     }
   };
 
-  const pollJobStatus = async (jobId) => {
+  // 분석은 1~3분 걸린다. 2.5초마다 상태를 보고 note_ready 가 되면 노트를 가져온다
+  const pollJobStatus = (jobId) => {
+    clearInterval(pollRef.current);
     setAnalyzing(true);
-    let attempts = 0;
-    const interval = setInterval(async () => {
-      attempts++;
+    const tick = async () => {
       try {
         const res = await api.getJobStatus(jobId);
-        const stage = res.stage;
-
-        if (stage === 'note_ready' || stage === 'generating' || stage === 'awaiting_cover' || stage === 'done') {
-          clearInterval(interval);
+        if (NOTE_STAGES.includes(res.stage) || (res.stage === 'failed' && res.steps?.some((x) => x.key === 'note' && x.status === 'done'))) {
+          clearInterval(pollRef.current);
+          const note = await api.getNote(jobId);
+          setNoteData(toCard(note));
+          setJobData((prev) => ({ ...prev, stage: res.stage }));
           setAnalyzing(false);
-          const noteRes = await api.getNote(jobId);
-          setNoteData(noteRes.note || noteRes);
-        } else if (stage === 'failed') {
-          clearInterval(interval);
+          setProgress(null);
+        } else if (res.stage === 'failed') {
+          clearInterval(pollRef.current);
           setAnalyzing(false);
-          setError(res.error || '음원 분석에 실패했습니다.');
-        }
-
-        if (attempts > 60) {
-          clearInterval(interval);
-          setAnalyzing(false);
+          setProgress(null);
+          setError(res.error?.message || '음원 분석에 실패했습니다.');
+        } else if (ACTIVE.includes(res.stage)) {
+          setProgress(res.queue_position ? `대기 ${res.queue_position}번째` : `${res.stage_label} ${Math.round((res.progress || 0) * 100)}%`);
         }
       } catch (err) {
-        console.error(err);
+        clearInterval(pollRef.current);
+        setAnalyzing(false);
+        setError(err.message);
       }
-    }, 2500);
+    };
+    tick();
+    pollRef.current = setInterval(tick, 2500);
   };
 
   const handleStartAnalysis = async () => {
@@ -90,7 +114,7 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
       return;
     }
     if (!consentAgree) {
-      setError('자작곡 확인 및 가이드라인 동의가 필요합니다.');
+      setError('필수 동의 세 가지에 체크해 주세요.');
       return;
     }
 
@@ -102,15 +126,16 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
       formData.append('file', file);
       formData.append('title', title);
       formData.append('artist', artist);
-      formData.append('featured', featured);
-      formData.append('songwriter', songwriter);
-      formData.append('producer', producer);
-      formData.append('lyrics', lyrics);
-      formData.append('genre_hint', genreHint);
-      formData.append('consent_version', 'v1.2');
+      formData.append('genre', genre);
+      if (lyrics.trim()) formData.append('lyrics', lyrics.trim());
+      formData.append('consent_privacy', consents.privacy);
+      formData.append('consent_external_ai', consents.external_ai);
+      formData.append('consent_original', consents.original);
+      formData.append('consent_showcase', consents.showcase);
+      formData.append('consent_version', CONSENT_VERSION);
 
       const res = await api.createJob(formData);
-      const jobId = res.job_id || res.id;
+      const jobId = res.job_id;
 
       setJobData((prev) => ({
         ...prev,
@@ -124,7 +149,7 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
       }));
 
       setUploading(false);
-      pollJobStatus(jobId);
+      // jobId 가 바뀌면 위 useEffect 가 상태 확인을 시작한다
     } catch (err) {
       setUploading(false);
       setError(err.message || '업로드 중 오류가 발생했습니다.');
@@ -138,7 +163,6 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
     setSongwriter('김루시드');
     setProducer('Echo Lab');
     setLyrics('자정의 시계탑 소리가 울리면\n길었던 하루의 기억들이 잔향처럼 흩어진다\n아무도 묻지 않는 밤의 끝에서...');
-    setConsentAgree(true);
     setError(null);
     setJobData((prev) => ({
       ...prev,
@@ -152,31 +176,40 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
     }));
     setNoteData({
       bpm: 98,
+      key: 'E♭ major',
       genre: 'Alternative Pop / Indie',
-      sound_characteristics: '선명한 808 신스 베이스와 몽환적인 리버브 기타 사운드',
-      mood: '몽환적 / 새벽의 잔향과 서정성',
-      emotion_flow: '차분한 어쿠스틱 피아노 도입부에서 후반부 감정 빌드업',
-      concept_summary: '자정의 고요함을 닮은 공간계 사운드와 진솔한 가사가 돋보이는 곡입니다. 3000px 규격 아트워크와 Spotify Canvas 영상으로 시각적 브랜딩을 강화하면 스트리밍 노출에 매우 유리합니다.',
+      sound_characteristics: '차분한 어쿠스틱 피아노 도입부에서 후반부 감정 빌드업',
+      mood: '몽환적 / 새벽 / 잔향 / 서정 / 고요',
+      colors: ['#1b1f3b', '#53354a', '#e84545'],
+      concept_summary: '자정의 고요함을 닮은 공간계 사운드와 진솔한 가사가 돋보이는 곡이에요. 98 BPM의 느린 걸음 위에서 후반부로 갈수록 감정이 차오릅니다.',
     });
   };
 
+  // 수락 전에 피처링·작곡가·프로듀서·가사를 발매 정보에 넣는다 (3단계 검사·제출 준비표에 쓰임)
   const handleAcceptNote = async () => {
     if (!jobData?.jobId || jobData?.jobId?.toString().startsWith('demo')) {
       onNextStep();
       return;
     }
     setAccepting(true);
+    setError(null);
     try {
+      const cur = (await api.getReleaseInfo(jobData.jobId)).info;
+      const credits = cur.credits.filter((c) => !['작곡', '프로듀서'].includes(c.role));
+      if (songwriter.trim()) credits.push({ role: '작곡', legal_name: songwriter.trim(), stage_name: '' });
+      if (producer.trim()) credits.push({ role: '프로듀서', legal_name: '', stage_name: producer.trim() });
+      const feat = featured.replace(/^\s*(feat\.?|ft\.?)\s*/i, '').trim();
       await api.saveReleaseInfo(jobData.jobId, {
-        title,
-        artist,
-        featured,
-        songwriter,
-        producer,
-        lyrics,
+        ...cur,
+        title: title.trim() || cur.title,
+        artist: artist.trim() || cur.artist,
+        featuring: feat ? [feat] : cur.featuring,
+        credits,
+        lyrics: lyrics.trim() || cur.lyrics,
       });
-
-      await api.acceptNote(jobData.jobId);
+      const st = await api.getJobStatus(jobData.jobId);
+      if (st.stage === 'note_ready' || st.stage === 'failed') await api.acceptNote(jobData.jobId);
+      setJobData((prev) => ({ ...prev, featured, songwriter, producer, lyrics }));
       setAccepting(false);
       onNextStep();
     } catch (err) {
@@ -330,7 +363,19 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">가사 또는 곡 설명 (선택)</label>
+            <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">장르 (선택)</label>
+            <input
+              type="text"
+              value={genre}
+              onChange={(e) => setGenre(e.target.value)}
+              maxLength={50}
+              placeholder="예: 인디 록, 발라드"
+              className="w-full bg-white dark:bg-[#121215] border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-indigo-500 shadow-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">가사 (선택)</label>
             <textarea
               rows={3}
               value={lyrics}
@@ -340,18 +385,26 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
             />
           </div>
 
-          {/* Consent Checkbox */}
-          <label className="flex items-start gap-2.5 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-white/5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={consentAgree}
-              onChange={(e) => setConsentAgree(e.target.checked)}
-              className="mt-0.5 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500"
-            />
-            <span className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              [필수] 본 음원은 자작곡이며, 유통사 규격 사전 검수 및 AI 어시스턴트 활용 약관(v1.2)에 동의합니다.
-            </span>
-          </label>
+          {/* Consent Checkboxes — 서버 /studio 와 같은 문구 */}
+          <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-white/5 space-y-2">
+            <span className="block text-xs font-bold text-zinc-800 dark:text-zinc-200">동의 (동의서 {CONSENT_VERSION})</span>
+            {[
+              ['privacy', <>[필수] 만 14세 이상이에요. 개인정보 수집·이용 — 곡 정보·음원·크레딧(참여자 이름)·발매 정보·접속 IP. 유통사 제출 준비표·ZIP도 이 정보로 만들어요. 업로드 7일 뒤 자동 삭제 (<a href={toFileUrl('/privacy')} target="_blank" rel="noopener noreferrer" className="underline">개인정보처리방침</a>)</>],
+              ['external_ai', '[필수] 외부 AI 전송(미국) — 음원은 Google Gemini(무료 등급, 학습에 쓰일 수 있음), 글·이미지는 코디세이 API(OpenAI 모델, 학습 미사용)로 처리'],
+              ['original', '[필수] 직접 만든 곡이거나 올릴 권리가 있고, 크레딧에 넣는 참여자에게 동의를 받았어요. 규격 검사·권리 자가진단은 참고용이라 유통사 통과를 보장하지 않아요. AI 결과물은 저작권이 인정되지 않을 수 있어요'],
+              ['showcase', '[선택] 결과물을 서비스 개선·발표 자료에 써도 돼요'],
+            ].map(([key, text]) => (
+              <label key={key} className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={consents[key]}
+                  onChange={(e) => setConsent(key, e.target.checked)}
+                  className="mt-0.5 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">{text}</span>
+              </label>
+            ))}
+          </div>
 
           {/* Action Button: Start Analysis */}
           {!noteData && (
@@ -368,7 +421,7 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
               ) : analyzing ? (
                 <>
                   <Sparkles className="w-4 h-4 animate-spin text-amber-300" />
-                  <span>Gemini & DSP 하이브리드 오디오 분석 중...</span>
+                  <span>AI가 곡을 듣고 있어요 (1~3분){progress ? ` · ${progress}` : '...'}</span>
                 </>
               ) : (
                 <>
@@ -407,30 +460,32 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-white/5 space-y-1 shadow-sm">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">사운드 특성 & BPM</span>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">BPM · 키 · 장르감</span>
                 <p className="font-bold text-base text-zinc-900 dark:text-white">
-                  {noteData.bpm ? `${noteData.bpm} BPM` : 'BPM 측정 완료'} • {noteData.genre || 'Alternative Pop'}
+                  {[noteData.bpm && `${noteData.bpm} BPM`, noteData.key, noteData.genre].filter(Boolean).join(' • ')}
                 </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">{noteData.sound_characteristics || '선명한 신스 베이스와 서정적인 멜로디 라인'}</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-3">{noteData.sound_characteristics}</p>
               </div>
 
               <div className="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-white/5 space-y-1 shadow-sm">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">감정선 & 무드</span>
-                <p className="font-bold text-base text-indigo-600 dark:text-indigo-400">{noteData.mood || '몽환적 / 새벽 잔향'}</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">{noteData.emotion_flow || '도입부의 차분함에서 후반부 고조되는 감정 빌드업'}</p>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">무드 키워드</span>
+                <p className="font-bold text-base text-indigo-600 dark:text-indigo-400">{noteData.mood}</p>
               </div>
 
               <div className="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-white/5 space-y-1 shadow-sm">
-                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">추천 타깃 플레이리스트</span>
-                <p className="font-bold text-base text-sky-600 dark:text-sky-400">새벽 드라이브 / 감성 인디</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">Spotify '인디 감성 충전', 멜론 '새벽 감성 믹스' 타깃</p>
+                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">곡의 색 (커버·영상에 쓰여요)</span>
+                <div className="flex gap-2 pt-1">
+                  {(noteData.colors || []).map((c) => (
+                    <span key={c} title={c} className="w-9 h-9 rounded-lg border border-zinc-200 dark:border-white/10 shadow-sm" style={{ background: c }} />
+                  ))}
+                </div>
               </div>
             </div>
 
             <div className="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-white/5 space-y-2 shadow-sm">
               <span className="text-xs font-bold text-zinc-800 dark:text-zinc-300">A&R 디렉터 코멘트</span>
               <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                "{noteData.concept_summary || '자정의 고요함을 닮은 공간계 사운드와 진솔한 가사가 돋보이는 곡입니다. 3000px 규격 아트워크와 Spotify Canvas 영상으로 시각적 브랜딩을 강화하면 스트리밍 노출에 매우 유리합니다.'}"
+                "{noteData.concept_summary}"
               </p>
             </div>
 

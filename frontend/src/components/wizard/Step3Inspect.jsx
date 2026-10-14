@@ -4,30 +4,36 @@ import { ShieldCheck, CheckCircle2, AlertTriangle, XCircle, ArrowRight, ArrowLef
 import { api } from '../../services/api';
 
 export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevStep }) {
-  const [distributor, setDistributor] = useState('distrokid'); // 'distrokid' | 'muse'
-  const [inspectData, setInspectData] = useState(null);
-  const [loading, setLoading] = useState(
-    Boolean(jobData?.jobId && !jobData?.jobId.toString().startsWith('demo'))
-  );
+  const isDemo = !jobData?.jobId || jobData.jobId.toString().startsWith('demo');
+  const [distributor, setDistributor] = useState(jobData?.targetDistributor || 'distrokid'); // 'distrokid' | 'muse'
+  const [inspectData, setInspectData] = useState(null); // 서버 DistributorCheck
+  const [loading, setLoading] = useState(!isDemo);
+  const [error, setError] = useState(null);
 
+  // 화면의 체크 4개 ↔ 서버 권리 자가진단 답 (GET /release/rights-questions 의 id·값)
   const [rights, setRights] = useState({
-    is_original: true,
+    is_original: false,
     is_cover: false,
     used_sample: false,
     has_ai_audio: false,
   });
+  const toAnswers = (r) => ({
+    song_type: r.is_cover ? 'cover' : 'original',
+    samples: r.used_sample ? 'pack' : 'none',
+    ai_audio: r.has_ai_audio ? 'generated' : 'none',
+  });
 
   const fetchInspection = async (dist) => {
-    if (!jobData?.jobId || jobData?.jobId.toString().startsWith('demo')) {
+    if (isDemo) {
       setLoading(false);
       return;
     }
     setLoading(true);
+    setError(null);
     try {
-      const res = await api.getDistributorInspection(jobData.jobId, dist);
-      setInspectData(res);
+      setInspectData(await api.getDistributorInspection(jobData.jobId, dist));
     } catch (err) {
-      console.error(err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -37,15 +43,32 @@ export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevSt
     fetchInspection(distributor);
   }, [distributor, jobData?.jobId]);
 
+  // 전에 답한 자가진단이 있으면 체크 상태로 보여 준다
+  useEffect(() => {
+    if (isDemo) return;
+    api.getRights(jobData.jobId).then((r) => {
+      const a = r.answers || {};
+      if (!Object.keys(a).length) return;
+      setRights({
+        is_original: a.song_type === 'original',
+        is_cover: a.song_type === 'cover',
+        used_sample: a.samples === 'pack' || a.samples === 'other_song',
+        has_ai_audio: a.ai_audio === 'generated',
+      });
+    }).catch(() => {});
+  }, [jobData?.jobId]);
+
   const handleRightsChange = async (key, val) => {
     const updated = { ...rights, [key]: val };
+    if (key === 'is_original' && val) updated.is_cover = false;
+    if (key === 'is_cover' && val) updated.is_original = false;
     setRights(updated);
-    if (jobData?.jobId) {
-      try {
-        await api.saveRights(jobData.jobId, updated);
-      } catch (err) {
-        console.error(err);
-      }
+    if (isDemo) return;
+    try {
+      await api.saveRights(jobData.jobId, toAnswers(updated));
+      fetchInspection(distributor); // AI 표기 등 판정이 바뀔 수 있다
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -57,14 +80,20 @@ export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevSt
     onNextStep();
   };
 
-  const checks = inspectData?.checks || [
-    { name: '오디오 포맷 및 비트심도', status: 'pass', desc: 'WAV 24-bit / 48kHz 무손실 규격 적합' },
-    { name: 'True Peak 라우드니스', status: 'pass', desc: '-1.0 dBTP 이하로 스트리밍 왜곡 위험 없음' },
-    { name: '커버 이미지 해상도 & 색공간', status: 'pass', desc: '3000 × 3000 px, RGB (sRGB) 충족' },
-    { name: '커버 텍스트 금지 요소', status: 'pass', desc: 'URL, 바코드, SNS 아이디, 가격 미포함' },
-    { name: '트랙 제목 및 피처링 표기', status: 'pass', desc: 'Spotify / Apple Music Style Guide 준수' },
-    { name: '가사 형식 요건', status: 'warn', desc: '반복 구절 생략 표기 주의 필요 (Chorus 2x 등 지양)' },
-  ];
+  const checks = inspectData
+    ? inspectData.items.map((i) => ({ name: i.label, status: i.status, desc: i.detail }))
+    : isDemo ? [
+      { name: '오디오 포맷 및 비트심도', status: 'pass', desc: 'WAV 24-bit / 48kHz 무손실 규격 적합' },
+      { name: 'True Peak 라우드니스', status: 'pass', desc: '-1.0 dBTP 이하로 스트리밍 왜곡 위험 없음' },
+      { name: '커버 이미지 해상도 & 색공간', status: 'pass', desc: '3000 × 3000 px, RGB (sRGB) 충족' },
+      { name: '커버 텍스트 금지 요소', status: 'pass', desc: 'URL, 바코드, SNS 아이디, 가격 미포함' },
+      { name: '트랙 제목 및 피처링 표기', status: 'pass', desc: 'Spotify / Apple Music Style Guide 준수' },
+      { name: '가사 형식 요건', status: 'warn', desc: '반복 구절 생략 표기 주의 필요 (Chorus 2x 등 지양)' },
+    ] : [];
+  const counts = inspectData?.counts || { fail: 0, warn: checks.filter((c) => c.status === 'warn').length };
+  const risk = counts.fail ? { label: `반려 위험: 고쳐야 할 항목 ${counts.fail}개`, tone: 'rose' }
+    : counts.warn ? { label: `확인 필요 ${counts.warn}개`, tone: 'amber' }
+    : { label: '반려 위험도: 낮음', tone: 'emerald' };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -77,6 +106,10 @@ export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevSt
           실제 유통사 검수 기준에 맞춰 오디오, 커버, 메타데이터 표기 규격을 사전에 종합 진단합니다.
         </p>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-300 text-sm">{error}</div>
+      )}
 
       {/* Distributor Tabs */}
       <div className="flex items-center justify-center gap-3">
@@ -123,9 +156,12 @@ export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevSt
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>반려 위험도: 매우 낮음 (안전)</span>
+            <span className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border ${
+              risk.tone === 'rose' ? 'bg-rose-50 dark:bg-rose-500/15 border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300'
+                : risk.tone === 'amber' ? 'bg-amber-50 dark:bg-amber-500/15 border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300'
+                : 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+            }`}>
+              {loading ? <span>검사 중...</span> : <><CheckCircle2 className="w-4 h-4" /><span>{risk.label}</span></>}
             </span>
           </div>
         </div>
@@ -135,6 +171,7 @@ export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevSt
           {checks.map((check, idx) => {
             const isPass = check.status === 'pass' || check.status === 'ok';
             const isWarn = check.status === 'warn';
+            const isTodo = check.status === 'todo'; // 사람이 직접 확인할 항목
 
             return (
               <div
@@ -143,8 +180,8 @@ export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevSt
               >
                 {isPass ? (
                   <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                ) : isWarn ? (
-                  <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                ) : isWarn || isTodo ? (
+                  <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isTodo ? 'text-sky-500' : 'text-amber-500'}`} />
                 ) : (
                   <XCircle className="w-5 h-5 text-rose-500 flex-shrink-0 mt-0.5" />
                 )}
@@ -155,7 +192,7 @@ export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevSt
                     <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
                       isPass ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : isWarn ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300'
                     }`}>
-                      {isPass ? 'PASS' : isWarn ? '주의' : '반려위험'}
+                      {isPass ? 'PASS' : isWarn ? '주의' : isTodo ? '직접 확인' : '반려위험'}
                     </span>
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-snug">{check.desc}</p>
