@@ -120,6 +120,16 @@ CREATE TABLE IF NOT EXISTS track_fingerprints (
     fp       TEXT NOT NULL,      -- JSON 정수 배열
     duration REAL NOT NULL
 );
+
+-- 마지막 설문 (10/14 회의): 작업 하나(또는 바로 공개한 곡 하나)에 응답 하나. 이름·연락처 없음, 작업이 지워져도 남긴다
+CREATE TABLE IF NOT EXISTS surveys (
+    subject    TEXT PRIMARY KEY,   -- job:<job_id> | track:<track_id>
+    version    TEXT NOT NULL,      -- 문항 버전 (문항을 고치면 올린다)
+    answers    TEXT NOT NULL,      -- JSON {문항 id: 값}
+    context    TEXT NOT NULL,      -- JSON 응답 시점 이용 요약 (어디까지 했는지 — 작업이 지워져도 분석 가능)
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 _initialized: set[Path] = set()
@@ -167,6 +177,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE tracks ADD COLUMN ai_usage TEXT NOT NULL DEFAULT 'none'")  # none | tool | generated (#40)
     if "known_match" not in tcols:
         conn.execute("ALTER TABLE tracks ADD COLUMN known_match TEXT")  # AcoustID가 찾은 비슷한 곡 JSON (올린 사람이 확인하고 올림)
+    if "owner_views" not in tcols:  # 올린 사람이 반응을 확인했는지 (10/14 피드백 자동 수집)
+        conn.execute("ALTER TABLE tracks ADD COLUMN owner_views INTEGER NOT NULL DEFAULT 0")
+        conn.execute("ALTER TABLE tracks ADD COLUMN owner_seen_at TEXT")
+        conn.execute("ALTER TABLE tracks ADD COLUMN owner_seen_reactions INTEGER NOT NULL DEFAULT 0")  # 마지막으로 볼 때 반응 수
     fcols = {r[1] for r in conn.execute("PRAGMA table_info(feedback)")}
     if "hidden_reason" not in fcols:
         conn.execute("ALTER TABLE feedback ADD COLUMN hidden_reason TEXT")  # owner | reported | spam | operator

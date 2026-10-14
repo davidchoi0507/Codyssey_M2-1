@@ -19,8 +19,8 @@ class ApiError extends Error {
   constructor(status, body) { super(body?.message || `요청이 실패했어요 (${status})`); this.status = status; this.code = body?.code; this.body = body; }
 }
 
-async function api(method, path, body, { form = false } = {}) {
-  const opt = { method, headers: {}, credentials: "same-origin" };
+async function api(method, path, body, { form = false, headers = {} } = {}) {
+  const opt = { method, headers: { ...headers }, credentials: "same-origin" };
   if (body !== undefined && body !== null) {
     if (form) opt.body = body;
     else { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
@@ -96,6 +96,7 @@ const routes = [
   [/^#\/community$/, community],
   [/^#\/track\/([0-9A-Z]{26})$/, trackView],
   [/^#\/me$/, me],
+  [/^#\/survey\/(job|track)\/([0-9A-Z]{26})(?:\/([\w-]+))?$/, surveyPage],
   [/^#\/login/, me],
 ];
 
@@ -497,7 +498,7 @@ async function stepPromo(p) {
     ${pkg.videos.length ? `<div class="card"><h3>영상</h3><div class="grid2" style="margin-top:12px">${pkg.videos.map((v) => `<div><video src="${esc(v.url)}" controls playsinline style="width:100%;border-radius:12px;max-height:420px;background:#000"></video>
       <p class="small muted">${v.kind === "short" ? "숏폼 15초 (릴스·틱톡·쇼츠)" : "Spotify Canvas 8초 (무음 반복)"}</p></div>`).join("")}</div></div>` : ""}
     ${Object.keys(pkg.channels).length ? `<div class="card"><h3>채널별 글</h3>${Object.entries(pkg.channels).map(([ch, c]) => `<div style="margin-top:16px"><div class="row"><b>${esc({ instagram: "인스타그램", tiktok: "틱톡", threads: "스레드", x: "X" }[ch] || ch)}</b><span class="sp"></span>
-      <button class="btn small" data-copy="${esc(c.text + (c.hashtags ? "\n\n" + c.hashtags.join(" ") : ""))}">복사</button>${c.regenerate_remaining ? `<button class="btn small ghost" data-regen="${esc(c.item_id)}">다시 쓰기</button>` : ""}</div>
+      <button class="btn small" data-copy="${esc(c.text + (c.hashtags ? "\n\n" + c.hashtags.join(" ") : ""))}" data-usage="copied_channel" data-target="${esc(ch)}">복사</button>${c.regenerate_remaining ? `<button class="btn small ghost" data-regen="${esc(c.item_id)}">다시 쓰기</button>` : ""}</div>
       ${c.hook ? `<div class="small muted">영상 위 훅: ${esc(c.hook)}</div>` : ""}<div class="copybox" style="margin-top:6px">${esc(c.text)}${c.hashtags ? "\n\n" + esc(c.hashtags.join(" ")) : ""}</div>
       ${c.images ? `<div class="row" style="margin-top:8px">${Object.entries(c.images).map(([r, u]) => `<a class="btn small" href="${esc(u)}" target="_blank" rel="noopener">이미지 ${esc(r)}</a>`).join("")}</div>` : ""}</div>`).join("")}</div>` : ""}
     ${pkg.editorial ? `<div class="card"><h3>Spotify 에디토리얼 피칭</h3><p class="muted small">Spotify for Artists에서 발매 7일 전까지 내요.</p><div class="copybox">${esc(pkg.editorial.spotify_ko)}</div>
@@ -511,7 +512,7 @@ async function stepPromo(p) {
     $("#mCancel", m).onclick = () => $("#modal").close();
     $("#mGo", m).onclick = (e) => guard(e.currentTarget, async () => { J.pkg = await api("POST", `/jobs/${J.id}/items/${b.dataset.regen}/regenerate`, { request: $("#regenReq").value.trim() || null }); $("#modal").close(); renderStepOnly(); toast("새 버전을 만들었어요."); }, "만드는 중");
   }));
-  $$("[data-copy]", p).forEach((b) => (b.onclick = () => navigator.clipboard.writeText(b.dataset.copy).then(() => toast("복사했어요."))));
+  $$("[data-copy]", p).forEach((b) => (b.onclick = () => { navigator.clipboard.writeText(b.dataset.copy).then(() => toast("복사했어요.")); usageEvent(b.dataset.usage, b.dataset.target); }));
   $("#ownImg").onchange = (e) => { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append("file", f);
     api("POST", `/jobs/${J.id}/own-image`, fd, { form: true }).then((r) => { J.pkg = r; renderStepOnly(); toast("올린 이미지를 커버 후보에 넣었어요."); }).catch((err) => toast(err.message, true)); };
 }
@@ -536,6 +537,7 @@ async function stepSubmit(p) {
     <div class="card"><h3>발매 일정</h3>${plan.warnings.map((w) => `<div class="notice warn small" style="margin-top:8px">${esc(w)}</div>`).join("")}
       <ul class="cal" style="margin-top:10px">${plan.steps.map((s) => `<li class="${s.status || ""}"><div><div class="lbl">${esc(s.label)}</div><div class="small muted">${esc(s.date || "")}</div></div>
         <div><b>${esc(s.title)}</b><div class="small muted">${esc(s.detail)}</div></div></li>`).join("")}</ul></div>
+    ${pkg.zip_url ? await surveyCard("job", J.id) : ""}
     <div class="row" style="margin-top:18px">${noteReady() ? nextBtn("share", "커뮤니티에 올려 반응 받기") : ""}</div>`;
   $$("[data-dist]", p).forEach((b) => (b.onclick = () => { J.dist = b.dataset.dist; renderStepOnly(); }));
 }
@@ -544,7 +546,7 @@ async function stepShare(p) {
   if (J.track === undefined) { try { J.track = await api("GET", `/jobs/${J.id}/community`); } catch { J.track = null; } }
   const t = J.track;
   if (t) {
-    p.innerHTML = `<h2>커뮤니티 공개</h2><p class="lead">올렸어요! 관리 링크로 반응을 보고 설정을 바꿀 수 있어요.</p>${ownerSummary(t)}`;
+    p.innerHTML = `<h2>커뮤니티 공개</h2><p class="lead">올렸어요! 관리 링크로 반응을 보고 설정을 바꿀 수 있어요.</p>${ownerSummary(t)}${await surveyCard("job", J.id)}`;
     bindOwner(p, t);
     return;
   }
@@ -657,7 +659,7 @@ async function quick() {
         return api("POST", "/community/tracks", body, { form: true });
       });
       $("#qForm").remove();
-      $("#qDone").innerHTML = `<div class="notice ok" style="margin-bottom:16px">공개했어요! 아래 관리 링크를 꼭 저장해 두세요.</div>${ownerSummary(t)}`;
+      $("#qDone").innerHTML = `<div class="notice ok" style="margin-bottom:16px">공개했어요! 아래 관리 링크를 꼭 저장해 두세요.</div>${ownerSummary(t)}${await surveyCard("track", t.track_id, t.owner_key)}`;
       bindOwner($("#qDone"), t);
     }, "올리는 중").catch(async (err) => { $("#qErr").textContent = err.message; token = (await api("GET", "/community/form-token")).token; });
   };
@@ -763,6 +765,76 @@ function linkify(text) {
 }
 
 /* ---------- 내 곡 ---------- */
+
+/* ---------- 사용 기록 · 마지막 설문 (10/14 회의) ---------- */
+
+/** 화면에서만 일어나는 일(복사 등)을 서버에 남긴다. 실패해도 화면엔 영향 없게 기다리지 않는다. */
+function usageEvent(event, target, jobId = J?.id) {
+  if (event && jobId) api("POST", `/jobs/${jobId}/usage`, { event, target: target || null }).catch(() => {});
+}
+
+const surveyApi = (kind, id, key) => [kind === "job" ? `/jobs/${id}/survey` : `/community/tracks/${id}/survey`,
+  { headers: key ? { "X-Owner-Key": key } : {} }];
+const surveyHref = (kind, id, key) => `#/survey/${kind}/${id}${key ? "/" + key : ""}`;
+
+/** 끝낸 화면 아래에 붙는 설문 안내 (답했으면 고맙다는 말 + 고치기). */
+async function surveyCard(kind, id, key) {
+  try {
+    const [path, opt] = surveyApi(kind, id, key);
+    const v = await api("GET", path, null, opt);
+    if (v.answers) return `<div class="card"><div class="row"><b>설문에 답해 주셔서 고마워요!</b><span class="sp"></span><a class="btn small ghost" href="${surveyHref(kind, id, key)}">답 고치기</a></div></div>`;
+    if (kind === "job") usageEvent("survey_shown");
+    return `<div class="card" style="border-color:var(--accent)"><div class="row"><div><b>1분 설문</b><div class="small muted">써 보니 어땠나요? ${v.questions.length}문항, 답은 서비스를 고치는 데만 써요.</div></div>
+      <span class="sp"></span><a class="btn primary small" href="${surveyHref(kind, id, key)}">답하기</a></div></div>`;
+  } catch { return ""; }
+}
+
+async function surveyPage(kind, id, key) {
+  const [path, opt] = surveyApi(kind, id, key);
+  const v = await api("GET", path, null, opt);
+  const a = v.answers || {};
+  const back = kind === "job" ? `#/job/${id}/submit` : `#/track/${id}`;
+  const chips = (g, options, cur) => `<div class="chips" style="margin-top:8px" data-g="${g}">${Object.entries(options).map(([k, label]) =>
+    `<button type="button" class="chip ${cur === k ? "on" : ""}" data-v="${esc(k)}">${esc(label)}</button>`).join("")}</div>`;
+  view.innerHTML = `
+  <div class="panel"><div class="eyebrow">마지막 설문</div><h2>써 보니 어땠나요?</h2>
+    <p class="lead">1분이면 돼요. 어디까지 썼는지는 자동으로 기록돼서 따로 묻지 않아요. 이름·연락처는 받지 않아요.</p></div>
+  <form class="card stack" id="svForm">
+    ${v.questions.map((q) => `<div><b>${esc(q.question)}</b>${q.required ? ` <span class="small muted">(필수)</span>` : ""}
+      ${q.type === "choice" ? chips(q.id, q.options, a[q.id])
+        : q.type === "matrix" ? Object.entries(q.rows).map(([r, label]) => `<div style="margin-top:10px"><span class="small">${esc(label)}</span>${chips(`${q.id}__${r}`, q.options, (a[q.id] || {})[r])}</div>`).join("")
+        : `<textarea name="${esc(q.id)}" maxlength="${q.max_length || 500}" style="margin-top:8px">${esc(a[q.id] || "")}</textarea>`}</div>`).join("")}
+    <p class="err" id="svErr"></p>
+    <div class="row"><a class="btn ghost" href="${back}" id="svSkip">나중에 할게요</a><span class="sp"></span><button class="btn primary" id="svBtn">보내기</button></div>
+  </form>`;
+  // 칩: 같은 칩을 다시 누르면 선택 해제 (선택 문항을 비울 수 있게)
+  $$("[data-g]", view).forEach((box) => box.addEventListener("click", (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    const was = b.classList.contains("on");
+    $$(".chip", box).forEach((c) => c.classList.remove("on"));
+    if (!was) b.classList.add("on");
+  }));
+  $("#svSkip").onclick = () => { if (kind === "job" && !v.answers) usageEvent("survey_closed", null, id); };
+  const picked = (g) => $(`[data-g="${g}"] .chip.on`, view)?.dataset.v;
+  $("#svForm").onsubmit = (e) => {
+    e.preventDefault();
+    const answers = {};
+    for (const q of v.questions) {
+      if (q.type === "choice" && picked(q.id)) answers[q.id] = picked(q.id);
+      if (q.type === "matrix") {
+        const rows = Object.fromEntries(Object.keys(q.rows).map((r) => [r, picked(`${q.id}__${r}`)]).filter(([, x]) => x));
+        if (Object.keys(rows).length) answers[q.id] = rows;
+      }
+      if (q.type === "text" && e.currentTarget[q.id].value.trim()) answers[q.id] = e.currentTarget[q.id].value.trim();
+    }
+    $("#svErr").textContent = "";
+    guard($("#svBtn"), async () => {
+      await api("PUT", path, { answers }, opt);
+      view.innerHTML = `<div class="card"><h3>고마워요!</h3><p class="muted">보내 주신 답은 서비스를 고치는 데 써요. 답은 언제든 다시 고칠 수 있어요.</p>
+        <a class="btn primary" href="${back}">돌아가기</a></div>`;
+    }, "보내는 중").catch((err) => ($("#svErr").textContent = err.message));
+  };
+}
 
 async function me() {
   await loadMe();

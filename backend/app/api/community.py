@@ -19,7 +19,7 @@ from app.api.deps import current_user, job_files, settings
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.pipeline import community as c
-from app.pipeline import moderation, reports
+from app.pipeline import moderation, reports, usage
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.bands import job_band
 from app.pipeline.limits import client_ip
@@ -152,7 +152,9 @@ def job_track(jf: JobFiles = Depends(job_files), s: Settings = Depends(_enabled)
     t = c.track_for_job(jf.job_id)
     if t is None:
         raise AppError("NOT_PUBLISHED", "아직 커뮤니티에 올리지 않은 곡이에요.", False, http_status=404)
-    return _owner_view(s, t)
+    view = _owner_view(s, t)
+    usage.owner_viewed(t["track_id"], view.stats.reactions)
+    return view
 
 
 # ---- 공개 (누구나) ----
@@ -237,7 +239,9 @@ def report_feedback(track_id: str, feedback_id: int, body: ReportRequest, reques
 
 @router.get("/community/tracks/{track_id}/owner", response_model=OwnerView, summary="올린 사람 화면: 비공개 의견까지 전부")
 def owner(track_id: str, x_owner_key: str | None = OwnerKey, s: Settings = Depends(_enabled)) -> OwnerView:
-    return _owner_view(s, _owned(track_id, x_owner_key, s))
+    view = _owner_view(s, _owned(track_id, x_owner_key, s))
+    usage.owner_viewed(track_id, view.stats.reactions)  # 올린 사람이 반응을 확인했는지 (사용 기록)
+    return view
 
 
 @router.patch("/community/tracks/{track_id}", response_model=OwnerView, summary="공개 방식·의견 공개·소개 바꾸기")

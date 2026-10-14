@@ -70,6 +70,12 @@
     </div>
 
     <div class="box">
+      <h2>1분 설문</h2>
+      <div class="sub">써 보니 어땠나요? 이름·연락처 없이 짧게 답해 주시면 서비스를 고치는 데 써요.</div>
+      <p><a class="main" id="survey" href="#">설문 답하기</a></p>
+    </div>
+
+    <div class="box">
       <h2>관리 링크</h2>
       <div class="sub">이 페이지 주소가 곧 열쇠예요. 다른 사람에게 보내지 말고 따로 저장해 두세요.</div>
       <p><code id="manageUrl"></code></p>
@@ -124,6 +130,7 @@ function render(t) {
   document.querySelector(`input[name=pub][value="${t.comments_public ? 1 : 0}"]`).checked = true;
   $('#intro').value = t.intro;
   $('#manageUrl').textContent = location.href;
+  $('#survey').href = `/studio#/survey/track/${tid}/${encodeURIComponent(key)}`;
 }
 async function load() {
   try { render(await api(`/community/tracks/${tid}/owner`)); }

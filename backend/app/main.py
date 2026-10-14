@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
-from app.api import auth, band, community, files, jobs, note, package, release
+from app.api import auth, band, community, files, jobs, note, package, release, survey
 from app.db import import_legacy_files
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -82,7 +82,7 @@ def health() -> dict:
 
 
 for r in (band.router, jobs.router, note.router, package.router, files.router, community.router, release.router,
-          auth.router):
+          auth.router, survey.router):
     app.include_router(r)
 
 STUDIO = Path(__file__).parent / "studio"

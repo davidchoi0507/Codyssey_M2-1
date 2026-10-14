@@ -8,7 +8,7 @@ from app.api.deps import find_job, job_files, settings
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.tokens import make_token, read_token
-from app.pipeline import distributors, guide, release_info, rights
+from app.pipeline import distributors, guide, release_info, rights, usage
 from app.pipeline.jobfiles import JobFiles
 from app.schemas.release import (DistributorCheck, DistributorProfile, GuideRecommendation, GuideRecommendRequest,
                                  ReleaseInfo, ReleaseInfoView, RightsQuestion, RightsResult)
@@ -97,7 +97,8 @@ def distributor_check(jf: JobFiles, dist_id: str, s: Settings) -> DistributorChe
             summary="이 유통사 기준 판정 (등록 시점·파일·크레딧·AI 정책·비용) + 제출 준비표 링크")
 def get_distributor_check(dist_id: str, jf: JobFiles = Depends(job_files),
                           s: Settings = Depends(settings)) -> DistributorCheck:
-    return distributor_check(jf, _dist(dist_id), s)
+    usage.event_once(jf, "distributor_checked", dist=_dist(dist_id))
+    return distributor_check(jf, dist_id, s)
 
 
 @router.get("/jobs/{job_id}/distributors/{dist_id}/sheet.csv", summary="제출 준비표 CSV (서명 링크 t, 24시간)",
@@ -107,6 +108,7 @@ def sheet(job_id: str, dist_id: str, t: str = Query(), s: Settings = Depends(set
     if read_token(s.download_token_secret, t) != (jf.job_id, f"sheet/{_dist(dist_id)}"):
         raise AppError("LINK_EXPIRED", "링크가 만료되었어요. 화면을 새로고침해 주세요.", False, http_status=403)
     info, _ = release_info.load(jf)
+    usage.event_once(jf, "sheet_downloaded", dist=dist_id)
     name = f"{distributors.PROFILES[dist_id].name}_제출준비표.csv"
     return Response(distributors.sheet_csv(dist_id, info, sheet_files(info), distributors.job_context(jf)), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})

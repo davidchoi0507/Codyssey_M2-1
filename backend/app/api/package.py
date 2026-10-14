@@ -7,6 +7,7 @@ from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import Stage
 from app.core.tokens import read_token
+from app.pipeline import usage
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.render import select_cover as record_selection
 from app.pipeline.results import MAX_OWN_IMAGE_MB, build_zip, regenerate as regenerate_item, save_own_image, zip_info
@@ -82,6 +83,7 @@ def download_zip(job_id: str, request: Request, t: str | None = Query(default=No
         check_owner(jf, request, x_band_code)
     pkg = _package(jf, s)
     path = build_zip(jf, pkg, pkg.ai_generated.models)
+    usage.event_once(jf, "zip_downloaded")
     song = jf.read_json(jf.song)
     name = f"{song.get('artist', '')} - {song.get('title', '')}".strip(" -") or jf.job_id
     return FileResponse(path, media_type="application/zip", filename=f"{name}.zip")
