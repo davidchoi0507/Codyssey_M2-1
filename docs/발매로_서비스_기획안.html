@@ -2,16 +2,16 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>음원 발매 준비 올인원 솔루션 [발매로] 서비스 기획안</title>
+  <title>음원 발매 준비 서비스 [발매로] 기획안</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800;900&display=swap');
 
     @page {
       size: A4 portrait;
-      margin: 15mm 16mm;
+      margin: 13mm 15mm;
       @bottom-right {
         content: counter(page);
-        font-size: 9pt;
+        font-size: 8pt;
         color: #94a3b8;
       }
     }
@@ -28,8 +28,8 @@
     body {
       background-color: #ffffff;
       color: #0f172a;
-      line-height: 1.6;
-      font-size: 10pt;
+      line-height: 1.5;
+      font-size: 9.2pt;
     }
 
     .page {
@@ -37,244 +37,197 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      min-height: 260mm;
+      height: 268mm;
+      max-height: 268mm;
+      overflow: hidden;
     }
     .page:last-child {
       page-break-after: avoid;
     }
 
-    /* Cover Page */
-    .cover-header {
-      border-bottom: 3px solid #4f46e5;
-      padding-bottom: 12px;
-      margin-bottom: 25px;
+    /* Top Header */
+    .top-header {
+      border-bottom: 2px solid #4f46e5;
+      padding-bottom: 6px;
+      margin-bottom: 14px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-    .cover-badge {
-      display: inline-block;
+    .top-badge {
       background: #e0e7ff;
       color: #4338ca;
-      font-size: 9pt;
+      font-size: 8pt;
       font-weight: 800;
-      padding: 4px 10px;
+      padding: 2px 8px;
       border-radius: 9999px;
       border: 1px solid #c7d2fe;
-      letter-spacing: 0.5px;
     }
-    .cover-date {
-      font-size: 9pt;
+    .top-date {
+      font-size: 8pt;
       color: #64748b;
       font-weight: 600;
     }
 
-    .hero-section {
-      margin: 30px 0;
+    /* Hero */
+    .hero-box {
+      margin-bottom: 12px;
     }
-    .hero-title-sub {
-      font-size: 13pt;
+    .hero-sub {
+      font-size: 10.5pt;
       color: #6366f1;
       font-weight: 800;
-      margin-bottom: 6px;
-      letter-spacing: -0.3px;
+      margin-bottom: 3px;
     }
     .hero-title {
-      font-size: 26pt;
+      font-size: 20pt;
       font-weight: 900;
       color: #0f172a;
       line-height: 1.25;
-      letter-spacing: -1px;
-      margin-bottom: 15px;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
     }
     .hero-title span {
       color: #4f46e5;
     }
     .hero-desc {
-      font-size: 11pt;
+      font-size: 9pt;
       color: #475569;
-      line-height: 1.6;
-      max-width: 90%;
+      line-height: 1.55;
     }
 
-    /* Executive Callout Box */
+    /* Summary Card */
     .summary-card {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
-      border-left: 5px solid #4f46e5;
-      border-radius: 8px;
-      padding: 16px 20px;
-      margin: 20px 0;
+      border-left: 4px solid #4f46e5;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin: 12px 0;
     }
     .summary-title {
-      font-size: 11pt;
+      font-size: 9.5pt;
       font-weight: 800;
       color: #1e1b4b;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      margin-bottom: 4px;
     }
     .summary-text {
-      font-size: 9.5pt;
+      font-size: 8.7pt;
       color: #334155;
-      line-height: 1.6;
+      line-height: 1.5;
     }
 
-    /* Document Meta Grid */
-    .meta-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-top: 25px;
-      border-top: 1px solid #e2e8f0;
-      padding-top: 15px;
-    }
-    .meta-item {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      padding: 10px;
-      border-radius: 6px;
-    }
-    .meta-label {
-      font-size: 8pt;
-      color: #64748b;
-      font-weight: 700;
-      text-transform: uppercase;
-      margin-bottom: 2px;
-    }
-    .meta-val {
-      font-size: 9.5pt;
-      color: #0f172a;
-      font-weight: 800;
-    }
-
-    /* Section Headers */
+    /* Section */
     .section-header {
-      border-bottom: 2px solid #e2e8f0;
-      padding-bottom: 6px;
-      margin: 22px 0 14px 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .section-title {
-      font-size: 13pt;
-      font-weight: 900;
-      color: #0f172a;
+      border-bottom: 1.5px solid #e2e8f0;
+      padding-bottom: 4px;
+      margin: 14px 0 8px 0;
       display: flex;
       align-items: center;
       gap: 6px;
     }
-    .section-title-num {
+    .section-title {
+      font-size: 11pt;
+      font-weight: 900;
+      color: #0f172a;
+    }
+    .section-num {
       color: #4f46e5;
     }
 
-    /* Tables */
+    /* Grid Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 8px 0;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 9px 12px;
+    }
+    .card-title {
+      font-size: 9pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 3px;
+    }
+    .card-desc {
+      font-size: 8.3pt;
+      color: #475569;
+      line-height: 1.45;
+    }
+
+    /* Table */
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 12px 0;
-      font-size: 9pt;
+      margin: 8px 0;
+      font-size: 8.3pt;
     }
     th, td {
       border: 1px solid #cbd5e1;
-      padding: 8px 10px;
+      padding: 6px 8px;
       text-align: left;
-      vertical-align: middle;
     }
     th {
       background-color: #f1f5f9;
       color: #1e293b;
       font-weight: 800;
-      font-size: 8.5pt;
     }
-    td strong {
-      color: #0f172a;
-    }
-    .highlight-col {
+    .highlight-cell {
       background-color: #f0fdf4;
       font-weight: 600;
     }
 
-    /* Cards & Grids */
-    .card-grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin: 12px 0;
-    }
-    .card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 12px 14px;
-    }
-    .card-title {
-      font-size: 10pt;
-      font-weight: 800;
-      color: #0f172a;
-      margin-bottom: 5px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .card-desc {
-      font-size: 8.5pt;
-      color: #475569;
-      line-height: 1.5;
-    }
-
-    /* Pipeline 4 Steps */
-    .pipeline-container {
+    /* 4 Steps */
+    .pipeline-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 8px;
-      margin: 14px 0;
+      margin: 10px 0;
     }
-    .pipeline-step {
+    .step-card {
       background: #f8fafc;
       border: 1px solid #cbd5e1;
-      border-top: 4px solid #6366f1;
+      border-top: 3px solid #6366f1;
       border-radius: 6px;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+      padding: 8px;
     }
-    .step-num {
-      font-size: 8pt;
+    .step-tag {
+      font-size: 7.5pt;
       font-weight: 800;
       color: #4f46e5;
       text-transform: uppercase;
       margin-bottom: 2px;
     }
     .step-name {
-      font-size: 9.5pt;
+      font-size: 8.7pt;
       font-weight: 800;
       color: #0f172a;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
-    .step-list {
-      font-size: 8pt;
+    .step-desc {
+      font-size: 7.8pt;
       color: #475569;
-      padding-left: 14px;
-      line-height: 1.45;
+      line-height: 1.4;
     }
 
-    /* Bullet List */
+    /* Checklist */
     ul.check-list {
       list-style: none;
       padding-left: 0;
-      margin: 8px 0;
+      margin: 5px 0;
     }
     ul.check-list li {
       position: relative;
-      padding-left: 18px;
-      font-size: 9pt;
+      padding-left: 15px;
+      font-size: 8.3pt;
       color: #334155;
-      margin-bottom: 5px;
-      line-height: 1.5;
+      margin-bottom: 3.5px;
+      line-height: 1.4;
     }
     ul.check-list li::before {
       content: "✔";
@@ -282,32 +235,24 @@
       left: 0;
       color: #4f46e5;
       font-weight: 900;
-      font-size: 9pt;
-    }
-
-    .callout-blue {
-      background: #eef2ff;
-      border: 1px solid #c7d2fe;
-      border-radius: 6px;
-      padding: 10px 14px;
-      margin: 10px 0;
-      font-size: 9pt;
-      color: #1e1b4b;
-    }
-    .callout-green {
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 6px;
-      padding: 10px 14px;
-      margin: 10px 0;
-      font-size: 9pt;
-      color: #14532d;
-    }
-
-    .footer-note {
-      border-top: 1px solid #e2e8f0;
-      padding-top: 8px;
       font-size: 8pt;
+    }
+
+    .callout {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 8px 0;
+      font-size: 8.3pt;
+      color: #334155;
+      line-height: 1.45;
+    }
+
+    .footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 5px;
+      font-size: 7.8pt;
       color: #94a3b8;
       display: flex;
       justify-content: space-between;
@@ -319,51 +264,90 @@
   <!-- ================= PAGE 1 ================= -->
   <div class="page">
     <div>
-      <div class="cover-header">
-        <span class="cover-badge">OFFICIAL SERVICE PROPOSAL</span>
-        <span class="cover-date">2026. 10. 14 | 프로젝트 기획안</span>
+      <div class="top-header">
+        <span class="top-badge">SERVICE PROPOSAL</span>
+        <span class="top-date">2026. 10. 14 | 프로젝트 기획안</span>
       </div>
 
-      <div class="hero-section">
-        <div class="hero-title-sub">음악만 가져오세요, 발매 준비는 '발매로'가 끝냅니다</div>
-        <h1 class="hero-title">누구나 음원을 발매하도록 돕는<br>원스톱 발매 패키징 서비스 <span>[발매로]</span></h1>
+      <div class="hero-box">
+        <div class="hero-sub">누구나 자신의 음악을 발매할 수 있도록</div>
+        <h1 class="hero-title">음원 발매 준비 도우미 <span>[발매로 (Balmaero)]</span></h1>
         <p class="hero-desc">
-          AI 음악 제작과 홈레코딩의 대중화로 누구나 곡을 만드는 시대가 열렸지만, 복잡한 유통사 규격과 고가의 디자인 외주비용은 여전히 거대한 장벽입니다. <strong>[발매로 (Balmaero)]</strong>는 창작자가 음원만 올리면, 유통사 규격에 맞춘 앨범 커버, 메타데이터, 사전 검수, 제출 준비표를 원클릭으로 패키징해 주는 디지털 A&R 스튜디오입니다.
+          자작곡이나 데모 음원을 보유하고 있어도, 앨범 커버 제작이나 낯선 유통사 양식 작성에 어려움을 겪는 일반인 및 초보 창작자를 위해 <strong>유통사 제출에 필요한 자료를 원클릭으로 정리해 주는 발매 준비 보조 웹 서비스</strong>입니다.
         </p>
       </div>
 
       <div class="summary-card">
-        <div class="summary-title">📌 한눈에 보는 핵심 가치 제안 (Value Proposition)</div>
+        <div class="summary-title">📌 서비스 정의 및 핵심 역할</div>
         <div class="summary-text">
-          • <strong>서비스 본질:</strong> "유통 대행(브로커)"이 아닌, <strong>"유통사 제출 필수 준비물 1부터 10까지를 유통사 화면 순서대로 완벽하게 차려주는 준비 도우미"</strong><br>
-          • <strong>핵심 해결:</strong> ① 외주비 30만원이 없어서 발매를 포기하던 3000px 커버 아트 무료 생성, ② 유통사 규격 미달(오디오 클리핑, 커버 금지 텍스트) 사전 검수(Preflight), ③ 글로벌(DistroKid) 및 국내(뮤즈플랫폼) 맞춤형 원클릭 제출표 제공<br>
-          • <strong>포지셔닝:</strong> 레이블이 있는 상위 1% 프로 음악인이 아닌, <strong>인프라가 없는 99%의 실용음악과 학생, 인디 아마추어, AI 음악 크리에이터</strong>를 위한 1인 기획사
+          • <strong>서비스 성격:</strong> 유통을 대행하는 회사가 아니라, <strong>창작자가 유통사 웹사이트에 직접 접수할 때 필요한 자료(3000px 커버 이미지, 소개글, 메타데이터 입력표)를 한곳에서 간편하게 준비해 주는 도우미</strong>입니다.<br>
+          • <strong>해결하는 고충:</strong> ① 고가의 디자인 외주 없이 유통 규격(3000×3000px)에 맞는 앨범 커버 생성, ② 유통사 규격 미달로 인한 반려 위험 사전 점검, ③ 유통사 화면 순서대로 그대로 복사해 넣을 수 있는 정리표 제공.
         </div>
       </div>
 
-      <div class="section-header" style="margin-top: 20px;">
-        <h2 class="section-title"><span class="section-title-num">01.</span> 기획 배경: 왜 지금 '발매로'인가?</h2>
+      <div class="section-header">
+        <h2 class="section-title"><span class="section-num">01.</span> 기획 배경: 왜 이 서비스가 필요한가?</h2>
       </div>
 
-      <div class="card-grid-2">
+      <div class="grid-2">
         <div class="card">
-          <div class="card-title">🎵 '음악 제작'의 급격한 대중화</div>
+          <div class="card-title">🎧 음원 제작 장벽의 완화</div>
           <div class="card-desc">
-            Suno, Udio, Logic, Garageband 등 생성형 AI와 DAW 툴의 발전으로 전공자가 아니더라도 누구나 10분 만에 들을 만한 고음질 자작곡을 만드는 시대가 도래했습니다. 음원 제작의 허들은 역사상 가장 낮아졌습니다.
+            홈레코딩과 다양한 음악 제작 도구의 발전으로 전문 작곡가가 아니더라도 누구나 음원을 만들고 소장할 수 있는 환경이 조성되었습니다. 자신의 음악을 정식 음원 사이트에 발매해 보고 싶어 하는 대중적 수요도 함께 증가하고 있습니다.
           </div>
         </div>
         <div class="card">
-          <div class="card-title">🚧 반대로 '음원 발매'는 여전히 난공불락</div>
+          <div class="card-title">📝 반면 복잡한 발매 준비 절차</div>
           <div class="card-desc">
-            음악을 멜론이나 스포티파이에 올리려면 유통사를 거쳐야 합니다. 하지만 3000px 규격 커버 아트, 24bit 오디오 스펙, 가사 포맷, 크레딧 영문 표기 등 까다로운 진입장벽 때문에 수많은 일반인과 학생들이 발매를 포기합니다.
+            막상 음원을 발매하려면 유통사가 요구하는 엄격한 규격(3000px RGB 커버, 오디오 규격, 영문 메타데이터, 크레딧 양식)을 맞춰야 합니다. 발매 경험이 없는 초보 창작자에게는 이 서류 작업 자체가 커다란 걸림돌이 됩니다.
           </div>
         </div>
       </div>
+
+      <div class="section-header">
+        <h2 class="section-title"><span class="section-num">02.</span> 대상 창작자 정의: 프로 vs 일반 창작자</h2>
+      </div>
+
+      <p style="font-size: 8.3pt; color: #475569; margin-bottom: 5px;">
+        기획사나 전담 A&R, 외주 디자이너를 갖춘 전문 음악인에게는 자체 제작 툴이 불필요하지만, <strong>개인 자격으로 첫 발매를 시도하는 일반인 및 초보 창작자</strong>에게는 이러한 준비 보조 도구가 실질적인 도움이 됩니다.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 25%;">구분</th>
+            <th style="width: 37%;">전문 음악 산업 종사자 (기성 프로)</th>
+            <th style="width: 38%;" class="highlight-cell">일반인 / 초보 창작자 [발매로 타깃]</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>발매 지원 인프라</strong></td>
+            <td>연예기획사, 레이블 실무진이 대행</td>
+            <td class="highlight-cell"><strong>소속사 없음, 본인이 직접 서류 준비</strong></td>
+          </tr>
+          <tr>
+            <td><strong>앨범 커버 제작</strong></td>
+            <td>전문 그래픽 디자이너 외주 의뢰</td>
+            <td class="highlight-cell"><strong>디자인 외주 비용 부담, 직접 제작 어려움</strong></td>
+          </tr>
+          <tr>
+            <td><strong>유통사 서류 작성</strong></td>
+            <td>업계 실무진이 능숙하게 처리</td>
+            <td class="highlight-cell"><strong>용어(ISRC, 크레딧, 가사 양식)가 생소함</strong></td>
+          </tr>
+          <tr>
+            <td><strong>서비스 이용 목적</strong></td>
+            <td>기존 전문 시스템 활용</td>
+            <td class="highlight-cell"><strong>발매 준비 시간 절약 및 반려 방지 보조</strong></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
-    <div class="footer-note">
-      <span>프로젝트 발매로 (Balmaero) — 팀장 최다인 외 3인</span>
-      <span>Page 1 of 3</span>
+    <div class="footer">
+      <span>프로젝트 [발매로 (Balmaero)] 서비스 기획안</span>
+      <span>Page 1 of 2</span>
     </div>
   </div>
 
@@ -371,186 +355,102 @@
   <div class="page">
     <div>
       <div class="section-header">
-        <h2 class="section-title"><span class="section-title-num">02.</span> 핵심 타깃 분석: 프로 vs 아마추어 (설득 논리)</h2>
+        <h2 class="section-title"><span class="section-num">03.</span> [발매로] 핵심 솔루션: 발매 준비 4단계 흐름</h2>
       </div>
 
-      <div class="callout-blue">
-        <strong>💡 현업 전문가(음악감독님) 피드백에 대한 시장 분석:</strong><br>
-        "전문 음악 산업 종사자에게는 이런 서비스가 전혀 매력이 없다"는 지적은 100% 사실입니다. 프로 음악가는 이미 대형 기획사, 전담 A&R, 외주 디자이너를 보유하고 있기 때문입니다. 그러나 <strong>[발매로]는 프로를 위한 툴이 아니라, 기획사가 없는 99%의 롱테일(Long Tail) 창작자들을 타깃</strong>으로 합니다.
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 20%;">비교 항목</th>
-            <th style="width: 40%;">상위 1% 프로 음악인 (기성 작곡가)</th>
-            <th style="width: 40%;" class="highlight-col">하위 99% 학생·인디·일반인 [발매로 타깃]</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>소속 및 인프라</strong></td>
-            <td>연예기획사, 전문 레이블 소속, 전담 매니저</td>
-            <td class="highlight-col"><strong>소속사 없음 (1인 방구석 창작자, 학생)</strong></td>
-          </tr>
-          <tr>
-            <td><strong>앨범 커버 아트</strong></td>
-            <td>50~100만원 전문 그래픽 디자이너 외주</td>
-            <td class="highlight-col"><strong>커버 외주비 30만원이 없어서 발매 포기</strong></td>
-          </tr>
-          <tr>
-            <td><strong>유통사 접수</strong></td>
-            <td>기획사 실무진이 대행, 유통사 직통 라인 보유</td>
-            <td class="highlight-col"><strong>DistroKid/뮤즈플랫폼 양식과 절차를 모름</strong></td>
-          </tr>
-          <tr>
-            <td><strong>음원 마스터링</strong></td>
-            <td>전문 마스터링 스튜디오에서 완벽 검수</td>
-            <td class="highlight-col"><strong>True Peak 왜곡이나 규격 미달로 빈번한 반려</strong></td>
-          </tr>
-          <tr>
-            <td><strong>[발매로] 필요성</strong></td>
-            <td>불필요 (기존 인프라 활용)</td>
-            <td class="highlight-col"><strong>🔥 극도로 절실함 (유일한 발매 수단)</strong></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="section-header" style="margin-top: 25px;">
-        <h2 class="section-title"><span class="section-title-num">03.</span> [발매로] 핵심 솔루션: 4단계 올인원 파이프라인</h2>
-      </div>
-
-      <div class="pipeline-container">
-        <div class="pipeline-step">
-          <div>
-            <div class="step-num">Step 01</div>
-            <div class="step-name">업로드 & AI A&R</div>
-            <ul class="step-list">
-              <li>MP3/WAV 음원 드래그</li>
-              <li>BPM 및 오디오 신호 분석</li>
-              <li>AI 청취로 감정선·무드 도출</li>
-              <li>맞춤 타깃 리스너 추천</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="pipeline-step">
-          <div>
-            <div class="step-num">Step 02</div>
-            <div class="step-name">유통 필수 에셋</div>
-            <ul class="step-list">
-              <li><strong>3000×3000px 커버 3종</strong></li>
-              <li>RGB/무텍스트 규격 보증</li>
-              <li>Spotify 캔버스 모션 영상</li>
-              <li>멜론/인스타 앨범 소개글</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="pipeline-step">
-          <div>
-            <div class="step-num">Step 03</div>
-            <div class="step-name">반려 방지 사전검사</div>
-            <ul class="step-list">
-              <li>True Peak 라우드니스 진단</li>
-              <li>24bit / 48kHz 규격 확인</li>
-              <li>가사 표기법(대소문자/줄바꿈)</li>
-              <li><strong>권리 자가진단 (AI/샘플)</strong></li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="pipeline-step">
-          <div>
-            <div class="step-num">Step 04</div>
-            <div class="step-name">원클릭 제출팩</div>
-            <ul class="step-list">
-              <li><strong>DistroKid 18개 순서 복사표</strong></li>
-              <li><strong>뮤즈플랫폼 앨범정보 표</strong></li>
-              <li>소형 유통사용 표준 엑셀(CSV)</li>
-              <li>고화질 에셋 ZIP 일괄 다운</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="callout-green">
-        <strong>✨ 창작자의 실제 사용 시나리오:</strong><br>
-        자작곡을 만든 학생이 '발매로'에 음원을 올리고 3분 만에 3000px 앨범 커버와 소개글, 검수 팩을 완성합니다. 그 후 DistroKid 또는 뮤즈플랫폼 창을 띄우고 '발매로' 화면에 정리된 텍스트를 클릭(원클릭 복사)하여 붙여넣기만 하면, <strong>외주 비용 0원, 반려 위험 0%로 발매 접수가 완료</strong>됩니다.
-      </div>
-    </div>
-
-    <div class="footer-note">
-      <span>프로젝트 발매로 (Balmaero) — 팀장 최다인 외 3인</span>
-      <span>Page 2 of 3</span>
-    </div>
-  </div>
-
-  <!-- ================= PAGE 3 ================= -->
-  <div class="page">
-    <div>
-      <div class="section-header">
-        <h2 class="section-title"><span class="section-title-num">04.</span> 유통사 2-Track 전략: DistroKid vs 뮤즈플랫폼</h2>
-      </div>
-
-      <p style="font-size: 9pt; color: #475569; margin-bottom: 10px;">
-        개인은 멜론이나 스포티파이에 직접 음원을 올릴 수 없으므로 반드시 유통사를 경유해야 합니다. '발매로'는 창작자의 목표에 따라 최적의 2개 유통사 경로를 안내하고 맞춤형 제출표를 제공합니다.
+      <p style="font-size: 8.3pt; color: #475569; margin-bottom: 6px;">
+        창작자가 음원 파일과 기본 정보를 입력하면, 유통사에 그대로 등록할 수 있는 에셋과 자료를 단계별로 구성합니다.
       </p>
 
-      <div class="card-grid-2">
-        <div class="card" style="border-left: 4px solid #0284c7;">
-          <div class="card-title">🌍 글로벌 중심: DistroKid (디스트로키드)</div>
-          <ul class="check-list">
-            <li><strong>주요 배포처:</strong> Spotify, Apple Music, YouTube Music, TikTok 등 해외 150여 개사</li>
-            <li><strong>특징:</strong> 연간 $24.99 정기 구독, 음원 수익 100% 창작자 수령, 초고속 배포(1~3일)</li>
-            <li><strong>'발매로' 지원:</strong> 영문 업로드 18개 구역 순서에 1:1 대응하는 원클릭 복사 도우미 제공</li>
-          </ul>
-        </div>
-
-        <div class="card" style="border-left: 4px solid #10b981;">
-          <div class="card-title">🇰🇷 국내 중심: 뮤즈플랫폼 (MuzePlatform)</div>
-          <ul class="check-list">
-            <li><strong>주요 배포처:</strong> 멜론, 지니, FLO, 벅스, 네이버 VIBE 등 국내 전 플랫폼 + 해외 동시 지원</li>
-            <li><strong>특징:</strong> 누구나 가입 가능(심사 없음), 초기 등록비 무료 플랜(수수료 20%), 국내 정산 편리</li>
-            <li><strong>'발매로' 지원:</strong> 국내 유통 필수 항목(가사, 작사/작곡 실명 표기) 및 표준 엑셀(CSV) 양식 제공</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="section-header" style="margin-top: 20px;">
-        <h2 class="section-title"><span class="section-title-num">05.</span> 전문가(음악감독님)와의 연계 및 기대 효과</h2>
-      </div>
-
-      <div class="card-grid-2">
-        <div class="card">
-          <div class="card-title">🎓 실용음악과 학생 및 제자 멘토링 효용</div>
-          <div class="card-desc">
-            학생들의 졸업 작품이나 자작 과제곡을 유통사에 발매할 때 지도교수/감독님이 일일이 커버나 규격을 봐줄 필요 없이, <strong>'발매로'를 통해 1차 규격 검수와 앨범 커버를 스스로 완성</strong>해 오도록 가이드할 수 있습니다.
+      <div class="pipeline-grid">
+        <div class="step-card">
+          <div class="step-tag">Step 1</div>
+          <div class="step-name">음원 정보 입력</div>
+          <div class="step-desc">
+            • 음원 파일(MP3/WAV) 업로드<br>
+            • 기본 정보(곡명, 아티스트명)<br>
+            • BPM 및 템포/무드 기초 분석<br>
+            • 가사 및 참여자 정보 입력
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-title">🗄️ 서랍 속 미발표 습작의 빠른 포트폴리오화</div>
-          <div class="card-desc">
-            정규 상업 앨범으로 내기에는 애매하여 서랍 속에 잠자고 있던 비트 스케치나 데모곡들을 단 5분 만에 발매 팩으로 패키징하여 음원 스트리밍 플랫폼에 등록하고 포트폴리오 자산화할 수 있습니다.
+        <div class="step-card">
+          <div class="step-tag">Step 2</div>
+          <div class="step-name">필수 에셋 생성</div>
+          <div class="step-desc">
+            • <strong>유통사 규격(3000px) 커버 3종</strong><br>
+            • RGB/정사각형/금지 텍스트 배제<br>
+            • 곡 분위기에 맞춘 앨범 소개글<br>
+            • 숏폼 모션 프리뷰 영상
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-tag">Step 3</div>
+          <div class="step-name">사전 규격 검수</div>
+          <div class="step-desc">
+            • 오디오 규격(비트심도, 샘플레이트)<br>
+            • True Peak 라우드니스 왜곡 체크<br>
+            • 제목/가사 표기법 점검<br>
+            • 저작권 및 자작곡 자가 확인
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-tag">Step 4</div>
+          <div class="step-name">제출 준비표 완성</div>
+          <div class="step-desc">
+            • <strong>유통사 화면 순서 맞춤 복사표</strong><br>
+            • DistroKid / 뮤즈플랫폼 분기<br>
+            • 소형 유통사용 표준 CSV 제공<br>
+            • 전체 에셋 ZIP 일괄 다운로드
           </div>
         </div>
       </div>
 
-      <div class="section-header" style="margin-top: 20px;">
-        <h2 class="section-title"><span class="section-title-num">06.</span> 실사용자 5인 테스트 및 검증 계획</h2>
+      <div class="callout">
+        <strong>💡 사용자 이용 방식:</strong> 창작자는 '발매로'에서 완성된 자료 화면을 띄워두고, 목표 유통사(DistroKid 또는 뮤즈플랫폼) 접수 페이지의 입력 칸에 <strong>원클릭으로 복사하여 붙여넣음으로써 손쉽게 발매 신청을 완료</strong>합니다.
+      </div>
+
+      <div class="section-header">
+        <h2 class="section-title"><span class="section-num">04.</span> 유통사 지원 방향: 해외 및 국내 2-Track</h2>
+      </div>
+
+      <div class="grid-2">
+        <div class="card" style="border-left: 3.5px solid #0284c7;">
+          <div class="card-title">🌐 글로벌 발매 지원: DistroKid (디스트로키드)</div>
+          <ul class="check-list">
+            <li><strong>주요 스토어:</strong> Spotify, Apple Music, YouTube Music 등 해외 플랫폼</li>
+            <li><strong>특징:</strong> 연간 정기 구독 방식, 음원 수익 정산 편리</li>
+            <li><strong>지원 방식:</strong> 영문 업로드 18개 구역 순서에 일치하는 메타데이터 복사표 제공</li>
+          </ul>
+        </div>
+
+        <div class="card" style="border-left: 3.5px solid #10b981;">
+          <div class="card-title">🇰🇷 국내 발매 지원: 뮤즈플랫폼 (MuzePlatform)</div>
+          <ul class="check-list">
+            <li><strong>주요 스토어:</strong> 멜론, 지니, FLO, 벅스 등 국내 주요 음원 사이트</li>
+            <li><strong>특징:</strong> 누구나 가입 및 접수 가능, 국내 환경에 맞춘 간편 정산</li>
+            <li><strong>지원 방식:</strong> 국내 유통 필수 항목(가사 양식, 실명 표기) 정리 및 엑셀(CSV) 양식 제공</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <h2 class="section-title"><span class="section-num">05.</span> 서비스 검증 및 피드백 계획</h2>
       </div>
 
       <ul class="check-list">
-        <li><strong>테스트 대상:</strong> 실용음악과 학생 2인 + 인디 밴드 창작자 2인 + AI 음악 크리에이터 1인 (총 5인)</li>
-        <li><strong>테스트 방식:</strong> 본인의 미발매 데모 음원을 '발매로'에 업로드 ➔ 3000px 커버 및 홍보 카피 생성 ➔ 유통사 사전 검수 팩 확인 ➔ 정량 평가 설문(5점 척도)</li>
-        <li><strong>검증 지표:</strong> ① 시각-청각 감성 일치도, ② 유통사 규격 적합도, ③ 디자이너 외주 대비 비용/시간 절감 만족도</li>
+        <li><strong>검증 목적:</strong> 실제 음원 파일로 앨범 커버 생성 및 유통사 제출 자료 정리 기능을 시험하고 실용성 점검</li>
+        <li><strong>피드백 수집 대상:</strong> 미발매 음원을 제작하거나 소장하고 있는 창작자 및 음악 애호가 5인 이상</li>
+        <li><strong>평가 항목:</strong> ① 생성된 앨범 커버의 규격 적합도, ② 유통사 입력 자료의 실질적 편의성, ③ 서비스 전반의 개선 필요 사항</li>
+        <li><strong>반영 계획:</strong> 수집된 피드백을 바탕으로 UI 편의성 및 유통사 메타데이터 세부 항목 고도화</li>
       </ul>
     </div>
 
-    <div class="footer-note">
-      <span>프로젝트 발매로 (Balmaero) — 팀장 최다인 외 3인</span>
-      <span>Page 3 of 3</span>
+    <div class="footer">
+      <span>프로젝트 [발매로 (Balmaero)] 서비스 기획안</span>
+      <span>Page 2 of 2</span>
     </div>
   </div>
 
