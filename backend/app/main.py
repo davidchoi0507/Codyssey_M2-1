@@ -108,6 +108,27 @@ def privacy() -> FileResponse:
     return FileResponse(STUDIO / "privacy.html", headers={"Cache-Control": "no-cache"})
 
 
+# 팀장 화면(React, 팀 레포 frontend/) 빌드 결과. 서버에서는 ~/apps/indie-studio/frontend_dist (scripts/deploy_indie_fe.sh)
+FRONTEND = Path(__file__).resolve().parents[2] / "frontend_dist"
+
+
+@app.get("/app", include_in_schema=False)
+def frontend_root() -> RedirectResponse:
+    return RedirectResponse("/app/")
+
+
+@app.get("/app/{path:path}", include_in_schema=False)
+def frontend(path: str) -> FileResponse:
+    """팀원 공유용 팀장 화면. 해시 붙은 assets/만 오래 캐시하고 index.html은 매번 새로."""
+    f = (FRONTEND / path).resolve()
+    if path and f.is_file() and f.is_relative_to(FRONTEND.resolve()):
+        cache = "public, max-age=31536000, immutable" if path.startswith("assets/") else "no-cache"
+        return FileResponse(f, headers={"Cache-Control": cache})
+    if not (FRONTEND / "index.html").is_file():
+        raise AppError("NOT_FOUND", "팀장 화면이 아직 서버에 올라가지 않았어요.", False, http_status=404)
+    return FileResponse(FRONTEND / "index.html", headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/", include_in_schema=False)
 def root() -> RedirectResponse:
     return RedirectResponse("/studio")
