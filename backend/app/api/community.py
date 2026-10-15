@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.api.auth import link_track
-from app.api.deps import current_user, job_files, settings
+from app.api.deps import current_user, job_files, person_key, settings
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.pipeline import community as c
@@ -45,9 +45,10 @@ def _track_id(track_id: str) -> str:
     return track_id
 
 
-def _track(t: dict, *, owner: bool = False) -> dict:
+def _track(t: dict, *, owner: bool = False, who: str | None = None) -> dict:
     tid = t["track_id"]
     st = c.stats(tid)
+    mine = c.my_reaction(tid, who) or {}
     return dict(track_id=tid, title=t["title"], artist=t["artist"], genre=t["genre"], intro=t["intro"],
                 listen_mode=t["listen_mode"], clip_sec=t["clip_sec"], comments_public=bool(t["comments_public"]),
                 colors=json.loads(t["colors"]), moods=json.loads(t["moods"]),
@@ -55,7 +56,8 @@ def _track(t: dict, *, owner: bool = False) -> dict:
                 audio_url=f"/community/tracks/{tid}/audio?v={t['updated_at']}",
                 plays=t["plays"], reactions=st["reactions"], ai_usage=t.get("ai_usage") or "none",
                 stats=FeedbackStats(**st) if (owner or t["comments_public"]) else None,
-                created_at=datetime.fromisoformat(t["created_at"]))
+                created_at=datetime.fromisoformat(t["created_at"]), comment_count=st["comments"],
+                my_rating=mine.get("rating"), my_tags=mine.get("tags", []))
 
 
 def _feedback(rows: list[dict]) -> list[Feedback]:
@@ -92,7 +94,7 @@ def publish(body: PublishRequest, request: Request, jf: JobFiles = Depends(job_f
     user = current_user(request)
     t = c.publish(s, jf, listen_mode=body.listen_mode, comments_public=body.comments_public, intro=body.intro,
                   client=client_ip(request), band_code=job_band(jf.job_id), user_id=user["user_id"] if user else None,
-                  ai_usage=body.ai_usage, confirm_original=body.confirm_original)
+                  ai_usage=body.ai_usage, confirm_original=body.confirm_original, who=person_key(request, user))
     link_track(t["track_id"], user)
     return _owner_view(s, t)
 
@@ -143,7 +145,7 @@ async def publish_direct(
                              intro=intro, listen_mode=listen_mode, clip_start=clip_start,
                              comments_public=comments_public, client=client,
                              user_id=user["user_id"] if user else None, image=image, ai_usage=ai_usage,
-                             confirm_original=confirm_original)
+                             confirm_original=confirm_original, who=person_key(request, user))
     return _owner_view(s, t)
 
 
@@ -173,18 +175,20 @@ def form_token(s: Settings = Depends(_enabled)) -> FormToken:
 
 
 @router.get("/community/tracks", response_model=TrackList, summary="곡 목록 (최신·인기·랜덤, 장르·검색)")
-def tracks(sort: Literal["new", "popular", "random"] = "new", genre: str | None = Query(None, max_length=50),
-           q: str | None = Query(None, max_length=50), limit: int = Query(20, ge=1, le=50), offset: int = Query(0, ge=0),
+def tracks(request: Request, sort: Literal["new", "popular", "random"] = "new",
+           genre: str | None = Query(None, max_length=50), q: str | None = Query(None, max_length=50),
+           limit: int = Query(20, ge=1, le=50), offset: int = Query(0, ge=0),
            _: Settings = Depends(_enabled)) -> TrackList:
     rows, total = c.list_tracks(sort=sort, genre=genre, q=q, limit=limit, offset=offset)
-    return TrackList(tracks=[Track(**_track(t)) for t in rows], total=total)
+    who = person_key(request)
+    return TrackList(tracks=[Track(**_track(t, who=who)) for t in rows], total=total)
 
 
 @router.get("/community/tracks/{track_id}", response_model=TrackDetail, summary="곡 하나 + 공개된 의견")
-def track(track_id: str, _: Settings = Depends(_enabled)) -> TrackDetail:
+def track(track_id: str, request: Request, _: Settings = Depends(_enabled)) -> TrackDetail:
     t = c.get_track(_track_id(track_id))
     fb = _feedback(c.feedback_rows(track_id)) if t["comments_public"] else []
-    return TrackDetail(**_track(t), feedback=fb)
+    return TrackDetail(**_track(t, who=person_key(request)), feedback=fb)
 
 
 def _file(path: Path, media_type: str) -> FileResponse:
@@ -212,12 +216,14 @@ def play(track_id: str, request: Request, _: Settings = Depends(_enabled)) -> di
 
 
 @router.post("/community/tracks/{track_id}/feedback", response_model=Feedback, summary="반응 남기기 (별점·태그·의견)",
-             description="로그인 없음. 같은 접속은 한 곡에 하루 3번, 전체 하루 30번까지. comments_public=false인 곡이면 "
-                         "올린 사람만 보고, 화면에는 '올린 사람에게만 전달돼요'라고 안내.")
+             description="로그인 없음. (10/16) 별점·태그는 한 사람이 한 곡에 하나 — 다시 보내면 바뀐다(목록의 my_rating). "
+                         "한마디는 한 사람이 한 곡에 하루 3개, 전체 하루 30개까지. '한 사람' = 로그인 계정, 아니면 브라우저 "
+                         "익명 ID(쿠키 aid, 서버가 자동 발급). comments_public=false인 곡이면 올린 사람만 보고, 화면에는 "
+                         "'올린 사람에게만 전달돼요'라고 안내.")
 def feedback(track_id: str, body: FeedbackRequest, request: Request, s: Settings = Depends(_enabled)) -> Feedback:
     r = c.add_feedback(s, _track_id(track_id), rating=body.rating, tags=body.tags, comment=body.comment,
-                       nickname=body.nickname, client=client_ip(request), form_token=body.form_token,
-                       honeypot=body.website)
+                       nickname=body.nickname, client=client_ip(request), who=person_key(request),
+                       form_token=body.form_token, honeypot=body.website)
     return _feedback([r])[0]
 
 

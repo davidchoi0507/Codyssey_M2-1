@@ -4,12 +4,15 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 
-from app.api.deps import find_job, job_files, settings
+from app.api.deps import find_job, job_files, runner, settings
 from app.core.config import Settings
 from app.core.errors import AppError
+from app.core.stages import Stage
 from app.core.tokens import make_token, read_token
 from app.pipeline import distributors, guide, release_info, rights, usage
 from app.pipeline.jobfiles import JobFiles
+from app.pipeline.render import forget_titled_renders, rename_in_texts
+from app.pipeline.runner import JobRunner
 from app.schemas.release import (DistributorCheck, DistributorProfile, GuideRecommendation, GuideRecommendRequest,
                                  ReleaseInfo, ReleaseInfoView, RightsQuestion, RightsResult)
 
@@ -63,8 +66,19 @@ def get_release_info(jf: JobFiles = Depends(job_files)) -> ReleaseInfoView:
             summary="발매 정보 저장 (전체를 한 번에) → 검사 결과",
             description="저장하면 곡 정보(제목·아티스트·장르·발매일·가사)도 같이 바뀌어 발매 캘린더·제출 전 검수·커뮤니티에 반영된다. "
                         "suggestions의 fields를 info에 덮어써서 다시 PUT하면 자동 교정이 적용된다.")
-def put_release_info(body: ReleaseInfo, jf: JobFiles = Depends(job_files)) -> ReleaseInfoView:
-    release_info.save(jf, body)
+async def put_release_info(body: ReleaseInfo, jf: JobFiles = Depends(job_files),
+                           r: JobRunner = Depends(runner)) -> ReleaseInfoView:
+    async with r.lock(jf.job_id):
+        old = jf.read_json(jf.song)
+        release_info.save(jf, body)
+        if (old.get("title"), old.get("artist")) != (body.title, body.artist):
+            # (10/16) 제목·아티스트가 바뀌면: 글 안의 이름은 바로 바꿔 넣고, 글자가 박힌 이미지·영상은 다시 그린다 (40초 안팎)
+            n = rename_in_texts(jf, old, {"title": body.title, "artist": body.artist})
+            busy = r.is_running(jf.job_id)  # 만드는 중이면 건드리지 않는다 (드문 경우 — 끝난 뒤 다시 저장하면 됨)
+            redraw = not busy and forget_titled_renders(jf) and jf.status()["stage"] in (Stage.DONE, Stage.FAILED)
+            jf.event("renamed", texts=n, redraw=redraw)
+            if redraw:
+                r.start_render(jf)
     return _info_view(jf)
 
 

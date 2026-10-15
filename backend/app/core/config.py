@@ -1,6 +1,8 @@
 """환경변수 → 설정. 모델명·한도·경로는 전부 여기서만 읽는다."""
 from functools import lru_cache
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -43,7 +45,8 @@ class Settings(BaseSettings):
     max_duration_sec: int = 600
     min_duration_sec: int = 15  # 숏폼 하이라이트(highlight_sec)보다 짧으면 결과물을 못 만든다
     cpu_workers: int = 2
-    daily_jobs_per_client: int = 3   # 초대 코드 없이 올릴 때 접속 IP별 (코드 필수면 안 씀)
+    daily_jobs_per_client: int = 3   # 초대 코드 없이 올릴 때 사람별 — 로그인 계정, 아니면 브라우저 익명 ID (10/16)
+    daily_jobs_per_ip: int = 30      # 같은 접속 IP 전체 상한 — 교실처럼 여럿이 한 와이파이를 써도 막히지 않게 넉넉히
     daily_jobs_per_band: int = 5     # 밴드(초대 코드)별 기본값 — 밴드마다 bands.daily_limit로 바꿀 수 있음
     daily_jobs_global: int = 60
     band_code_required: bool = False  # true면 곡을 올릴 때 초대 코드(X-Band-Code) 필수 — 밴드 테스트 때 켬
@@ -52,19 +55,25 @@ class Settings(BaseSettings):
     cover_candidates: int = Field(default=2, ge=1, le=3)  # 방향마다 만들 후보 수 — 2 이상이면 Gemini가 하나 고름, 1이면 끔
     cover_judge_model: str = "gemini-3.5-flash-lite"  # 커버 고르기 전용 (하루 500회 — 듣기용 상위 모델 한도를 안 씀)
     retention_days: int = 7
+    # 작업 보관 방식 (10/16, 동의서 v1.6 · DECISIONS #44): days = 업로드 RETENTION_DAYS일 뒤 삭제,
+    # service_end = 서비스 종료일(SERVICE_END_DATE)까지 두고 다음 날 일괄 삭제. 화면·동의 문구를 바꾸는 날 함께 켠다.
+    retention_mode: Literal["days", "service_end"] = "days"
     keep_job_ids: str = ""  # 쉼표 구분 — 7일 삭제에서 빼는 작업 (팀 공유 샘플 등)
 
     # 커뮤니티 (곡 공개·반응)
     community_enabled: bool = True     # /community 페이지와 API
-    community_daily_publish_per_client: int = 5
-    feedback_daily_per_client: int = 30        # 접속 IP별 하루 반응 수 (전체 곡 합)
-    feedback_daily_per_client_track: int = 3   # 한 곡에 같은 IP가 하루 남길 수 있는 반응 수
+    community_daily_publish_per_client: int = 5  # 사람별 (계정 또는 브라우저 익명 ID)
+    community_daily_publish_per_ip: int = 30     # 같은 접속 IP 전체 상한
+    feedback_daily_per_client: int = 30        # 사람별 하루 한마디 수 (전체 곡 합) — 별점·태그만 바꾸는 건 안 셈
+    feedback_daily_per_client_track: int = 3   # 한 곡에 같은 사람이 하루 남길 수 있는 한마디 수
+    feedback_daily_per_ip: int = 300           # 같은 접속 IP 전체 상한 (교실 와이파이 고려)
     # 도배·욕설·광고 방지 (DECISIONS #32)
     form_token_required: bool = True   # 화면이 받은 1회용 제출 토큰 없이는 반응·공개를 받지 않음 (매크로 방지)
     form_min_sec: float = 3.0          # 화면을 연 뒤 이보다 빨리 제출하면 거절
     form_token_ttl_sec: int = 600
-    feedback_cooldown_sec: int = 30    # 같은 IP 반응 간격
-    feedback_burst_per_min: int = 3    # 1분에 이보다 많으면 burst_block_min분 차단
+    feedback_cooldown_sec: int = 30    # 같은 사람 반응 간격
+    feedback_burst_per_min: int = 3    # 같은 사람이 1분에 이보다 많으면 burst_block_min분 차단
+    feedback_ip_burst_per_min: int = 30  # 같은 IP 전체가 1분에 이보다 많으면 차단 (쿠키를 지워 가며 하는 매크로 대비)
     burst_block_min: int = 10
     feedback_ip_retention_days: int = 7  # 반응·신고에 남긴 접속 IP를 지우는 기한 (화면에는 안 나감)
     # 신고 (DECISIONS #33)
@@ -121,6 +130,15 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    def job_expires(self, created_at: datetime) -> datetime | None:
+        """작업이 지워지는 시각 (scripts/cleanup.py와 화면 expires_at이 같은 기준). 종료일 방식인데 날짜가 없으면 None."""
+        if self.retention_mode == "service_end":
+            if not self.service_end_date:
+                return None
+            end = datetime.fromisoformat(self.service_end_date).replace(tzinfo=timezone(timedelta(hours=9)))
+            return end + timedelta(days=1)  # 종료일 하루를 다 쓰고 다음 날 (한국 시간 0시) 지운다
+        return created_at + timedelta(days=self.retention_days)
 
     @property
     def auth_origin_list(self) -> list[str]:

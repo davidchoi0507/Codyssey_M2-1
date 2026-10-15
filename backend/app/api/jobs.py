@@ -5,12 +5,15 @@ import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from app.api.auth import link_job
-from app.api.deps import current_user, file_url, job_files, runner, settings
+from app.api.deps import current_user, file_url, job_files, person_key, runner, settings
 from app.core.config import Settings
 from app.core.errors import AppError
-from app.pipeline.intake import create_job
+from app.analysis.audio_io import check_magic
+from app.pipeline import community, reports
+from app.pipeline.intake import ALLOWED_EXT, create_job
 from app.pipeline.bands import find_band
 from app.pipeline.limits import check_daily_limits, client_ip, record_client
 from app.pipeline.jobfiles import JobFiles
@@ -48,12 +51,16 @@ async def create(
     consent_external_ai: bool = Form(description="음원의 Gemini 전송·무료 티어 학습 가능성 고지 — 필수"),
     consent_showcase: bool = Form(False, description="발표 사용 동의 — 선택"),
     consent_version: str = Form(max_length=20, description="동의 문구 버전"),
+    confirm_original: bool = Form(False, description="(10/16 추가) 409 KNOWN_SONG_MATCH 뒤 '직접 만든 곡이 맞다'고 확인하고 "
+                                  "다시 보낼 때 true"),
     x_band_code: str | None = Header(default=None, description="밴드 초대 코드 (BAND_CODE_REQUIRED=true면 필수)"),
     s: Settings = Depends(settings), r: JobRunner = Depends(runner),
 ) -> JobCreated:
     client = client_ip(request)
+    user = current_user(request)
+    who = person_key(request, user)
     band = find_band(x_band_code, client)
-    check_daily_limits(s, client, band)  # 파일을 받기 전에
+    check_daily_limits(s, client, band, who)  # 파일을 받기 전에
     s.jobs_dir.mkdir(parents=True, exist_ok=True)
     limit = s.max_upload_mb * 1024 * 1024
     with tempfile.TemporaryDirectory(dir=s.data_dir) as tmp:
@@ -68,17 +75,31 @@ async def create(
                     raise AppError("UPLOAD_TOO_LARGE", f"{s.max_upload_mb}MB 이하 파일만 올릴 수 있어요.", False,
                                    http_status=413)
                 out.write(chunk)
-        dup_key = (band["code"] if band else client, digest.hexdigest(), title.strip(), artist.strip())
+        dup_key = (band["code"] if band else who, digest.hexdigest(), title.strip(), artist.strip())
         if (dup := _find_duplicate(dup_key)) and JobFiles(s.jobs_dir, dup).status()["stage"] != "failed":
             return JobCreated(job_id=dup, status_url=f"/jobs/{dup}", duplicate=True)
+        # 남의 곡 먼저 거르기 (10/16): AI 분석(Gemini 하루 한도) 전에 소리 지문으로 — 커뮤니티에 이미 공개된 곡과 같은
+        # 녹음이면 거절, 알려진 곡(AcoustID)과 비슷하면 '직접 만든 곡이 맞아요' 확인을 받아야 분석 시작. 몇 초 걸림.
+        ext = Path(file.filename or "").suffix.lower()
+        known = None
+        if ext in ALLOWED_EXT:
+            check_magic(tmp_path, ext)
+            _, known = await run_in_threadpool(community.check_copy, s, tmp_path, ext,
+                                               user_id=user["user_id"] if user else None, who=who,
+                                               confirm_original=confirm_original)
         song = {"title": title, "artist": artist, "genre": genre, "description": description, "lyrics": lyrics}
         consent = {"consent_original": consent_original, "consent_privacy": consent_privacy,
                    "consent_external_ai": consent_external_ai, "consent_showcase": consent_showcase,
                    "consent_version": consent_version}
         jf = create_job(s, tmp_path, filename=file.filename or "", song=song, consent=consent, source="api")
         _recent_uploads[dup_key] = (jf.job_id, time.monotonic())
-    record_client(jf.job_id, client, band)
-    link_job(jf.job_id, current_user(request))  # 로그인했으면 '내 곡'에 (선택)
+    if known:  # 알려진 곡과 비슷하지만 올린 사람이 직접 만든 곡이라고 확인함 — 공개할 때 다시 묻지 않게 남긴다
+        jf.write_json(jf.root / community.COPY_CHECK, {"known": known, "confirmed": True})
+        jf.event("known_song_confirmed", score=known["score"])
+        reports.notify(f"알려진 곡과 비슷하지만 올린 사람이 자작곡이라고 확인하고 분석을 시작했어요: '{artist} — {title}' ≈ "
+                       f"'{known['artist']} — {known['title']}' (점수 {known['score']}, 작업 {jf.job_id})")
+    record_client(jf.job_id, client, band, who)
+    link_job(jf.job_id, user)  # 로그인했으면 '내 곡'에 (선택)
     r.start_analysis(jf)
     return JobCreated(job_id=jf.job_id, status_url=f"/jobs/{jf.job_id}")
 

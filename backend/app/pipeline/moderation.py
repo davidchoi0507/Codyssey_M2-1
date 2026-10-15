@@ -116,6 +116,23 @@ def check_rate(s: Settings, client: str) -> None:
     q.append(now)
 
 
+def check_ip_burst(s: Settings, client: str) -> None:
+    """같은 IP 전체가 1분에 feedback_ip_burst_per_min번 넘게 남기면 차단 — 사람별 제한(check_rate)은 쿠키를 지우면
+    피할 수 있어서 IP에도 넉넉한 상한을 둔다 (교실 와이파이에서 여럿이 써도 안 걸릴 만큼)."""
+    now = time.monotonic()
+    key = f"ipburst:{client}"
+    if _blocked_until.get(key, 0) > now:
+        left = int((_blocked_until[key] - now) // 60) + 1
+        raise Rejected("TOO_FAST", f"이 인터넷 연결에서 짧은 시간에 너무 많이 남겼어요. {left}분 뒤에 다시 남겨 주세요.", 429)
+    q = _recent[key]
+    while q and now - q[0] > 60:
+        q.popleft()
+    if len(q) >= s.feedback_ip_burst_per_min:
+        _blocked_until[key] = now + s.burst_block_min * 60
+        raise Rejected("TOO_FAST", f"이 인터넷 연결에서 짧은 시간에 너무 많이 남겼어요. {s.burst_block_min}분 뒤에 다시 남겨 주세요.", 429)
+    q.append(now)
+
+
 def reset_memory() -> None:
     """테스트·재시작용."""
     _recent.clear()
@@ -125,15 +142,15 @@ def reset_memory() -> None:
 
 # ---- 같은 말 반복 ----
 
-def check_duplicate(client: str, comment: str | None) -> None:
-    """같은 접속이 하루 안에 같은 한마디(정규화 기준)를 다시 쓰면 거절."""
+def check_duplicate(who: str, comment: str | None) -> None:
+    """같은 사람(deps.person_key)이 하루 안에 같은 한마디(정규화 기준)를 다시 쓰면 거절."""
     if not comment:
         return
     since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
     sq = _squash(comment)
     with db.connect() as conn:
-        rows = conn.execute("SELECT comment FROM feedback WHERE client = ? AND ts >= ? AND comment IS NOT NULL",
-                            (client, since)).fetchall()
+        rows = conn.execute("SELECT comment FROM feedback WHERE who = ? AND ts >= ? AND comment IS NOT NULL",
+                            (who, since)).fetchall()
     if any(_squash(r["comment"]) == sq for r in rows):
         raise Rejected("TEXT_DUPLICATE", "같은 내용을 이미 남겼어요. 다른 곡에는 그 곡에 맞는 한마디를 남겨 주세요.")
 

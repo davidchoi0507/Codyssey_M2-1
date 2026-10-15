@@ -1,4 +1,5 @@
-"""보관 기간(RETENTION_DAYS, 기본 7일)이 지난 작업 삭제 — 서버에서 매일 실행 (systemd 타이머).
+"""보관 기간이 지난 작업 삭제 — 서버에서 매일 실행 (systemd 타이머).
+RETENTION_MODE=days면 업로드 RETENTION_DAYS일(기본 7일) 뒤, service_end면 SERVICE_END_DATE 다음 날 일괄 (10/16, 동의서 v1.6).
 
   python -m scripts.cleanup            # 삭제
   python -m scripts.cleanup --dry-run  # 지울 대상만 보기
@@ -25,21 +26,25 @@ def main() -> int:
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
     s = get_settings()
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=s.retention_days)).isoformat(timespec="seconds")
+    now = datetime.now(timezone.utc)
     keep = {j.strip() for j in s.keep_job_ids.split(",") if j.strip()}
     with db.connect() as conn:
-        old = [r["job_id"] for r in conn.execute("SELECT job_id FROM jobs WHERE created_at < ?", (cutoff,))
-               if r["job_id"] not in keep]
+        rows = conn.execute("SELECT job_id, created_at FROM jobs").fetchall()
+    old = [r["job_id"] for r in rows if r["job_id"] not in keep
+           and (exp := s.job_expires(datetime.fromisoformat(r["created_at"]))) is not None and exp <= now]
     # DB에 없는 오래된 폴더(가져오기 전 실패 등)도 정리
     orphans = []
     if s.jobs_dir.exists():
         with db.connect() as conn:
             known = {r["job_id"] for r in conn.execute("SELECT job_id FROM jobs")}
-        limit = datetime.now().timestamp() - s.retention_days * 86400
+        def expired(d) -> bool:
+            exp = s.job_expires(datetime.fromtimestamp(d.stat().st_mtime, timezone.utc))
+            return exp is not None and exp <= now
         orphans = [d.name for d in s.jobs_dir.iterdir()
-                   if d.is_dir() and d.name not in known and d.name not in keep and d.stat().st_mtime < limit]
+                   if d.is_dir() and d.name not in known and d.name not in keep and expired(d)]
 
-    print(f"보관 {s.retention_days}일 지난 작업 {len(old)}건, DB에 없는 오래된 폴더 {len(orphans)}건")
+    rule = f"종료일 {s.service_end_date} 다음 날 일괄" if s.retention_mode == "service_end" else f"{s.retention_days}일"
+    print(f"보관({rule}) 지난 작업 {len(old)}건, DB에 없는 오래된 폴더 {len(orphans)}건")
     if args.dry_run:
         for j in old + orphans:
             print(" ", j)

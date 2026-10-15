@@ -95,6 +95,45 @@ def _swap_renders(jf: JobFiles, prev_key: str, new_key: str) -> None:
         shutil.rmtree(cached, ignore_errors=True)
 
 
+def forget_titled_renders(jf: JobFiles) -> bool:
+    """(10/16) 제목·아티스트가 바뀌면 글자가 박힌 결과(숏폼·채널 이미지·제목 커버)를 지워 다시 그리게 한다.
+    Canvas는 글자가 없어 그대로 둔다. 커버를 이미 골라 렌더링한 적이 있으면 True (그때만 다시 렌더링하면 된다)."""
+    for p in [*(jf.root / "video").glob("short_*.mp4"), *(jf.root / "channels").glob("*/image_*.png"),
+              *(jf.root / "covers").glob("*_title.png")]:
+        p.unlink(missing_ok=True)
+    shutil.rmtree(jf.root / "renders", ignore_errors=True)  # 예전에 고른 다른 커버의 결과 (예전 제목)
+    return jf.selected_cover.exists()
+
+
+def rename_in_texts(jf: JobFiles, old: dict, new: dict) -> int:
+    """(10/16) 채널 글·피칭 메일·에디토리얼 안의 예전 제목·아티스트를 새 이름으로 바꿔 넣는다 (AI 안 씀, 횟수 안 씀).
+    old·new: {"title", "artist"}. 바꾼 파일 수."""
+    pairs = [(old[k].strip(), new[k].strip()) for k in ("title", "artist")
+             if old.get(k) and new.get(k) and len(old[k].strip()) >= 2 and old[k].strip() != new[k].strip()]
+    if not pairs:
+        return 0
+
+    def sub(v, tag: bool = False):
+        if isinstance(v, str):
+            for a, b in pairs:
+                v = v.replace(a.replace(" ", "") if tag else a, b.replace(" ", "") if tag else b)
+            return v
+        if isinstance(v, list):
+            return [sub(x, tag) for x in v]
+        if isinstance(v, dict):
+            return {k: sub(x, tag or k in ("hashtags", "tags")) for k, x in v.items()}
+        return v
+    n = 0
+    for p in [*(jf.root / "channels").glob("*/copy_v*.json"), *(jf.root / "pitch").glob("*.json"),
+              *(jf.root / "editorial").glob("*.json")]:
+        data = jf.read_json(p)
+        new_data = sub(data)
+        if new_data != data:
+            jf.write_json(p, new_data)
+            n += 1
+    return n
+
+
 async def _inspect(settings: Settings, jf: JobFiles, sel: dict, cover: Path) -> None:
     """고른 커버(글자 없는 3000px)를 유통사 기준으로 검사해 둔다. 실패해도 렌더링은 계속 (검수 목록에 '직접 확인')."""
     result = await inspect_cover(settings, cover)

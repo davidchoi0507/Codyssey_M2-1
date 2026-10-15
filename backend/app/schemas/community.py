@@ -81,6 +81,11 @@ class Track(BaseModel):
     ai_usage: str = Field(default="none", description="(10/10 추가) none · tool · generated — generated면 화면에 'AI 활용' 표시")
     stats: FeedbackStats | None = Field(description="comments_public=false면 null (올린 사람 화면에는 항상 있음)")
     created_at: datetime
+    comment_count: int = Field(default=0, description="(10/16 추가) 글(한마디)이 있는 반응 수 — '💬 한마디 N개'. "
+                               "의견 비공개 곡도 수는 나감(내용은 올린 사람만)")
+    my_rating: int | None = Field(default=None, description="(10/16 추가) 지금 보는 사람이 준 별점 (없으면 null) — 별점은 1인 1개, "
+                                  "다시 남기면 바뀜")
+    my_tags: list[str] = Field(default_factory=list, description="(10/16 추가) 지금 보는 사람이 고른 태그")
 
 
 class TrackList(BaseModel):

@@ -184,6 +184,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
     fcols = {r[1] for r in conn.execute("PRAGMA table_info(feedback)")}
     if "hidden_reason" not in fcols:
         conn.execute("ALTER TABLE feedback ADD COLUMN hidden_reason TEXT")  # owner | reported | spam | operator
+    # 같은 사람 구분 (10/16): u:<계정> | a:<브라우저 익명 ID> | ip:<IP>. IP만 쓰면 같은 와이파이의 여러 사람이 한 사람이 된다
+    for table, cols_ in (("jobs", cols), ("tracks", tcols), ("feedback", fcols)):
+        if "who" not in cols_:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN who TEXT")
+            conn.execute(f"CREATE INDEX IF NOT EXISTS {table}_who ON {table}(who)")
 
 
 def import_legacy_files(jobs_dir: Path) -> int:

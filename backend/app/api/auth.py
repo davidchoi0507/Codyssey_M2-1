@@ -1,5 +1,6 @@
 """로그인·내 곡: /auth/*, /me/* (DECISIONS #34). 곡 올리는 사람만 쓰는 선택 기능."""
 import hmac
+import re
 import logging
 from datetime import datetime
 from typing import Literal
@@ -9,7 +10,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from app import db
-from app.api.deps import current_user, require_user, session_token, settings
+from app.api.deps import ANON_COOKIE, ANON_ID, current_user, require_user, session_token, settings
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import STAGE_LABELS, Stage
@@ -18,6 +19,7 @@ from app.pipeline import community as c
 from app.pipeline.jobfiles import JobFiles
 
 router = APIRouter(tags=["로그인·내 곡"])
+_JOB_ID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")  # ULID
 log = logging.getLogger(__name__)
 Provider = Literal["kakao", "google"]
 
@@ -179,6 +181,36 @@ def my_tracks(user: dict = Depends(require_user), s: Settings = Depends(settings
                     cover_url=f"/community/tracks/{t['track_id']}/cover?v={t['updated_at']}",
                     manage_url=f"/community/manage?t={t['track_id']}#key={c.owner_key(s, t['track_id'])}",
                     created_at=datetime.fromisoformat(t["created_at"])) for t in rows]
+
+
+class ClaimRequest(BaseModel):
+    job_ids: list[str] = Field(default_factory=list, max_length=100,
+                               description="이 브라우저가 기억한 작업 ID (로그인 전에 올린 것)")
+
+
+class ClaimResult(BaseModel):
+    jobs: int = Field(description="내 계정으로 옮긴 작업 수")
+    tracks: int = Field(description="내 계정으로 옮긴 공개 곡 수")
+
+
+@router.post("/me/claim", response_model=ClaimResult, summary="(10/16 추가) 로그인 전에 올린 작업·곡을 내 계정으로 가져오기",
+             description="job_ids(이 브라우저가 기억한 작업)와, 이 브라우저의 익명 ID(쿠키 aid)로 올린 작업·곡 중 아직 주인 계정이 "
+                         "없는 것을 내 계정에 연결한다. 작업 ID는 추측할 수 없는 값이라 '가진 브라우저 = 주인'으로 본다(작업 API와 같은 "
+                         "기준). 다른 계정에 이미 연결된 것은 건드리지 않는다. 그 작업으로 공개한 곡도 같이.")
+def claim(body: ClaimRequest, request: Request, user: dict = Depends(require_user)) -> ClaimResult:
+    ids = [j for j in dict.fromkeys(body.job_ids) if _JOB_ID.match(j)]
+    aid = request.cookies.get(ANON_COOKIE) or ""
+    who = f"a:{aid}" if ANON_ID.match(aid) else None
+    uid = user["user_id"]
+    with db.connect() as conn:
+        q = ",".join("?" * len(ids)) or "NULL"
+        n_jobs = conn.execute(f"UPDATE jobs SET user_id = ? WHERE user_id IS NULL AND (job_id IN ({q}) OR who = ?)",
+                              (uid, *ids, who)).rowcount
+        n_tracks = conn.execute(
+            f"UPDATE tracks SET user_id = ? WHERE user_id IS NULL AND (who = ? OR job_id IN "
+            f"(SELECT job_id FROM jobs WHERE user_id = ? AND job_id IN ({q})) OR job_id IN (SELECT job_id FROM jobs "
+            f"WHERE user_id = ? AND who = ?))", (uid, who, uid, *ids, uid, who)).rowcount
+    return ClaimResult(jobs=n_jobs, tracks=n_tracks)
 
 
 def link_job(job_id: str, user: dict | None) -> None:

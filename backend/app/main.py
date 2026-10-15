@@ -1,5 +1,6 @@
 """FastAPI 앱: 라우터 등록, CORS, 에러 형식 통일."""
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from app.api import auth, band, community, files, jobs, note, package, release, survey
+from app.api.deps import ANON_COOKIE, ANON_ID
 from app.db import import_legacy_files
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -55,9 +57,17 @@ SECURITY_HEADERS = {
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
+    # 브라우저 익명 ID (10/16, 동의서 v1.6): 로그인 없이 쓰는 사람을 구분 — 하루 한도·중복 공개·별점 1인 1개.
+    # 처음 오면 만들어 이번 요청에도 쓰고(request.state.aid) 쿠키로 돌려준다. 이름·연락처와 연결하지 않는다.
+    new_aid = None
+    if not ANON_ID.match(request.cookies.get(ANON_COOKIE) or ""):
+        new_aid = request.state.aid = secrets.token_urlsafe(16)
     response = await call_next(request)
     for k, v in SECURITY_HEADERS.items():
         response.headers.setdefault(k, v)
+    if new_aid:
+        response.set_cookie(ANON_COOKIE, new_aid, max_age=180 * 86400, httponly=True, samesite="lax", path="/",
+                            secure=settings.public_base_url.startswith("https://"))
     return response
 
 

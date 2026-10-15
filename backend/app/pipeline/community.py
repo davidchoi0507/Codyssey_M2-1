@@ -134,14 +134,20 @@ def check_public_text(title: str, artist: str, intro: str | None) -> None:
     moderation.check_text(intro, field="곡 소개", allow_links=True)
 
 
-def check_copy(s: Settings, src: Path, ext: str | None, *, user_id: str | None, client: str,
+def check_copy(s: Settings, src: Path, ext: str | None, *, user_id: str | None, who: str | None,
                confirm_original: bool) -> tuple[dict | None, dict | None]:
-    """남의 곡 막기 (#40). (지문, AcoustID가 찾은 곡). 다른 사람이 이미 올린 곡이면 거절,
-    알려진 곡과 비슷하면 올린 사람이 '직접 만든 곡이 맞다'고 다시 확인해야(confirm_original) 올라가고 운영자에게 알린다."""
+    """남의 곡 막기 (#40). (지문, AcoustID가 찾은 곡). 이미 공개된 곡과 같은 녹음이면 거절 — 내가 올린 곡이면
+    ALREADY_PUBLISHED, 다른 사람 곡이면 DUPLICATE_TRACK (10/16: 본인도 두 번 공개 안 됨, 내린 곡은 비교에서 빠짐).
+    알려진 곡과 비슷하면 올린 사람이 '직접 만든 곡이 맞다'고 다시 확인해야(confirm_original) 진행되고 운영자에게 알린다.
+    업로드(POST /jobs, 분석 전)와 공개 때 둘 다 쓴다."""
     fp = fingerprint.compute(src, ext)
     if fp is None:
         return None, None
-    if dup := fingerprint.find_duplicate(fp, user_id=user_id, client=client):
+    if dup := fingerprint.find_duplicate(fp):
+        mine = (user_id and dup["user_id"] == user_id) or (who and dup["who"] == who)
+        if mine:
+            raise AppError("ALREADY_PUBLISHED", f"이미 커뮤니티에 공개한 곡이에요 ('{dup['artist']} — {dup['title']}'). "
+                           "공개 방식을 바꾸려면 그 곡의 관리 화면이나 '내 곡'에서 바꿔 주세요.", False, http_status=409)
         reports.notify(f"이미 올라온 곡과 같은 녹음을 다른 사람이 올리려 해 막았어요: '{dup['artist']} — {dup['title']}'")
         raise AppError("DUPLICATE_TRACK", f"커뮤니티에 이미 같은 곡이 있어요 ('{dup['artist']} — {dup['title']}'). "
                        "다른 사람의 곡은 올릴 수 없어요. 내 곡인데 다른 사람이 올렸다면 그 곡을 '남의 곡' 사유로 신고해 주세요.",
@@ -149,8 +155,26 @@ def check_copy(s: Settings, src: Path, ext: str | None, *, user_id: str | None, 
     known = fingerprint.lookup_known(s, fp)
     if known and not confirm_original:
         raise AppError("KNOWN_SONG_MATCH", f"알려진 곡 '{known['artist']} — {known['title']}'과(와) 비슷해요. 직접 만든 곡이 맞다면 "
-                       "확인을 체크하고 다시 올려 주세요. 다른 사람의 곡이면 올릴 수 없어요.", False, http_status=409)
+                       "확인하고 다시 올려 주세요. 다른 사람의 곡이면 올릴 수 없어요.", False, http_status=409)
     return fp, known
+
+
+def _check_publish_limit(s: Settings, client: str, who: str | None) -> None:
+    """하루 공개 수: 사람별 + 같은 IP 전체 상한 (10/16 — IP만 세면 같은 와이파이의 여러 사람이 한도를 같이 쓴다)."""
+    since = _today_start_utc()
+    with db.connect() as conn:
+        by_ip = conn.execute("SELECT count(*) FROM tracks WHERE client = ? AND created_at >= ?", (client, since)).fetchone()[0]
+        mine = conn.execute("SELECT count(*) FROM tracks WHERE who = ? AND created_at >= ?",
+                            (who, since)).fetchone()[0] if who else by_ip
+    if mine >= s.community_daily_publish_per_client:
+        raise AppError("DAILY_LIMIT", f"하루에 {s.community_daily_publish_per_client}곡까지 공개할 수 있어요.", False,
+                       http_status=429)
+    if who and by_ip >= s.community_daily_publish_per_ip:
+        raise AppError("DAILY_LIMIT", "이 인터넷 연결에서 오늘 공개할 수 있는 곡이 모두 찼어요. 내일 다시 와 주세요.", False,
+                       http_status=429)
+
+
+COPY_CHECK = "copy_check.json"  # 업로드 때 한 남의 곡 검사 결과 (작업 폴더) — 공개 때 같은 확인을 또 묻지 않게
 
 
 def _after_publish(track_id: str, fp: dict | None, known: dict | None, title: str, artist: str) -> None:
@@ -165,7 +189,7 @@ def _after_publish(track_id: str, fp: dict | None, known: dict | None, title: st
 
 def publish(s: Settings, jf: JobFiles, *, listen_mode: str, comments_public: bool, intro: str | None,
             client: str, band_code: str | None, user_id: str | None = None, ai_usage: str | None = None,
-            confirm_original: bool = False) -> dict:
+            confirm_original: bool = False, who: str | None = None) -> dict:
     """작업의 곡을 공개한다. 이미 올렸으면 설정만 바꾼다 (공개 방식이 바뀌면 음원을 다시 만든다)."""
     song = jf.read_json(jf.song)
     check_public_text(song.get("title", ""), song.get("artist", ""),
@@ -173,14 +197,12 @@ def publish(s: Settings, jf: JobFiles, *, listen_mode: str, comments_public: boo
     if existing := track_for_job(jf.job_id):
         return update(s, existing["track_id"], listen_mode=listen_mode, comments_public=comments_public, intro=intro,
                       jf=jf)
-    with db.connect() as conn:
-        today = conn.execute("SELECT count(*) FROM tracks WHERE client = ? AND created_at >= ?",
-                             (client, _today_start_utc())).fetchone()[0]
-    if today >= s.community_daily_publish_per_client:
-        raise AppError("DAILY_LIMIT", f"하루에 {s.community_daily_publish_per_client}곡까지 공개할 수 있어요.", False,
-                       http_status=429)
+    _check_publish_limit(s, client, who)
     src = jf.find_original()
-    fp, known = check_copy(s, src, None, user_id=user_id, client=client, confirm_original=confirm_original) if src else (None, None)
+    prior = jf.root / COPY_CHECK
+    if not confirm_original and prior.exists() and json.loads(prior.read_text(encoding="utf-8")).get("confirmed"):
+        confirm_original = True  # 업로드 때 '직접 만든 곡이 맞아요'를 이미 눌렀다
+    fp, known = check_copy(s, src, None, user_id=user_id, who=who, confirm_original=confirm_original) if src else (None, None)
     if ai_usage is None:  # 권리 자가진단에 답했으면 그 값
         from app.pipeline import rights
         ai_usage = rights.load(jf).get("ai_audio") or "none"
@@ -197,13 +219,13 @@ def publish(s: Settings, jf: JobFiles, *, listen_mode: str, comments_public: boo
         with db.connect() as conn:
             conn.execute(
                 "INSERT INTO tracks (track_id, job_id, title, artist, genre, intro, listen_mode, clip_start, clip_sec, "
-                "comments_public, colors, moods, band_code, client, consent, created_at, updated_at, user_id, ai_usage) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "comments_public, colors, moods, band_code, client, consent, created_at, updated_at, user_id, ai_usage, who) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (track_id, jf.job_id, song.get("title", ""), song.get("artist", ""), song.get("genre") or "",
                  (intro if intro is not None else song.get("description")) or "", listen_mode, clip_start, clip_sec,
                  int(comments_public), json.dumps(note.get("colors", []) if note else []),
                  json.dumps(note.get("mood_keywords", []) if note else [], ensure_ascii=False),
-                 band_code, client, json.dumps(consent, ensure_ascii=False), now, now, user_id, ai_usage))
+                 band_code, client, json.dumps(consent, ensure_ascii=False), now, now, user_id, ai_usage, who))
     except Exception:
         shutil.rmtree(tdir, ignore_errors=True)
         raise
@@ -253,7 +275,10 @@ def remove(s: Settings, track_id: str) -> None:
 # ---- 반응 ----
 
 def add_feedback(s: Settings, track_id: str, *, rating: int | None, tags: list[str], comment: str | None,
-                 nickname: str | None, client: str, form_token: str | None = None, honeypot: str | None = None) -> dict:
+                 nickname: str | None, client: str, who: str, form_token: str | None = None,
+                 honeypot: str | None = None) -> dict:
+    """반응 남기기. (10/16) 별점·태그는 한 사람(who)이 한 곡에 하나 — 다시 남기면 앞의 별점·태그를 지우고 새 것으로 바꾼다.
+    한마디는 여러 개 남길 수 있다(한 곡 하루 feedback_daily_per_client_track개). client(IP)는 도배 막기에만."""
     get_track(track_id)
     comment = (comment or "").strip() or None
     nickname = (nickname or "").strip() or None
@@ -265,23 +290,50 @@ def add_feedback(s: Settings, track_id: str, *, rating: int | None, tags: list[s
     moderation.check_text(nickname, field="닉네임")
     moderation.check_text(comment, field="한마디")
     moderation.check_meaningful(comment)
-    moderation.check_duplicate(client, comment)
-    moderation.check_rate(s, client)
+    moderation.check_duplicate(who, comment)
+    if comment:  # 별점·태그만 바꾸는 건 간격 제한 없이 (같은 값으로 덮어쓰기라 도배가 안 됨)
+        moderation.check_rate(s, who)
+    moderation.check_ip_burst(s, client)
     since = _today_start_utc()
     with db.connect() as conn:
-        mine = conn.execute("SELECT count(*) FROM feedback WHERE client = ? AND ts >= ?", (client, since)).fetchone()[0]
-        mine_here = conn.execute("SELECT count(*) FROM feedback WHERE client = ? AND track_id = ? AND ts >= ?",
-                                 (client, track_id, since)).fetchone()[0]
-        if mine_here >= s.feedback_daily_per_client_track or mine >= s.feedback_daily_per_client:
-            raise AppError("FEEDBACK_LIMIT", "오늘은 반응을 충분히 남겼어요. 내일 다시 들려 주세요.", False, http_status=429)
-        cur = conn.execute("INSERT INTO feedback (track_id, ts, nickname, rating, tags, comment, client) "
-                           "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        by_ip = conn.execute("SELECT count(*) FROM feedback WHERE client = ? AND ts >= ?", (client, since)).fetchone()[0]
+        if by_ip >= s.feedback_daily_per_ip:
+            raise AppError("FEEDBACK_LIMIT", "이 인터넷 연결에서 오늘 남길 수 있는 반응이 모두 찼어요. 내일 다시 들려 주세요.",
+                           False, http_status=429)
+        if comment:
+            mine = conn.execute("SELECT count(*) FROM feedback WHERE who = ? AND ts >= ? AND comment IS NOT NULL",
+                                (who, since)).fetchone()[0]
+            mine_here = conn.execute("SELECT count(*) FROM feedback WHERE who = ? AND track_id = ? AND ts >= ? "
+                                     "AND comment IS NOT NULL", (who, track_id, since)).fetchone()[0]
+            if mine_here >= s.feedback_daily_per_client_track or mine >= s.feedback_daily_per_client:
+                raise AppError("FEEDBACK_LIMIT", "오늘은 한마디를 충분히 남겼어요. 내일 다시 들려 주세요. (별점은 바꿀 수 있어요)",
+                               False, http_status=429)
+        # 보낸 것만 바꾼다: 별점을 보냈으면 앞의 별점을, 태그를 보냈으면 앞의 태그를 비우고, 아무것도 안 남은 줄은 지운다
+        if rating is not None:
+            conn.execute("UPDATE feedback SET rating = NULL WHERE track_id = ? AND who = ?", (track_id, who))
+        if tags:
+            conn.execute("UPDATE feedback SET tags = '[]' WHERE track_id = ? AND who = ?", (track_id, who))
+        if rating is not None or tags:
+            conn.execute("DELETE FROM feedback WHERE track_id = ? AND who = ? AND rating IS NULL AND tags = '[]' "
+                         "AND comment IS NULL", (track_id, who))
+        cur = conn.execute("INSERT INTO feedback (track_id, ts, nickname, rating, tags, comment, client, who) "
+                           "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                            (track_id, now_iso(), nickname, rating,
-                            json.dumps(tags, ensure_ascii=False), comment, client))
+                            json.dumps(tags, ensure_ascii=False), comment, client, who))
         fid = cur.lastrowid
     if suspects := moderation.spread_suspects(comment):
         reports.auto_hide_spam(suspects, track_id)
     return next(r for r in feedback_rows(track_id, include_hidden=True) if r["id"] == fid)
+
+
+def my_reaction(track_id: str, who: str | None) -> dict | None:
+    """이 사람이 이 곡에 남긴 별점·태그 {rating, tags} (없으면 None) — 화면에서 '내 별점'을 칠해 두기."""
+    if not who:
+        return None
+    with db.connect() as conn:
+        r = conn.execute("SELECT rating, tags FROM feedback WHERE track_id = ? AND who = ? AND (rating IS NOT NULL "
+                         "OR tags != '[]') ORDER BY id DESC LIMIT 1", (track_id, who)).fetchone()
+    return {"rating": r["rating"], "tags": json.loads(r["tags"])} if r else None
 
 
 def hide_feedback(track_id: str, feedback_id: int, hidden: bool = True) -> None:
@@ -411,7 +463,7 @@ def _title_colors(title: str) -> list[str]:
 def publish_direct(s: Settings, src: Path, *, filename: str, title: str, artist: str, genre: str, intro: str,
                    listen_mode: str, clip_start: float | None, comments_public: bool, client: str,
                    user_id: str | None, image: bytes | None, ai_usage: str = "none",
-                   confirm_original: bool = False) -> dict:
+                   confirm_original: bool = False, who: str | None = None) -> dict:
     """업로드한 음원을 AI 분석 없이 바로 공개. 원본은 남기지 않는다 (공개용 mp3·커버만 커뮤니티 폴더에)."""
     from app.analysis.audio_io import check_magic, probe_duration
     from app.pipeline.intake import ALLOWED_EXT
@@ -426,13 +478,8 @@ def publish_direct(s: Settings, src: Path, *, filename: str, title: str, artist:
         raise AppError("TOO_LONG", f"{s.max_duration_sec // 60}분 이하 곡만 올릴 수 있어요.", False)
     if round(duration, 1) < s.min_duration_sec:
         raise AppError("TOO_SHORT", f"{s.min_duration_sec}초 이상인 곡만 올릴 수 있어요.", False)
-    with db.connect() as conn:
-        today = conn.execute("SELECT count(*) FROM tracks WHERE client = ? AND created_at >= ?",
-                             (client, _today_start_utc())).fetchone()[0]
-    if today >= s.community_daily_publish_per_client:
-        raise AppError("DAILY_LIMIT", f"하루에 {s.community_daily_publish_per_client}곡까지 공개할 수 있어요.", False,
-                       http_status=429)
-    fp, known = check_copy(s, src, ext, user_id=user_id, client=client, confirm_original=confirm_original)
+    _check_publish_limit(s, client, who)
+    fp, known = check_copy(s, src, ext, user_id=user_id, who=who, confirm_original=confirm_original)
     track_id = new_job_id()
     tdir = track_dir(s, track_id)
     sec = s.highlight_sec
@@ -455,11 +502,11 @@ def publish_direct(s: Settings, src: Path, *, filename: str, title: str, artist:
         with db.connect() as conn:
             conn.execute(
                 "INSERT INTO tracks (track_id, job_id, title, artist, genre, intro, listen_mode, clip_start, clip_sec, "
-                "comments_public, colors, moods, band_code, client, consent, created_at, updated_at, user_id, source, ai_usage) "
-                "VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', NULL, ?, ?, ?, ?, ?, 'direct', ?)",
+                "comments_public, colors, moods, band_code, client, consent, created_at, updated_at, user_id, source, ai_usage, who) "
+                "VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', NULL, ?, ?, ?, ?, ?, 'direct', ?, ?)",
                 (track_id, title.strip(), artist.strip(), genre.strip(), intro.strip(), listen_mode, clip_start, clip_sec,
                  int(comments_public), json.dumps(colors), client, json.dumps(consent, ensure_ascii=False), now, now,
-                 user_id, ai_usage))
+                 user_id, ai_usage, who))
     except Exception:
         shutil.rmtree(tdir, ignore_errors=True)
         raise

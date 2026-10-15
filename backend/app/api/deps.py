@@ -85,6 +85,22 @@ def current_user(request: Request) -> dict | None:
     return user_for_token(session_token(request))
 
 
+ANON_COOKIE = "aid"
+ANON_ID = re.compile(r"^[A-Za-z0-9_-]{16,40}$")
+
+
+def person_key(request: Request, user: dict | None = None) -> str:
+    """같은 사람 구분 (10/16): 로그인했으면 계정, 아니면 브라우저 익명 ID(쿠키 aid — main.py가 처음 접속 때 발급),
+    둘 다 없으면 접속 IP. IP만 쓰면 교실처럼 한 와이파이를 쓰는 여러 사람이 한 사람이 된다."""
+    user = user if user is not None else current_user(request)
+    if user:
+        return f"u:{user['user_id']}"
+    aid = getattr(request.state, "aid", None) or request.cookies.get(ANON_COOKIE)
+    if aid and ANON_ID.match(aid):
+        return f"a:{aid}"
+    return f"ip:{client_ip(request)}"
+
+
 def require_user(request: Request) -> dict:
     user = current_user(request)
     if user is None:

@@ -21,11 +21,12 @@ VIDEO_CHANNELS = ("tiktok", "instagram")  # 숏폼(9:16)을 올리는 채널 —
 
 
 def expires_at(job_id: str, created_at: str) -> datetime | None:
-    """7일 삭제(scripts/cleanup.py)와 같은 기준. 삭제에서 빼둔 작업(KEEP_JOB_IDS)은 None."""
+    """작업 삭제(scripts/cleanup.py)와 같은 기준 — 업로드 N일 뒤 또는 서비스 종료일 다음 날(RETENTION_MODE).
+    삭제에서 빼둔 작업(KEEP_JOB_IDS)은 None."""
     s = get_settings()
     if job_id in {j.strip() for j in s.keep_job_ids.split(",")}:
         return None
-    return datetime.fromisoformat(created_at) + timedelta(days=s.retention_days)
+    return s.job_expires(datetime.fromisoformat(created_at))
 
 
 def job_status(jf: JobFiles, queue_position: int | None = None,

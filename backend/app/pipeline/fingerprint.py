@@ -103,18 +103,17 @@ def best_ber(a: list[int], b: list[int]) -> float:
     return best
 
 
-def find_duplicate(fp: dict, *, user_id: str | None, client: str) -> dict | None:
-    """공개 중인 다른 사람의 곡 가운데 같은 녹음이 있으면 그 곡 {track_id, title, artist, ber}."""
+def find_duplicate(fp: dict) -> dict | None:
+    """공개 중인 곡 가운데 같은 녹음이 있으면 그 곡 {track_id, title, artist, user_id, who, ber}.
+    (10/16) 올린 사람이 같아도 찾는다 — 같은 곡을 두 번 공개하지 않게. 누구 곡인지는 부르는 쪽이 판단한다."""
     with db.connect() as conn:
-        rows = conn.execute("SELECT f.track_id, f.fp, t.title, t.artist, t.user_id, t.client FROM track_fingerprints f "
+        rows = conn.execute("SELECT f.track_id, f.fp, t.title, t.artist, t.user_id, t.who FROM track_fingerprints f "
                             "JOIN tracks t ON t.track_id = f.track_id WHERE t.status IN ('live', 'reported')").fetchall()
     for r in rows:
-        same_owner = (user_id and r["user_id"] == user_id) or (client and r["client"] == client)
-        if same_owner:
-            continue
         ber = best_ber(fp["raw"], json.loads(r["fp"]))
         if ber < MATCH_BER:
-            return {"track_id": r["track_id"], "title": r["title"], "artist": r["artist"], "ber": round(ber, 3)}
+            return {"track_id": r["track_id"], "title": r["title"], "artist": r["artist"], "user_id": r["user_id"],
+                    "who": r["who"], "ber": round(ber, 3)}
     return None
 
 
