@@ -49,7 +49,8 @@ export default function App() {
       api.getMe()
         .then(setUser)
         .catch(() => tokenStorage.clear());
-    } else if (tokenStorage.get()) {
+    } else {
+      // 서버와 같은 주소(api.201.n-e.kr/app/)에서는 #session 없이 로그인 쿠키만 온다 → 토큰이 없어도 물어본다
       api.getMe()
         .then(setUser)
         .catch(() => tokenStorage.clear());
