@@ -197,7 +197,7 @@ export const api = {
 
   // 로그인 뒤 next 주소로 돌아오며 #session=토큰 이 붙는다 (App.jsx 에서 저장)
   getLoginUrl: (provider = 'kakao', redirectUri) => {
-    const nextParam = encodeURIComponent(redirectUri || window.location.origin);
+    const nextParam = encodeURIComponent(redirectUri || window.location.origin + import.meta.env.BASE_URL);
     return `${API_BASE}/auth/${provider}/login?next=${nextParam}`;
   },
 };
