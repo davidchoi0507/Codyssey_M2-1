@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>체험 기록 · 운영자</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+/* 운영자 페이지 — 체험 기록·설문 요약 (app/api/admin.py). 색은 /studio 와 같은 토큰 */
+:root {
+  --bg: #f7f5f1; --surface: #ffffff; --surface-2: #f1eee8; --ink: #17161a; --sub: #6a6870; --line: #e6e2da;
+  --accent: #ff5a36; --accent-ink: #ffffff; --accent-soft: #ffe9e3; --ok: #1a9d5b; --fail: #d9342b; --fail-soft: #fde7e5;
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111114; --surface: #1b1b20; --surface-2: #24242b; --ink: #f2f1f4; --sub: #a09fa8; --line: #2f2f37;
+    --accent: #ff7a5c; --accent-soft: #3a211b; --ok: #4fd18e; --fail: #ff7068; --fail-soft: #3d1c1a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.6 Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; letter-spacing: -.01em; }
+button, input { font: inherit; color: inherit; }
+h1, h2, h3 { letter-spacing: -.03em; line-height: 1.3; margin: 0; }
+main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 80px; }
+@media (max-width: 720px) { main { padding: 20px 16px 64px; } }
+header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+header h1 { font-size: 24px; }
+header p { margin: 0; color: var(--sub); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
+.bar-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.bar-form label { display: grid; gap: 4px; font-size: 12px; color: var(--sub); font-weight: 600; }
+.bar-form input { height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); min-width: 0; }
+.bar-form input[type=password] { width: 260px; max-width: 100%; }
+.btn { height: 38px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2);
+  font-weight: 700; cursor: pointer; white-space: nowrap; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn:disabled { opacity: .5; cursor: default; }
+.spacer { flex: 1; }
+.msg { margin-top: 10px; color: var(--sub); }
+.msg.err { color: var(--fail); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 16px 0; }
+.kpi .v { font-size: 26px; font-weight: 800; letter-spacing: -.03em; }
+.kpi .l { color: var(--sub); font-size: 12px; font-weight: 600; }
+.kpi .s { color: var(--sub); font-size: 12px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+@media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
+.card h2 { font-size: 16px; margin-bottom: 12px; }
+.card h3 { font-size: 14px; margin: 14px 0 8px; }
+.hint { color: var(--sub); font-size: 12px; margin: -6px 0 10px; }
+.bars { display: grid; gap: 6px; }
+.bar { display: grid; grid-template-columns: 130px 1fr 74px; gap: 10px; align-items: center; }
+.bar .name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .track { height: 10px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.bar .fill { height: 100%; background: var(--accent); border-radius: 99px; }
+.bar .num { font-variant-numeric: tabular-nums; text-align: right; color: var(--sub); font-size: 12px; }
+.q { padding: 12px 0; border-top: 1px solid var(--line); }
+.q:first-of-type { border-top: 0; padding-top: 0; }
+.q .title { font-weight: 700; margin-bottom: 8px; }
+.q .avg { color: var(--accent); font-weight: 800; margin-left: 6px; }
+.answers { margin: 0; padding-left: 18px; }
+.answers li { margin: 4px 0; white-space: pre-wrap; }
+.answers small { color: var(--sub); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--sub); font-weight: 600; font-size: 12px; white-space: nowrap; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table-wrap { overflow-x: auto; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--surface-2); font-size: 12px; margin: 1px 2px 1px 0; }
+.chip.ok { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.chip.fail { background: var(--fail-soft); color: var(--fail); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+details summary { cursor: pointer; color: var(--sub); }
+.empty { color: var(--sub); padding: 12px 0; }
+.matrix td, .matrix th { padding: 6px 8px; }
+#out[hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>체험 기록</h1>
+    <p>자동 사용 기록 + 마지막 설문 (발매 준비 작업 하나 또는 바로 공개한 곡 하나 = 체험 1건)</p>
+  </header>
+
+  <section class="card">
+    <form class="bar-form" id="form">
+      <label>운영자 키<input type="password" id="key" autocomplete="current-password" required></label>
+      <label>이 날짜부터 (비우면 전체)<input type="date" id="since"></label>
+      <button class="btn primary" type="submit">불러오기</button>
+      <span class="spacer"></span>
+      <button class="btn" type="button" id="dl-csv" disabled>CSV 받기</button>
+      <button class="btn" type="button" id="dl-json" disabled>JSON 받기</button>
+    </form>
+    <div class="msg" id="msg">운영자 키를 넣고 불러오기를 눌러 주세요. 키는 이 탭을 닫으면 잊어요.</div>
+  </section>
+
+  <div id="out" hidden>
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2">
+      <section class="card"><h2>발매 준비 — 어디까지 갔나</h2><p class="hint">각 단계까지 간 작업 수 / 전체 발매 준비 작업</p><div class="bars" id="funnel"></div></section>
+      <section class="card"><h2>쓴 기능</h2><p class="hint">한 번이라도 쓴 작업 수 / 전체 발매 준비 작업</p><div class="bars" id="features"></div></section>
+    </div>
+    <section class="card" style="margin-bottom:12px"><h2>마지막 설문</h2><div id="survey"></div></section>
+    <section class="card"><h2>체험 목록</h2><div class="table-wrap"><table id="rows"></table></div></section>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pct = (n, t) => (t ? Math.round((100 * n) / t) : 0);
+const REACH = { uploaded: '업로드', note_ready: 'A&R 노트 받음', note_accepted: '노트 수락', cover_selected: '커버 선택',
+  rendered: '결과물 완성', downloaded: 'ZIP·시트 받음', published: '바로 공개' };
+
+try { $('key').value = sessionStorage.getItem('admin_key') || ''; } catch (e) {}
+
+function query() {
+  const s = $('since').value;
+  return s ? `?since=${encodeURIComponent(s)}` : '';
+}
+
+async function call(path) {
+  const res = await fetch(path + query(), { headers: { 'X-Admin-Key': $('key').value }, cache: 'no-store' });
+  if (!res.ok) {
+    let m = `서버 오류 (${res.status})`;
+    try { m = (await res.json()).message || m; } catch (e) {}
+    throw new Error(m);
+  }
+  return res;
+}
+
+function bars(items, total) {
+  if (!items.length) return '<div class="empty">아직 없어요</div>';
+  return items.map((x) => `<div class="bar"><span class="name" title="${esc(x.label)}">${esc(x.label)}</span>
+    <span class="track"><span class="fill" style="width:${pct(x.n, total)}%"></span></span>
+    <span class="num">${x.n}/${total} · ${pct(x.n, total)}%</span></div>`).join('');
+}
+
+function kpi(label, value, sub = '') {
+  return `<div class="card kpi"><div class="l">${esc(label)}</div><div class="v">${esc(value)}</div><div class="s">${esc(sub)}</div></div>`;
+}
+
+function renderSurvey(sm) {
+  const qs = sm.questions;
+  if (!sm.survey_answered) return '<div class="empty">아직 설문 응답이 없어요</div>';
+  return qs.map((q) => {
+    let body;
+    if (!q.n) body = '<div class="empty">응답 없음</div>';
+    else if (q.type === 'choice') body = `<div class="bars">${bars(q.counts, q.n)}</div>`;
+    else if (q.type === 'matrix') {
+      const heads = q.rows[0].counts.map((c) => `<th>${esc(c.label)}</th>`).join('');
+      body = `<div class="table-wrap"><table class="matrix"><tr><th></th>${heads}</tr>${q.rows.map((r) =>
+        `<tr><td>${esc(r.label)}</td>${r.counts.map((c) => `<td class="num">${c.n || ''}</td>`).join('')}</tr>`).join('')}</table></div>`;
+    } else body = `<ul class="answers">${q.answers.map((a) => `<li>${esc(a.text)} <small class="mono">${esc(a.id)}</small></li>`).join('')}</ul>`;
+    const avg = q.average != null ? `<span class="avg">평균 ${q.average}/5</span>` : '';
+    return `<div class="q"><div class="title">${esc(q.question)} ${avg} <small style="color:var(--sub);font-weight:500">응답 ${q.n}</small></div>${body}</div>`;
+  }).join('');
+}
+
+function renderRows(rows) {
+  if (!rows.length) return '<tr><td class="empty">체험이 없어요</td></tr>';
+  const head = '<tr><th>시작</th><th>종류</th><th>어디까지</th><th>쓴 기능</th><th>실패</th><th>노트까지</th><th>공개·반응</th><th>설문</th><th>ID</th></tr>';
+  return head + rows.slice().reverse().map((r) => {
+    const t = r.track;
+    const feats = (r.features || []).map((f) => `<span class="chip">${esc(f)}</span>`).join('');
+    const pub = t ? `반응 ${t.reactions} · 재생 ${t.plays}` : '';
+    const sv = r.survey ? `<details><summary><span class="chip ok">응답</span></summary><pre class="mono" style="white-space:pre-wrap;margin:6px 0 0">${esc(JSON.stringify(r.survey, null, 1))}</pre></details>` : '';
+    return `<tr><td class="mono">${esc((r.created_at || '').replace('T', ' ').slice(0, 16))}</td>
+      <td>${r.kind === 'release' ? '발매 준비' : '바로 공개'}${r.deleted ? ' <span class="chip">삭제됨</span>' : ''}</td>
+      <td>${esc(REACH[r.reach] || r.reach)}</td><td>${feats}</td>
+      <td class="num">${r.failures ? `<span class="chip fail">${r.failures}</span>` : ''}</td>
+      <td class="num">${r.minutes_to_note != null ? esc(r.minutes_to_note) + '분' : ''}</td>
+      <td>${esc(pub)}</td><td>${sv}</td><td class="mono">${esc(r.id)}</td></tr>`;
+  }).join('');
+}
+
+function render({ summary: sm, rows }) {
+  const note = sm.minutes_to_note;
+  $('kpis').innerHTML = [
+    kpi('체험', sm.total, `발매 준비 ${sm.release} · 바로 공개 ${sm.community}`),
+    kpi('설문 응답', `${pct(sm.survey_answered, sm.total)}%`, `${sm.survey_answered}/${sm.total}`),
+    kpi('ZIP·시트까지 간 작업', `${pct(sm.funnel.at(-1)?.n || 0, sm.release)}%`, `${sm.funnel.at(-1)?.n || 0}/${sm.release}`),
+    kpi('A&R 노트까지', note ? `${note.median}분` : '–', note ? `중앙값 · 최대 ${note.max}분` : ''),
+    kpi('실패가 난 작업', sm.with_failure, `/${sm.release}`),
+    kpi('공개한 곡', sm.published, `반응 받음 ${sm.published_with_reaction} · 올린 사람 확인 ${sm.published_owner_viewed}`),
+  ].join('');
+  $('funnel').innerHTML = bars(sm.funnel, sm.release);
+  $('features').innerHTML = bars(sm.features, sm.release);
+  $('survey').innerHTML = renderSurvey(sm);
+  $('rows').innerHTML = renderRows(rows);
+  $('out').hidden = false;
+}
+
+$('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('msg').className = 'msg';
+  $('msg').textContent = '불러오는 중…';
+  try {
+    const data = await (await call('/admin/usage')).json();
+    try { sessionStorage.setItem('admin_key', $('key').value); } catch (e) {}
+    render(data);
+    $('dl-csv').disabled = $('dl-json').disabled = false;
+    $('msg').textContent = `${new Date().toLocaleString('ko-KR')} 기준 · 체험 ${data.summary.total}건`;
+  } catch (err) {
+    $('msg').className = 'msg err';
+    $('msg').textContent = err.message;
+  }
+});
+
+async function download(path) {
+  try {
+    const res = await call(path);
+    const name = (res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/)?.[1] || path.split('/').pop();
+    const url = URL.createObjectURL(await res.blob());
+    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    $('msg').className = 'msg err';
+    $('msg').textContent = err.message;
+  }
+}
+$('dl-csv').addEventListener('click', () => download('/admin/usage.csv'));
+$('dl-json').addEventListener('click', () => download('/admin/usage.json'));
+</script>
+</body>
+</html>

@@ -96,6 +96,9 @@ class Settings(BaseSettings):
     session_ttl_days: int = 30
     auth_redirect_origins: str = ""         # 로그인 후 돌아가도 되는 화면 주소 (쉼표). CORS_ORIGINS와 public_base_url은 기본 허용
 
+    # 운영자 페이지 /admin (체험 기록·설문 보기·내려받기). 비어 있으면 /admin 데이터는 꺼진다
+    admin_key: str | None = None
+
     # 미디어
     font_path: Path = Path("./app/fonts/NotoSansKR-Bold.ttf")
     highlight_sec: float = 15.0
@@ -146,7 +149,7 @@ class Settings(BaseSettings):
         return list(dict.fromkeys([self.public_base_url.rstrip("/"), *self.cors_origin_list, *extra]))
 
     @field_validator("kakao_client_id", "kakao_client_secret", "kakao_admin_key", "kakao_app_id", "google_client_id", "google_client_secret",
-                     "telegram_bot_token", "telegram_chat_id", "service_end_date", "acoustid_api_key")
+                     "telegram_bot_token", "telegram_chat_id", "service_end_date", "acoustid_api_key", "admin_key")
     @classmethod
     def _blank_optional(cls, v: str | None) -> str | None:
         v = (v or "").strip()
