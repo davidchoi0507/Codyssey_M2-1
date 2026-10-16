@@ -43,7 +43,15 @@ async def ask_json(llm: CodysseyChat, system: str, payload: dict, schema: type[M
         fixed = repair(out)
         if not (check(fixed) if check else []):
             return fixed, _usage(raw) | {"repaired": problems}
-    raise AppError("LLM_BAD_OUTPUT", f"{what}를 정리하지 못했어요. 다시 시도해 주세요.", True)
+    raise AppError("LLM_BAD_OUTPUT", f"{_obj(what)} 정리하지 못했어요. 다시 시도해 주세요.", True)
+
+
+def _obj(word: str) -> str:
+    """목적격 조사 — 끝 글자에 받침이 있으면 '을', 없으면 '를' ('채널 홍보 글을', '커버 고르기를')."""
+    last = word.strip()[-1:]
+    if "가" <= last <= "힣":
+        return word + ("을" if (ord(last) - 0xAC00) % 28 else "를")
+    return word + "을(를)"
 
 
 def _usage(raw: AIMessage) -> dict:

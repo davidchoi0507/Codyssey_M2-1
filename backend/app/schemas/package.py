@@ -89,6 +89,8 @@ class CheckItem(BaseModel):
     label: str
     status: Literal["ok", "warn", "fail", "todo"] = Field(description="ok 통과 · warn 확인 필요 · fail 고쳐야 함 · todo 직접 확인")
     detail: str
+    due_date: str | None = Field(default=None, description="(10/16 추가) 등록 시점(id=lead)만 — 이 날까지 유통사에 올리면 되는 날 "
+                                                           "YYYY-MM-DD (발매일 − 유통사 권장 일수)")
 
 
 class SubmissionCheck(BaseModel):

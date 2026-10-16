@@ -77,8 +77,10 @@ class Settings(BaseSettings):
     burst_block_min: int = 10
     feedback_ip_retention_days: int = 7  # 반응·신고에 남긴 접속 IP를 지우는 기한 (화면에는 안 나감)
     # 신고 (DECISIONS #33)
-    report_hide_threshold: int = 3     # 서로 다른 접속에서 이만큼 신고되면 자동 숨김
+    report_hide_threshold: int = 3     # 서로 다른 사람(계정·브라우저)이 이만큼 신고하면 자동 숨김
     report_hide_threshold_stolen: int = 1  # '남의 곡 무단 업로드' 곡 신고는 1번이면 먼저 숨기고 운영자가 확인 (#40)
+    report_daily_per_client: int = 10  # 한 사람이 하루에 새로 남길 수 있는 신고 수 (같은 대상 다시 신고는 안 셈)
+    report_daily_per_ip: int = 60      # 같은 접속 IP 전체 상한 (교실 와이파이 고려)
     fpcalc_path: str = "fpcalc"            # ffmpeg에 chromaprint가 없을 때 쓰는 fpcalc (서버: ~/apps/indie-studio/bin/fpcalc)
     acoustid_api_key: str | None = None    # 알려진 곡 조회 (acoustid.org 앱 키, 비상업 무료). 없으면 이 검사만 건너뜀
     telegram_bot_token: str | None = None  # 운영자 알림 (없으면 로그만)
@@ -142,12 +144,18 @@ class Settings(BaseSettings):
 
     def job_expires(self, created_at: datetime) -> datetime | None:
         """작업이 지워지는 시각 (scripts/cleanup.py와 화면 expires_at이 같은 기준). 종료일 방식인데 날짜가 없으면 None."""
+        end = self.service_end_at()
         if self.retention_mode == "service_end":
-            if not self.service_end_date:
-                return None
-            end = datetime.fromisoformat(self.service_end_date).replace(tzinfo=timezone(timedelta(hours=9)))
-            return end + timedelta(days=1)  # 종료일 하루를 다 쓰고 다음 날 (한국 시간 0시) 지운다
-        return created_at + timedelta(days=self.retention_days)
+            return end
+        by_days = created_at + timedelta(days=self.retention_days)
+        return min(by_days, end) if end else by_days  # 7일 방식이어도 서비스 종료일은 넘기지 않는다
+
+    def service_end_at(self) -> datetime | None:
+        """서비스가 끝나 모든 데이터를 지우는 시각 — 종료일 하루를 다 쓰고 다음 날 한국 시간 0시. 날짜가 없으면 None."""
+        if not self.service_end_date:
+            return None
+        end = datetime.fromisoformat(self.service_end_date).replace(tzinfo=timezone(timedelta(hours=9)))
+        return end + timedelta(days=1)
 
     @property
     def auth_origin_list(self) -> list[str]:

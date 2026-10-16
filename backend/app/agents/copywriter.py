@@ -21,13 +21,34 @@ def _time_problems(c: CopySet, duration: float) -> list[str]:
     return problems
 
 
+def _cut(text: str, limit: int, tail: str = "") -> str:
+    """limit자 안에서 문장·띄어쓰기 경계로 자른다 (단어 중간에서 끊지 않게)."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    room = limit - len(tail)
+    head = text[:room]
+    for sep in (". ", "! ", "? ", "\n", ", ", " "):
+        i = head.rfind(sep)
+        if i >= room // 2:
+            return head[:i + (1 if sep.strip() else 0)].rstrip() + tail
+    return head.rstrip() + tail
+
+
 def _repair(c: CopySet, duration: float) -> CopySet:
+    """AI가 두 번 다 형식을 틀렸을 때 코드로 고칠 수 있는 것만 고친다 (10/16: 홍보 글 실패가 실제로 남)."""
     c = c.model_copy(deep=True)
     for name in CHANNEL_NAMES:
         ch = getattr(c, name)
         ch.text = strip_times(ch.text, lambda sec: sec > duration + 1)
         if ch.hook:
             ch.hook = strip_times(ch.hook, lambda sec: sec > duration + 1)
+        tags = ["#" + h.lstrip("#").replace(" ", "") for h in ch.hashtags]
+        ch.hashtags = list(dict.fromkeys(t for t in tags if len(t) > 1))
+    if not c.tiktok.hook:
+        c.tiktok.hook = c.tiktok.text.strip().splitlines()[0] if c.tiktok.text.strip() else c.instagram.text.strip()
+    c.tiktok.hook = _cut(c.tiktok.hook, 20)
+    c.x.text = _cut(c.x.text, X_MAX_CHARS, "…")
     return c
 
 

@@ -13,6 +13,7 @@ from app import db
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError
 from app.pipeline.jobfiles import now_iso
+from app.pipeline.limits import _today_start_utc
 
 log = logging.getLogger(__name__)
 REASONS = {"abuse": "욕설·비하·혐오", "ad": "광고·도배", "stolen": "남의 곡을 허락 없이 올림", "other": "기타"}
@@ -36,8 +37,9 @@ def notify(text: str) -> None:
 
 
 def report(s: Settings, track_id: str, feedback_id: int | None, reason: str, detail: str | None,
-           client: str) -> dict:
-    """신고를 남기고, 기준을 넘으면 숨긴다. 같은 접속이 같은 대상을 두 번 신고하면 한 번으로 친다."""
+           client: str, who: str) -> dict:
+    """신고를 남기고, 기준을 넘으면 숨긴다. 같은 사람(who — 계정·브라우저 익명 ID)이 같은 대상을 두 번 신고하면 한 번으로 친다.
+    (10/16) 예전엔 접속 IP로 구분해 같은 와이파이의 여러 사람이 한 명이 됐다. 한 사람·한 IP의 하루 신고 수도 제한한다."""
     if reason not in REASONS:
         raise AppError("INVALID_REASON", "신고 사유를 골라 주세요.", False, http_status=422)
     with db.connect() as conn:
@@ -50,13 +52,18 @@ def report(s: Settings, track_id: str, feedback_id: int | None, reason: str, det
             if f is None:
                 raise AppError("FEEDBACK_NOT_FOUND", "반응을 찾을 수 없어요.", False, http_status=404)
         target = "feedback_id IS ?" if feedback_id is None else "feedback_id = ?"
-        dup = conn.execute(f"SELECT 1 FROM reports WHERE track_id = ? AND {target} AND client = ?",
-                           (track_id, feedback_id, client)).fetchone()
+        dup = conn.execute(f"SELECT 1 FROM reports WHERE track_id = ? AND {target} AND COALESCE(who, client) = ?",
+                           (track_id, feedback_id, who)).fetchone()
         if not dup:
-            conn.execute("INSERT INTO reports (track_id, feedback_id, reason, detail, client, ts) VALUES (?, ?, ?, ?, ?, ?)",
-                         (track_id, feedback_id, reason, (detail or "").strip()[:300] or None, client, now_iso()))
-        n = conn.execute(f"SELECT count(DISTINCT client) FROM reports WHERE track_id = ? AND {target} AND resolved = 0",
-                         (track_id, feedback_id)).fetchone()[0]
+            since = _today_start_utc()
+            if conn.execute("SELECT count(*) FROM reports WHERE who = ? AND ts >= ?", (who, since)).fetchone()[0]                     >= s.report_daily_per_client or                     conn.execute("SELECT count(*) FROM reports WHERE client = ? AND ts >= ?", (client, since)).fetchone()[0]                     >= s.report_daily_per_ip:
+                raise AppError("REPORT_LIMIT", "오늘은 신고를 더 받을 수 없어요. 급한 문제면 내일 다시 신고해 주세요.",
+                               False, http_status=429)
+            conn.execute("INSERT INTO reports (track_id, feedback_id, reason, detail, client, who, ts) "
+                         "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (track_id, feedback_id, reason, (detail or "").strip()[:300] or None, client, who, now_iso()))
+        n = conn.execute(f"SELECT count(DISTINCT COALESCE(who, client)) FROM reports WHERE track_id = ? AND {target} "
+                         "AND resolved = 0", (track_id, feedback_id)).fetchone()[0]
         hidden = False
         # 남의 곡 무단 업로드는 저작권 문제라 먼저 내리고 확인한다 (#40)
         threshold = s.report_hide_threshold_stolen if reason == "stolen" and feedback_id is None else s.report_hide_threshold

@@ -153,12 +153,29 @@ def withdraw(user: dict = Depends(require_user)) -> dict:
     return resp
 
 
-@router.get("/me/jobs", response_model=list[MyJob], summary="내가 올린 작업 (7일 안의 것만 — 지난 작업은 삭제됨)")
-def my_jobs(user: dict = Depends(require_user), s: Settings = Depends(settings)) -> list[MyJob]:
+def _owner(request: Request, alias: str) -> tuple[str, tuple]:
+    """(10/16) 로그인했으면 내 계정 것, 안 했으면 이 브라우저(익명 ID 쿠키 aid)로 올렸고 아직 계정에 안 붙은 것.
+    aid는 추측할 수 없고 자바스크립트로 못 읽는 쿠키라 '그 브라우저 = 주인'으로 본다(/me/claim과 같은 기준). 둘 다 없으면 401."""
+    if user := current_user(request):
+        return f"{alias}.user_id = ?", (user["user_id"],)
+    aid = request.cookies.get(ANON_COOKIE) or getattr(request.state, "aid", None) or ""
+    if ANON_ID.match(aid):
+        return f"{alias}.user_id IS NULL AND {alias}.who = ?", (f"a:{aid}",)
+    raise AppError("LOGIN_REQUIRED", "로그인하면 어느 기기에서나 내 곡을 볼 수 있어요.", False, http_status=401)
+
+
+_ANON_NOTE = ("(10/16) 로그인하지 않아도 이 브라우저에서 올린 것을 돌려준다(쿠키 aid 기준 — 쿠키를 지우거나 다른 기기면 안 보임). "
+              "로그인하면 내 계정 것. 쿠키도 로그인도 없으면 401 LOGIN_REQUIRED.")
+
+
+@router.get("/me/jobs", response_model=list[MyJob], summary="내가 올린 작업 (보관 기간이 지난 작업은 삭제됨)",
+            description=_ANON_NOTE)
+def my_jobs(request: Request, s: Settings = Depends(settings)) -> list[MyJob]:
+    where, params = _owner(request, "j")
     with db.connect() as conn:
         rows = conn.execute("SELECT j.job_id, j.stage, j.created_at, t.track_id FROM jobs j "
-                            "LEFT JOIN tracks t ON t.job_id = j.job_id WHERE j.user_id = ? ORDER BY j.created_at DESC",
-                            (user["user_id"],)).fetchall()
+                            f"LEFT JOIN tracks t ON t.job_id = j.job_id WHERE {where} ORDER BY j.created_at DESC",
+                            params).fetchall()
     out = []
     for r in rows:
         jf = JobFiles(s.jobs_dir, r["job_id"])
@@ -171,11 +188,12 @@ def my_jobs(user: dict = Depends(require_user), s: Settings = Depends(settings))
     return out
 
 
-@router.get("/me/tracks", response_model=list[MyTrack], summary="내가 커뮤니티에 올린 곡 (관리 링크 포함)")
-def my_tracks(user: dict = Depends(require_user), s: Settings = Depends(settings)) -> list[MyTrack]:
+@router.get("/me/tracks", response_model=list[MyTrack], summary="내가 커뮤니티에 올린 곡 (관리 링크 포함)",
+            description=_ANON_NOTE + " 로그인 없이 공개한 사람이 관리 링크를 잃어버렸을 때 같은 브라우저에서 다시 찾는 데 쓴다.")
+def my_tracks(request: Request, s: Settings = Depends(settings)) -> list[MyTrack]:
+    where, params = _owner(request, "t")
     with db.connect() as conn:
-        rows = [dict(r) for r in conn.execute("SELECT * FROM tracks WHERE user_id = ? ORDER BY created_at DESC",
-                                              (user["user_id"],))]
+        rows = [dict(r) for r in conn.execute(f"SELECT * FROM tracks t WHERE {where} ORDER BY created_at DESC", params)]
     return [MyTrack(track_id=t["track_id"], title=t["title"], artist=t["artist"], status=t["status"],
                     listen_mode=t["listen_mode"], plays=t["plays"], reactions=c.stats(t["track_id"])["reactions"],
                     cover_url=f"/community/tracks/{t['track_id']}/cover?v={t['updated_at']}",

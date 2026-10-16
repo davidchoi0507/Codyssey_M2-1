@@ -228,9 +228,11 @@ def feedback(track_id: str, body: FeedbackRequest, request: Request, s: Settings
 
 
 @router.post("/community/tracks/{track_id}/report", response_model=ReportResult, summary="(10/10 추가) 곡 신고",
-             description="로그인 없음. 서로 다른 접속에서 3번이면 자동으로 숨기고 운영자에게 알린다. 같은 접속의 중복 신고는 한 번으로.")
+             description="로그인 없음. 서로 다른 사람(계정·브라우저) 3명이면 자동으로 숨기고 운영자에게 알린다('남의 곡'은 1번). "
+                         "같은 사람의 중복 신고는 한 번으로. (10/16) 한 사람 하루 10건·한 IP 하루 60건 넘으면 429 REPORT_LIMIT.")
 def report_track(track_id: str, body: ReportRequest, request: Request, s: Settings = Depends(_enabled)) -> ReportResult:
-    return ReportResult(**reports.report(s, _track_id(track_id), None, body.reason, body.detail, client_ip(request)))
+    return ReportResult(**reports.report(s, _track_id(track_id), None, body.reason, body.detail, client_ip(request),
+                                         person_key(request)))
 
 
 @router.post("/community/tracks/{track_id}/feedback/{feedback_id}/report", response_model=ReportResult,
@@ -238,7 +240,7 @@ def report_track(track_id: str, body: ReportRequest, request: Request, s: Settin
 def report_feedback(track_id: str, feedback_id: int, body: ReportRequest, request: Request,
                     s: Settings = Depends(_enabled)) -> ReportResult:
     return ReportResult(**reports.report(s, _track_id(track_id), feedback_id, body.reason, body.detail,
-                                         client_ip(request)))
+                                         client_ip(request), person_key(request)))
 
 
 # ---- 올린 사람 (X-Owner-Key) ----

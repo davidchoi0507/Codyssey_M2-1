@@ -213,7 +213,7 @@ def publish(s: Settings, jf: JobFiles, *, listen_mode: str, comments_public: boo
         clip_start, clip_sec = _build_audio(jf, note, listen_mode, audio_path(s, track_id))
         _build_cover(jf, note, cover_path(s, track_id))
         now = now_iso()
-        consent = {"version": CONSENT_VERSION, "agreed_at": now,
+        consent = {"version": CONSENT_VERSION, "agreed_at": now, "service_end_date": s.service_end_date,
                    "items": ["자작곡이거나 공개할 권리가 있음", "커뮤니티 공개 (직접 내릴 때까지 보관)",
                              "듣는 사람의 반응 수집"]}
         with db.connect() as conn:
@@ -498,7 +498,8 @@ def publish_direct(s: Settings, src: Path, *, filename: str, title: str, artist:
         else:
             _gradient(colors).save(cover_path(s, track_id), "JPEG", quality=88)
         now = now_iso()
-        consent = {"version": CONSENT_VERSION, "agreed_at": now, "items": DIRECT_CONSENT_ITEMS}
+        consent = {"version": CONSENT_VERSION, "agreed_at": now, "service_end_date": s.service_end_date,
+                   "items": DIRECT_CONSENT_ITEMS}
         with db.connect() as conn:
             conn.execute(
                 "INSERT INTO tracks (track_id, job_id, title, artist, genre, intro, listen_mode, clip_start, clip_sec, "

@@ -13,7 +13,7 @@
 import csv
 import io
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from app.pipeline.release import today_kst
 from app.schemas.package import CheckItem
@@ -129,14 +129,24 @@ def evaluate(dist_id: str, info: ReleaseInfo, ctx: dict, today: date | None = No
     audio, cover_px, rights = ctx.get("audio"), ctx.get("cover_px"), ctx.get("rights") or {}
     items: list[CheckItem] = []
 
-    def add(id_, label, status, detail):
-        items.append(CheckItem(group="dist", id=id_, label=label, status=status, detail=detail))
+    def add(id_, label, status, detail, **extra):
+        items.append(CheckItem(group="dist", id=id_, label=label, status=status, detail=detail, **extra))
 
-    # 일정
+    # 일정 — (10/16 팀 피드백) 발매일에서 거꾸로 '언제까지 올리면 되는지' 날짜로 알려 준다
     if info.release_date:
-        left = (date.fromisoformat(info.release_date) - today).days
-        add("lead", "등록 시점", "ok" if left >= p.lead_days else "warn" if left >= 7 else "fail",
-            f"발매까지 {left}일 — {p.lead_time}" if left >= 0 else "발매일이 지났어요. 새 발매일을 정하세요.")
+        release = date.fromisoformat(info.release_date)
+        left = (release - today).days
+        due = release - timedelta(days=p.lead_days)
+        due_txt = f"{due.month}월 {due.day}일"
+        if left < 0:
+            detail = "발매일이 지났어요. 새 발매일을 정하세요."
+        elif due >= today:
+            detail = f"발매까지 {left}일 — {due_txt}까지 등록하세요 (발매 {p.lead_days}일 전). {p.lead_time}"
+        else:
+            detail = (f"발매까지 {left}일 — 권장 등록일({due_txt})이 지났어요. 지금 바로 올리거나 발매일을 미루세요. "
+                      f"{p.lead_time}")
+        add("lead", "등록 시점", "ok" if left >= p.lead_days else "warn" if left >= 7 else "fail", detail,
+            due_date=due.isoformat() if left >= 0 else None)
     else:
         add("lead", "등록 시점", "todo", f"발매일을 정하면 계산해요. {p.lead_time}")
     # 음원 형식
