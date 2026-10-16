@@ -10,17 +10,17 @@ from collections.abc import Callable
 from typing import TypeVar
 
 from langchain_core.exceptions import OutputParserException
-from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel
 
+from app.adapters.codyssey_llm import CodysseyChat
 from app.core.errors import AppError
 
 M = TypeVar("M", bound=BaseModel)
 
 
-async def ask_json(llm: BaseChatModel, system: str, payload: dict, schema: type[M], *,
+async def ask_json(llm: CodysseyChat, system: str, payload: dict, schema: type[M], *,
                    check: Callable[[M], list[str]] | None = None, repair: Callable[[M], M] | None = None,
                    what: str = "결과") -> tuple[M, dict]:
     """반환: (파싱된 결과, 토큰 사용량)."""

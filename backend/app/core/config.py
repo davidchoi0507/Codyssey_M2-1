@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # 코디세이 (OpenAI 호환)
-    codyssey_api_key: str
+    codyssey_api_key: str  # 쉼표로 여러 개 가능 → codyssey_api_keys
     codyssey_base_url: str
     codyssey_llm_model: str
     codyssey_llm_model_fast: str | None = None
@@ -129,6 +129,12 @@ class Settings(BaseSettings):
         if bad:
             raise ValueError(f"{bad} 모델은 종료(예정)되어 사용할 수 없어요. .env의 GEMINI_FALLBACK_MODELS를 바꿔 주세요.")
         return list(dict.fromkeys(names))
+
+    @property
+    def codyssey_api_keys(self) -> list[str]:
+        """CODYSSEY_API_KEY=키A,키B — 쉼표로 여러 개 넣으면 돌려 쓴다 (app/adapters/codyssey_keys.py). 중복 제거, 순서 유지."""
+        keys = (k.strip() for k in self.codyssey_api_key.split(","))
+        return list(dict.fromkeys(k for k in keys if k and not k.startswith("#")))
 
     @property
     def cors_origin_list(self) -> list[str]:
