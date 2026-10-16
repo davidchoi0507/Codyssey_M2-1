@@ -3,6 +3,7 @@
 LLM은 해석·키워드·색·커버 방향·후보 이유만 쓰고(ARNoteDraft),
 수치·파형·후보 구간처럼 측정값은 코드가 그대로 붙인다 — 숫자를 LLM이 다시 쓰지 않게.
 """
+import math
 import re
 
 from app.adapters.codyssey_llm import chat_model, model_label
@@ -58,12 +59,28 @@ def _perceived_bpm(features: Features, listening: Listening) -> float:
         return features.bpm
     return min(options, key=lambda b: abs(b - listening.perceived_bpm))
 
+
+def _shown_bpm(bpm: float) -> int:
+    """화면·문장에 쓰는 정수 BPM (반올림 0.5↑). 카드와 해석 문장이 같은 숫자를 쓰게 한 곳에서 정한다 (10/16 117.5 → 카드 118·문장 117)."""
+    return math.floor(bpm + 0.5)
+
+
+_BPM_IN_TEXT = re.compile(r"(\d+(?:\.\d+)?)(\s*BPM)")
+
+
+def _fix_bpm_text(text: str, shown: int) -> str:
+    """LLM이 소수·반올림을 달리 적었으면(±2 이내) 화면 숫자로 맞춘다. 반/두 배처럼 먼 숫자는 그대로 둔다."""
+    return _BPM_IN_TEXT.sub(lambda m: f"{shown}{m.group(2)}" if abs(float(m.group(1)) - shown) <= 2 else m.group(0), text)
+
+
 async def write_note(settings: Settings, *, job_id: str, features: Features, listening: Listening,
                      song: dict, gemini_model: str, version: int = 1,
                      user_correction: str | None = None, previous_interpretation: str | None = None,
                      edits_remaining: int | None = None) -> tuple[ARNote, dict]:
+    shown_bpm = _shown_bpm(_perceived_bpm(features, listening))
     payload = {
         "song": song,
+        "display_bpm": shown_bpm,
         "audio_feature_profile": profile_for_prompt(features),
         "listening": listening.model_dump(),
     }
@@ -75,13 +92,13 @@ async def write_note(settings: Settings, *, job_id: str, features: Features, lis
     draft, usage = await ask_json(chat_model(settings), load_prompt("ar_note"), payload, ARNoteDraft,
                                   check=_note_check(candidate_ids), what="A&R 노트")
 
-    reasons = {r.id: r.reason for r in draft.candidate_reasons}
+    reasons = {r.id: _fix_bpm_text(r.reason, shown_bpm) for r in draft.candidate_reasons}
     rec = next(c for c in features.highlight_candidates if c.id == draft.recommended_id)
     note = ARNote(
         job_id=job_id,
         version=version,
-        interpretation=draft.interpretation,
-        evidence=Evidence(bpm=_perceived_bpm(features, listening), bpm_measured=features.bpm,
+        interpretation=_fix_bpm_text(draft.interpretation, shown_bpm),
+        evidence=Evidence(bpm=shown_bpm, bpm_measured=features.bpm,
                           key=display_key(features.key), energy_change=display_energy(features.energy_change)),
         mood_keywords=draft.mood_keywords,
         colors=[c.upper() for c in draft.colors],

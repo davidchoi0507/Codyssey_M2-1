@@ -91,7 +91,7 @@ def summarize(rows: list[dict]) -> dict:
             item["answers"] = [{"id": r["id"], "text": r["survey"][q["id"]]} for r in answered if q["id"] in r["survey"]]
         questions.append(item)
 
-    return {
+    sm = {
         "total": len(rows), "release": len(rel), "community": len(rows) - len(rel),
         "funnel": funnel,
         "stopped_at": [{"label": REACH_LABELS[k], "n": v} for k, v in reach.most_common()],
@@ -104,6 +104,80 @@ def summarize(rows: list[dict]) -> dict:
         "survey_answered": len(answered),
         "questions": questions,
     }
+    sm["insights"] = insights(sm)
+    sm["feature_labels"] = FEATURE_LABELS  # 체험 목록의 기능 id → 이름 (화면용)
+    return sm
+
+
+def _p(n: int, total: int) -> int:
+    return round(100 * n / total) if total else 0
+
+
+def insights(sm: dict) -> list[dict]:
+    """숫자에서 바로 읽히는 것을 문장으로 (level: info·good·warn). 판단 기준은 여기 한 곳에서 고친다.
+
+    표본이 적으면 비율이 크게 흔들리므로 '경향'으로만 읽게 먼저 알린다.
+    """
+    out: list[dict] = []
+    rel, total = sm["release"], sm["total"]
+    if not total:
+        return [{"level": "info", "text": "아직 체험이 없어요. 테스트가 시작되면 여기 요약이 생겨요."}]
+    if rel < 10:
+        out.append({"level": "info", "text": f"발매 준비 체험이 {rel}건이라 비율이 한두 명에 크게 흔들려요. "
+                                             "숫자보다 '어디서 멈췄는지·무슨 말을 했는지' 위주로 보세요."})
+
+    f = sm["funnel"]
+    if rel and len(f) > 1:
+        drops = [(f[i]["n"] - f[i + 1]["n"], f[i], f[i + 1]) for i in range(len(f) - 1)]
+        n, a, b = max(drops, key=lambda d: d[0])
+        if n > 0:
+            out.append({"level": "warn" if _p(n, a["n"]) >= 30 else "info",
+                        "text": f"가장 많이 멈춘 곳: '{a['label']}' → '{b['label']}' 사이 {n}건({_p(n, a['n'])}%). "
+                                "이 단계 화면에서 무엇이 막혔는지 체험 목록·자유 답변에서 먼저 찾아보세요."})
+        done = f[-1]["n"]
+        out.append({"level": "good" if _p(done, rel) >= 50 else "warn",
+                    "text": f"끝까지(ZIP·시트 받기) 간 작업은 {done}/{rel}건({_p(done, rel)}%)이에요."})
+    if rel and sm["with_failure"]:
+        out.append({"level": "warn" if _p(sm["with_failure"], rel) >= 10 else "info",
+                    "text": f"실패가 한 번이라도 난 작업 {sm['with_failure']}건({_p(sm['with_failure'], rel)}%) — "
+                            "서버 로그(Gemini 혼잡·한도)와 같이 확인하세요."})
+    if (w := sm["minutes_to_note"]) and w["median"] > 3:
+        out.append({"level": "warn", "text": f"A&R 노트까지 중앙값 {w['median']}분 — 3분이 넘으면 기다리다 떠날 수 있어요."})
+    rare = [x["label"] for x in sm["features"] if rel >= 5 and _p(x["n"], rel) < 10]
+    if rare:
+        out.append({"level": "info", "text": f"거의 안 쓰인 기능: {', '.join(rare[:5])} — 못 찾은 건지 필요 없는 건지 설문 자유 답변과 같이 보세요."})
+
+    ans = sm["survey_answered"]
+    if ans:
+        if _p(ans, total) < 30:
+            out.append({"level": "warn", "text": f"설문 응답률 {_p(ans, total)}%({ans}/{total}) — 답한 사람은 보통 만족도가 "
+                                                 "더 높거나 낮은 쪽이라, 설문 평균보다 사용 기록을 더 믿으세요."})
+        q = {x["id"]: x for x in sm["questions"]}
+        for qid, name in (("satisfaction", "만족도"), ("reuse", "재사용 의향")):
+            if (x := q.get(qid)) and x["average"] is not None:
+                top = sum(c["n"] for c in x["counts"][3:5])
+                out.append({"level": "good" if x["average"] >= 4 else "warn" if x["average"] < 3 else "info",
+                            "text": f"{name} 평균 {x['average']}/5 · 4~5점 {top}/{x['n']}명({_p(top, x['n'])}%)."})
+        if (a := q.get("assets")) and a["n"]:
+            worst = max(a["rows"], key=lambda r: sum(c["n"] for c in r["counts"][2:4]))
+            bad = sum(c["n"] for c in worst["counts"][2:4])
+            if bad:
+                out.append({"level": "warn", "text": f"'많이 고쳐야/쓰기 어려워요'가 가장 많은 자료: {worst['label']} ({bad}명)."})
+        if (t := q.get("trust")) and t["n"]:
+            unseen = next((c["n"] for c in t["counts"] if c["label"] == "안내를 못 봤어요"), 0)
+            if _p(unseen, t["n"]) >= 30:
+                out.append({"level": "warn", "text": f"보관·AI 전송 안내를 '못 봤다'는 답이 {unseen}/{t['n']}명 — 동의·안내 문구 위치를 손봐야 해요."})
+        texts = sum(x["n"] for x in sm["questions"] if x["type"] == "text")
+        if texts:
+            out.append({"level": "info", "text": f"자유 답변 {texts}개 — 숫자로 안 보이는 이유가 여기 있어요. 아래 설문 칸에서 전부 읽어 보세요."})
+    else:
+        out.append({"level": "info", "text": "설문 응답이 아직 없어요. 사용 기록만으로 판단해야 해요."})
+
+    if sm["published"]:
+        none = sm["published"] - sm["published_with_reaction"]
+        if none:
+            out.append({"level": "info", "text": f"공개한 {sm['published']}곡 중 {none}곡은 아직 반응이 없어요 — 듣는 사람이 들어올 길(공유 링크 등)이 필요한지 보세요."})
+    return out
 
 
 def csv_text(rows: list[dict]) -> str:

@@ -29,7 +29,7 @@ header h1 { font-size: 24px; }
 header p { margin: 0; color: var(--sub); }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
 .bar-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
-.bar-form label { display: grid; gap: 4px; font-size: 12px; color: var(--sub); font-weight: 600; }
+.bar-form label:not(.check) { display: grid; gap: 4px; font-size: 12px; color: var(--sub); font-weight: 600; }
 .bar-form input { height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); min-width: 0; }
 .bar-form input[type=password] { width: 260px; max-width: 100%; }
 .btn { height: 38px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2);
@@ -74,6 +74,23 @@ details summary { cursor: pointer; color: var(--sub); }
 .empty { color: var(--sub); padding: 12px 0; }
 .matrix td, .matrix th { padding: 6px 8px; }
 #out[hidden] { display: none; }
+.check { display: flex; align-items: center; gap: 6px; height: 38px; font-size: 13px; color: var(--sub); font-weight: 600; }
+.bar-form .check input { height: auto; width: 16px; padding: 0; margin: 0; accent-color: var(--accent); }
+.insights { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.insights li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; }
+.insights .dot { width: 22px; height: 22px; border-radius: 99px; display: grid; place-items: center; font-size: 12px; font-weight: 800;
+  background: var(--surface-2); color: var(--sub); }
+.insights .warn .dot { background: var(--fail-soft); color: var(--fail); }
+.insights .good .dot { background: var(--accent-soft); color: var(--ok); }
+.how { margin: -4px 0 12px; font-size: 13px; color: var(--sub); }
+.how summary { font-weight: 600; }
+.how ul { margin: 6px 0 0; padding-left: 18px; }
+.how li { margin: 3px 0; }
+.guide { margin-top: 12px; }
+.guide summary { font-weight: 700; color: var(--ink); }
+.guide ol { margin: 10px 0 0; padding-left: 20px; }
+.guide li { margin: 6px 0; }
+.guide b { color: var(--ink); }
 </style>
 </head>
 <body>
@@ -86,23 +103,58 @@ details summary { cursor: pointer; color: var(--sub); }
   <section class="card">
     <form class="bar-form" id="form">
       <label>운영자 키<input type="password" id="key" autocomplete="current-password" required></label>
+      <label class="check"><input type="checkbox" id="remember"> 이 브라우저에 키 기억</label>
       <label>이 날짜부터 (비우면 전체)<input type="date" id="since"></label>
       <button class="btn primary" type="submit">불러오기</button>
       <span class="spacer"></span>
       <button class="btn" type="button" id="dl-csv" disabled>CSV 받기</button>
       <button class="btn" type="button" id="dl-json" disabled>JSON 받기</button>
     </form>
-    <div class="msg" id="msg">운영자 키를 넣고 불러오기를 눌러 주세요. 키는 이 탭을 닫으면 잊어요.</div>
+    <div class="msg" id="msg">운영자 키를 넣고 불러오기를 눌러 주세요. '키 기억'을 켜면 이 브라우저에서는 다음부터 바로 열려요 (공용 PC에서는 끄세요).</div>
+    <details class="guide">
+      <summary>이 페이지 읽는 법</summary>
+      <ol>
+        <li><b>먼저 날짜를 거르세요.</b> 팀 QA·시연 작업이 섞이면 숫자가 왜곡돼요. 실제 테스트 시작일을 '이 날짜부터'에 넣으세요.</li>
+        <li><b>'눈에 띄는 점'부터 읽으세요.</b> 숫자에서 바로 읽히는 것을 문장으로 정리했어요. 빨간 표시는 먼저 볼 것이에요.</li>
+        <li><b>'어디까지 갔나'에서 막대가 가장 크게 줄어드는 곳</b>이 사람들이 멈춘 단계예요. 그 단계 화면을 의심하고, 체험 목록에서 그 단계에 멈춘 작업을 찾아 보세요.</li>
+        <li><b>사용 기록 = 실제로 한 일, 설문 = 느낀 점.</b> 둘이 다르면(예: 만족한다고 했지만 ZIP을 안 받음) 사용 기록이 더 정확해요. 설문은 '왜'를 알려 줘요.</li>
+        <li><b>표본이 10건보다 적으면</b> 비율은 한두 명에 크게 흔들려요. 퍼센트보다 건수와 자유 답변을 보세요.</li>
+        <li><b>자유 답변</b>(고쳤으면 하는 점·오류)은 꼭 전부 읽으세요. 같은 말이 2번 이상 나오면 고칠 목록 1순위예요.</li>
+        <li><b>발표·보고서용</b>은 CSV를 받아 엑셀 피벗으로 정리하세요(체험 1건 = 1줄). JSON에는 요약·눈에 띄는 점까지 들어 있어요.</li>
+      </ol>
+    </details>
   </section>
 
   <div id="out" hidden>
     <div class="kpis" id="kpis"></div>
+    <section class="card" style="margin-bottom:12px"><h2>눈에 띄는 점</h2><ul class="insights" id="insights"></ul></section>
     <div class="grid2">
-      <section class="card"><h2>발매 준비 — 어디까지 갔나</h2><p class="hint">각 단계까지 간 작업 수 / 전체 발매 준비 작업</p><div class="bars" id="funnel"></div></section>
-      <section class="card"><h2>쓴 기능</h2><p class="hint">한 번이라도 쓴 작업 수 / 전체 발매 준비 작업</p><div class="bars" id="features"></div></section>
+      <section class="card"><h2>발매 준비 — 어디까지 갔나</h2><p class="hint">각 단계까지 간 작업 수 / 전체 발매 준비 작업</p>
+        <details class="how"><summary>어떻게 보나</summary><ul>
+          <li>위에서 아래로 줄어드는 게 정상이에요. <b>바로 앞 단계보다 크게 줄어든 곳</b>이 문제 후보예요.</li>
+          <li>업로드→노트: 분석 실패·대기 시간 / 노트→수락: 해석이 안 맞음 / 결과물→ZIP: 받는 방법을 못 찾음·필요 없음.</li>
+          <li>ZIP을 안 받아도 '커뮤니티 공개'로 끝냈을 수 있어요 — 오른쪽 '쓴 기능'과 같이 보세요.</li>
+        </ul></details><div class="bars" id="funnel"></div></section>
+      <section class="card"><h2>쓴 기능</h2><p class="hint">한 번이라도 쓴 작업 수 / 전체 발매 준비 작업</p>
+        <details class="how"><summary>어떻게 보나</summary><ul>
+          <li>많이 쓰인 기능 = 사람들이 원하는 것. 발표에서 '실제로 쓰인 기능'으로 보여 주기 좋아요.</li>
+          <li>거의 안 쓰인 기능은 <b>못 찾았는지, 필요 없는지</b> 자유 답변으로 확인하세요.</li>
+          <li>'복사·열기'는 화면이 보내는 기록이라, 화면에 그 버튼이 없으면 0이에요.</li>
+        </ul></details><div class="bars" id="features"></div></section>
     </div>
-    <section class="card" style="margin-bottom:12px"><h2>마지막 설문</h2><div id="survey"></div></section>
-    <section class="card"><h2>체험 목록</h2><div class="table-wrap"><table id="rows"></table></div></section>
+    <section class="card" style="margin-bottom:12px"><h2>마지막 설문</h2>
+      <details class="how"><summary>어떻게 보나</summary><ul>
+        <li>1~5점 문항은 <b>평균과 4~5점 비율</b>을 같이 보세요. 평균 4 이상이면 좋음, 3 미만이면 원인을 찾아야 해요.</li>
+        <li>'자료' 표는 행(커버·영상·글·메일)마다 '많이 고쳐야/쓰기 어려워요'가 많은 줄이 개선 1순위예요. '안 봤어요'가 많으면 화면에서 못 찾은 거예요.</li>
+        <li>안내(보관·AI 전송) 문항이 낮으면 동의 문구·안내 위치를 손봐야 해요.</li>
+        <li>설문은 끝까지 간 사람만 보기 쉬워서 실제보다 좋게 나올 수 있어요.</li>
+      </ul></details>
+      <div id="survey"></div></section>
+    <section class="card"><h2>체험 목록</h2>
+      <details class="how"><summary>어떻게 보나</summary><ul>
+        <li>최근 순이에요. '어디까지'로 멈춘 단계, '실패'로 오류가 난 작업을 찾고, '응답'을 펼치면 그 사람의 설문 답이 보여요.</li>
+        <li>ID(job:…)로 서버 로그·작업 기록을 찾아볼 수 있어요. '삭제됨'은 보관 기간이 지나 파일은 지워지고 숫자만 남은 작업이에요.</li>
+      </ul></details><div class="table-wrap"><table id="rows"></table></div></section>
   </div>
 </main>
 
@@ -113,7 +165,23 @@ const pct = (n, t) => (t ? Math.round((100 * n) / t) : 0);
 const REACH = { uploaded: '업로드', note_ready: 'A&R 노트 받음', note_accepted: '노트 수락', cover_selected: '커버 선택',
   rendered: '결과물 완성', downloaded: 'ZIP·시트 받음', published: '바로 공개' };
 
-try { $('key').value = sessionStorage.getItem('admin_key') || ''; } catch (e) {}
+// 키: 기본은 이 탭에서만(sessionStorage), '키 기억'을 켜면 이 브라우저에(localStorage)
+function loadKey() {
+  try {
+    const saved = localStorage.getItem('admin_key');
+    if (saved) { $('remember').checked = true; return saved; }
+    return sessionStorage.getItem('admin_key') || '';
+  } catch (e) { return ''; }
+}
+function saveKey() {
+  try {
+    sessionStorage.setItem('admin_key', $('key').value);
+    if ($('remember').checked) localStorage.setItem('admin_key', $('key').value);
+    else localStorage.removeItem('admin_key');
+  } catch (e) {}
+}
+$('key').value = loadKey();
+$('remember').addEventListener('change', () => { if (!$('remember').checked) { try { localStorage.removeItem('admin_key'); } catch (e) {} } });
 
 function query() {
   const s = $('since').value;
@@ -158,12 +226,12 @@ function renderSurvey(sm) {
   }).join('');
 }
 
-function renderRows(rows) {
+function renderRows(rows, labels = {}) {
   if (!rows.length) return '<tr><td class="empty">체험이 없어요</td></tr>';
   const head = '<tr><th>시작</th><th>종류</th><th>어디까지</th><th>쓴 기능</th><th>실패</th><th>노트까지</th><th>공개·반응</th><th>설문</th><th>ID</th></tr>';
   return head + rows.slice().reverse().map((r) => {
     const t = r.track;
-    const feats = (r.features || []).map((f) => `<span class="chip">${esc(f)}</span>`).join('');
+    const feats = (r.features || []).map((f) => `<span class="chip">${esc(labels[f] || f)}</span>`).join('');
     const pub = t ? `반응 ${t.reactions} · 재생 ${t.plays}` : '';
     const sv = r.survey ? `<details><summary><span class="chip ok">응답</span></summary><pre class="mono" style="white-space:pre-wrap;margin:6px 0 0">${esc(JSON.stringify(r.survey, null, 1))}</pre></details>` : '';
     return `<tr><td class="mono">${esc((r.created_at || '').replace('T', ' ').slice(0, 16))}</td>
@@ -185,10 +253,13 @@ function render({ summary: sm, rows }) {
     kpi('실패가 난 작업', sm.with_failure, `/${sm.release}`),
     kpi('공개한 곡', sm.published, `반응 받음 ${sm.published_with_reaction} · 올린 사람 확인 ${sm.published_owner_viewed}`),
   ].join('');
+  const mark = { warn: '!', good: '✓', info: 'i' };
+  $('insights').innerHTML = (sm.insights || []).map((x) =>
+    `<li class="${esc(x.level)}"><span class="dot">${mark[x.level] || 'i'}</span><span>${esc(x.text)}</span></li>`).join('');
   $('funnel').innerHTML = bars(sm.funnel, sm.release);
   $('features').innerHTML = bars(sm.features, sm.release);
   $('survey').innerHTML = renderSurvey(sm);
-  $('rows').innerHTML = renderRows(rows);
+  $('rows').innerHTML = renderRows(rows, sm.feature_labels);
   $('out').hidden = false;
 }
 
@@ -198,7 +269,7 @@ $('form').addEventListener('submit', async (e) => {
   $('msg').textContent = '불러오는 중…';
   try {
     const data = await (await call('/admin/usage')).json();
-    try { sessionStorage.setItem('admin_key', $('key').value); } catch (e) {}
+    saveKey();
     render(data);
     $('dl-csv').disabled = $('dl-json').disabled = false;
     $('msg').textContent = `${new Date().toLocaleString('ko-KR')} 기준 · 체험 ${data.summary.total}건`;
@@ -224,6 +295,7 @@ async function download(path) {
   }
 }
 $('dl-csv').addEventListener('click', () => download('/admin/usage.csv'));
+if ($('key').value) $('form').requestSubmit();
 $('dl-json').addEventListener('click', () => download('/admin/usage.json'));
 </script>
 </body>

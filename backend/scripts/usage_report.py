@@ -19,6 +19,9 @@ def pct(n: int, total: int) -> str:
 
 def report(sm: dict) -> None:
     print(f"체험 {sm['total']}건 — 발매 준비 {sm['release']}, 바로 공개 {sm['community']}")
+    print("\n[눈에 띄는 점]")
+    for x in sm["insights"]:
+        print(f"  {'!' if x['level'] == 'warn' else '·'} {x['text']}")
     if sm["release"]:
         print("\n[발매 준비 — 어디까지 갔나]")
         for f in sm["funnel"]:
