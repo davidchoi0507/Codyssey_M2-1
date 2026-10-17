@@ -1,4 +1,4 @@
-"""업로드·진행 화면: POST /jobs, GET /jobs/{job_id}, PATCH /jobs/{job_id}/info"""
+"""업로드·진행 화면: POST /jobs, POST /jobs/demo, GET /jobs/{job_id}, PATCH /jobs/{job_id}/info"""
 import hashlib
 import tempfile
 import time
@@ -12,10 +12,10 @@ from app.api.deps import current_user, file_url, job_files, person_key, runner, 
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.analysis.audio_io import check_magic
-from app.pipeline import community, reports
+from app.pipeline import community, demo, reports
 from app.pipeline.intake import ALLOWED_EXT, create_job
 from app.pipeline.bands import find_band
-from app.pipeline.limits import check_daily_limits, client_ip, record_client
+from app.pipeline.limits import check_daily_limits, check_demo_limits, client_ip, record_client
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.runner import JobRunner
 from app.pipeline.views import job_status
@@ -101,6 +101,25 @@ async def create(
     record_client(jf.job_id, client, band, who)
     link_job(jf.job_id, user)  # 로그인했으면 '내 곡'에 (선택)
     r.start_analysis(jf)
+    return JobCreated(job_id=jf.job_id, status_url=f"/jobs/{jf.job_id}")
+
+
+@router.post("/demo", response_model=JobCreated, status_code=201, summary="(10/17 추가) 체험 모드 — 예시 곡으로 시작",
+             description="곡 없이 예시 곡(아티스트 201의 AI 곡)으로 작업을 만든다. 분석·A&R 노트는 미리 만든 것이라 몇 초 안에 "
+                         "note_ready. 그다음(노트 수정·수락 → 커버·카피·영상, 발매 준비 검사, ZIP)은 보통 작업과 같은 API를 "
+                         "그대로 쓴다. 다른 점: 커뮤니티 공개는 403 DEMO_NO_PUBLISH, GET /jobs/{id}의 demo=true. "
+                         "업로드 동의는 받지 않는다(올리는 곡이 없음). 하루 한도는 사람별 DAILY_DEMO_PER_CLIENT(기본 3)로 "
+                         "내 곡 한도와 따로 센다. 예시 곡이 서버에 준비 안 됐으면 503 DEMO_UNAVAILABLE.")
+async def create_demo(request: Request, s: Settings = Depends(settings), r: JobRunner = Depends(runner)) -> JobCreated:
+    client = client_ip(request)
+    user = current_user(request)
+    who = person_key(request, user)
+    check_demo_limits(s, client, who)
+    s.jobs_dir.mkdir(parents=True, exist_ok=True)
+    jf = await run_in_threadpool(demo.create_demo_job, s)
+    record_client(jf.job_id, client, None, who)
+    link_job(jf.job_id, user)
+    r.start_analysis(jf)  # 결과 파일이 다 있어 단계를 건너뛰고 바로 note_ready
     return JobCreated(job_id=jf.job_id, status_url=f"/jobs/{jf.job_id}")
 
 

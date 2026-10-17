@@ -235,7 +235,7 @@ function renderRows(rows, labels = {}) {
     const pub = t ? `반응 ${t.reactions} · 재생 ${t.plays}` : '';
     const sv = r.survey ? `<details><summary><span class="chip ok">응답</span></summary><pre class="mono" style="white-space:pre-wrap;margin:6px 0 0">${esc(JSON.stringify(r.survey, null, 1))}</pre></details>` : '';
     return `<tr><td class="mono">${esc((r.created_at || '').replace('T', ' ').slice(0, 16))}</td>
-      <td>${r.kind === 'release' ? '발매 준비' : '바로 공개'}${r.deleted ? ' <span class="chip">삭제됨</span>' : ''}</td>
+      <td>${r.kind === 'release' ? '발매 준비' : r.kind === 'demo' ? '체험(예시 곡)' : '바로 공개'}${r.deleted ? ' <span class="chip">삭제됨</span>' : ''}</td>
       <td>${esc(REACH[r.reach] || r.reach)}</td><td>${feats}</td>
       <td class="num">${r.failures ? `<span class="chip fail">${r.failures}</span>` : ''}</td>
       <td class="num">${r.minutes_to_note != null ? esc(r.minutes_to_note) + '분' : ''}</td>
@@ -246,7 +246,7 @@ function renderRows(rows, labels = {}) {
 function render({ summary: sm, rows }) {
   const note = sm.minutes_to_note;
   $('kpis').innerHTML = [
-    kpi('체험', sm.total, `발매 준비 ${sm.release} · 바로 공개 ${sm.community}`),
+    kpi('체험', sm.total, `발매 준비 ${sm.release} · 바로 공개 ${sm.community}${sm.demo ? ` · 예시 곡 ${sm.demo}` : ''}`),
     kpi('설문 응답', `${pct(sm.survey_answered, sm.total)}%`, `${sm.survey_answered}/${sm.total}`),
     kpi('ZIP·시트까지 간 작업', `${pct(sm.funnel.at(-1)?.n || 0, sm.release)}%`, `${sm.funnel.at(-1)?.n || 0}/${sm.release}`),
     kpi('A&R 노트까지', note ? `${note.median}분` : '–', note ? `중앙값 · 최대 ${note.max}분` : ''),

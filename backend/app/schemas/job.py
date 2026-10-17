@@ -53,6 +53,7 @@ class JobStatus(BaseModel):
                                                                   "삭제에서 빼둔 작업은 null")
     retries: int = Field(default=0, description="'실패한 단계부터 다시 시도'를 누른 횟수. 다시 시도는 하루 곡 수·AI 횟수를 "
                                                 "쓰지 않음 (2026-10-07 추가)")
+    demo: bool = Field(default=False, description="(10/17 추가) 체험 모드(예시 곡) 작업 — 화면은 '공개' 대신 '내 곡 올리기'를 보여 준다")
 
 
 class BandJob(BaseModel):

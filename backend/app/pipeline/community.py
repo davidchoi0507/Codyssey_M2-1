@@ -24,7 +24,7 @@ from app.core.config import Settings
 from app.core.errors import AppError
 from app.pipeline.jobfiles import JobFiles, new_job_id, now_iso
 from app.pipeline.limits import _today_start_utc
-from app.pipeline import fingerprint, moderation, reports
+from app.pipeline import demo, fingerprint, moderation, reports
 from app.pipeline.render import cover_file_or_none
 
 CONSENT_VERSION = "community-v1"
@@ -191,6 +191,7 @@ def publish(s: Settings, jf: JobFiles, *, listen_mode: str, comments_public: boo
             client: str, band_code: str | None, user_id: str | None = None, ai_usage: str | None = None,
             confirm_original: bool = False, who: str | None = None) -> dict:
     """작업의 곡을 공개한다. 이미 올렸으면 설정만 바꾼다 (공개 방식이 바뀌면 음원을 다시 만든다)."""
+    demo.check_not_demo(jf)
     song = jf.read_json(jf.song)
     check_public_text(song.get("title", ""), song.get("artist", ""),
                       intro if intro is not None else song.get("description"))

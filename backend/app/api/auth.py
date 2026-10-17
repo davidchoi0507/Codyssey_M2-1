@@ -45,6 +45,7 @@ class MyJob(BaseModel):
     stage_label: str
     created_at: datetime
     track_id: str | None = Field(default=None, description="커뮤니티에 올렸으면 곡 ID")
+    demo: bool = Field(default=False, description="(10/17 추가) 체험 모드(예시 곡) 작업")
 
 
 class MyTrack(BaseModel):
@@ -173,7 +174,7 @@ _ANON_NOTE = ("(10/16) 로그인하지 않아도 이 브라우저에서 올린 �
 def my_jobs(request: Request, s: Settings = Depends(settings)) -> list[MyJob]:
     where, params = _owner(request, "j")
     with db.connect() as conn:
-        rows = conn.execute("SELECT j.job_id, j.stage, j.created_at, t.track_id FROM jobs j "
+        rows = conn.execute("SELECT j.job_id, j.stage, j.created_at, j.demo, t.track_id FROM jobs j "
                             f"LEFT JOIN tracks t ON t.job_id = j.job_id WHERE {where} ORDER BY j.created_at DESC",
                             params).fetchall()
     out = []
@@ -184,7 +185,8 @@ def my_jobs(request: Request, s: Settings = Depends(settings)) -> list[MyJob]:
         song = jf.read_json(jf.song)
         out.append(MyJob(job_id=r["job_id"], title=song.get("title", ""), artist=song.get("artist", ""),
                          stage=r["stage"], stage_label=STAGE_LABELS.get(Stage(r["stage"]), r["stage"]),
-                         created_at=datetime.fromisoformat(r["created_at"]), track_id=r["track_id"]))
+                         created_at=datetime.fromisoformat(r["created_at"]), track_id=r["track_id"],
+                         demo=bool(r["demo"])))
     return out
 
 

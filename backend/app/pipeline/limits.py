@@ -37,9 +37,9 @@ def check_daily_limits(settings: Settings, client: str, band: dict | None, who: 
     since = _today_start_utc()
     with db.connect() as conn:
         total = conn.execute("SELECT count(*) FROM jobs WHERE created_at >= ?", (since,)).fetchone()[0]
-        mine_ip = conn.execute("SELECT count(*) FROM jobs WHERE client = ? AND band_code IS NULL AND created_at >= ?",
-                               (client, since)).fetchone()[0]
-        mine = conn.execute("SELECT count(*) FROM jobs WHERE who = ? AND band_code IS NULL AND created_at >= ?",
+        mine_ip = conn.execute("SELECT count(*) FROM jobs WHERE client = ? AND band_code IS NULL AND demo = 0 "
+                               "AND created_at >= ?", (client, since)).fetchone()[0]
+        mine = conn.execute("SELECT count(*) FROM jobs WHERE who = ? AND band_code IS NULL AND demo = 0 AND created_at >= ?",
                             (who, since)).fetchone()[0] if who else mine_ip
     if total >= settings.daily_jobs_global:
         raise AppError("DAILY_LIMIT_GLOBAL", "오늘 준비한 분석 수량이 모두 찼어요. 내일 다시 와 주세요.", False,
@@ -53,6 +53,22 @@ def check_daily_limits(settings: Settings, client: str, band: dict | None, who: 
                        False, http_status=429)
     elif who and mine_ip >= settings.daily_jobs_per_ip:
         raise AppError("DAILY_LIMIT", "이 인터넷 연결에서 오늘 올릴 수 있는 곡이 모두 찼어요. 내일 다시 와 주세요.",
+                       False, http_status=429)
+
+
+def check_demo_limits(settings: Settings, client: str, who: str | None) -> None:
+    """체험 모드: 전체 하루 상한(생성 비용)은 같이 쓰고, 사람별은 DAILY_DEMO_PER_CLIENT로 따로 센다."""
+    since = _today_start_utc()
+    with db.connect() as conn:
+        total = conn.execute("SELECT count(*) FROM jobs WHERE created_at >= ?", (since,)).fetchone()[0]
+        key, val = ("who", who) if who else ("client", client)
+        mine = conn.execute(f"SELECT count(*) FROM jobs WHERE {key} = ? AND demo = 1 AND created_at >= ?",
+                            (val, since)).fetchone()[0]
+    if total >= settings.daily_jobs_global:
+        raise AppError("DAILY_LIMIT_GLOBAL", "오늘 준비한 분석 수량이 모두 찼어요. 내일 다시 와 주세요.", False,
+                       http_status=429)
+    if mine >= settings.daily_demo_per_client:
+        raise AppError("DAILY_LIMIT", f"체험은 하루 {settings.daily_demo_per_client}번까지 할 수 있어요. 내 곡을 올려 보세요.",
                        False, http_status=429)
 
 

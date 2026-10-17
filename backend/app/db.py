@@ -167,6 +167,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "user_id" not in cols:
         conn.execute("ALTER TABLE jobs ADD COLUMN user_id TEXT")  # 로그인해서 올린 사람 — '내 곡'
         conn.execute("CREATE INDEX IF NOT EXISTS jobs_user ON jobs(user_id, created_at)")
+    if "demo" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN demo INTEGER NOT NULL DEFAULT 0")  # 체험 모드 작업 (10/17) — 한도를 따로 셈
     tcols = {r[1] for r in conn.execute("PRAGMA table_info(tracks)")}
     if "user_id" not in tcols:
         conn.execute("ALTER TABLE tracks ADD COLUMN user_id TEXT")

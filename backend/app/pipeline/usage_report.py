@@ -2,6 +2,7 @@
 
 scripts/usage_report.py(서버 터미널)와 /admin 페이지(브라우저)가 같은 함수를 쓴다.
 체험 = 발매 준비 작업 하나(살아 있는 작업 + 지워진 작업의 metrics_archive) 또는 AI 없이 바로 공개한 곡 하나.
+체험 모드(예시 곡) 작업은 kind=demo로 따로 — 발매 준비 통계(release)에 섞지 않는다.
 """
 import csv
 import io
@@ -24,6 +25,12 @@ FEATURE_LABELS = {"note_edit": "노트 고치기", "relisten": "다시 듣기", 
                   **{k: v.split(" (")[0] for k, v in usage.CLIENT_EVENTS.items()}}
 
 
+def _kind(events: list[dict]) -> str:
+    """체험 모드(예시 곡, 10/17)는 따로 센다 — 발매 준비 퍼널·통계는 내 곡을 올린 체험만."""
+    up = next((e for e in events if e["event"] == "uploaded"), None)
+    return "demo" if up and up.get("source") == "demo" else "release"
+
+
 def experiences(since: str = "2000-01-01") -> list[dict]:
     s = get_settings()
     keep = {j.strip() for j in s.keep_job_ids.split(",") if j.strip()}
@@ -34,7 +41,7 @@ def experiences(since: str = "2000-01-01") -> list[dict]:
             if line.strip():
                 rec = json.loads(line)
                 if rec["events"] and rec["events"][0]["ts"] >= since:
-                    out[rec["job_id"]] = {"id": f"job:{rec['job_id']}", "kind": "release", "created_at": rec["events"][0]["ts"],
+                    out[rec["job_id"]] = {"id": f"job:{rec['job_id']}", "kind": _kind(rec["events"]), "created_at": rec["events"][0]["ts"],
                                           "deleted": True, **usage.summarize_events(rec["events"])}
     with db.connect() as conn:
         jobs = [r["job_id"] for r in conn.execute("SELECT job_id FROM jobs WHERE created_at >= ?", (since,))]
@@ -44,8 +51,9 @@ def experiences(since: str = "2000-01-01") -> list[dict]:
         if job_id in keep:
             continue
         jf = JobFiles(s.jobs_dir, job_id)
-        out[job_id] = {"id": f"job:{job_id}", "kind": "release", "created_at": jf.status()["created_at"],
-                       "deleted": False, **usage.summarize_events(jf.events())}
+        events = jf.events()
+        out[job_id] = {"id": f"job:{job_id}", "kind": _kind(events), "created_at": jf.status()["created_at"],
+                       "deleted": False, **usage.summarize_events(events)}
     for job_id, rec in out.items():
         if t := tracks.get(job_id):
             rec["track"] = usage.track_summary(t)
@@ -92,7 +100,8 @@ def summarize(rows: list[dict]) -> dict:
         questions.append(item)
 
     sm = {
-        "total": len(rows), "release": len(rel), "community": len(rows) - len(rel),
+        "total": len(rows), "release": len(rel), "community": sum(1 for r in rows if r["kind"] == "community"),
+        "demo": sum(1 for r in rows if r["kind"] == "demo"),
         "funnel": funnel,
         "stopped_at": [{"label": REACH_LABELS[k], "n": v} for k, v in reach.most_common()],
         "features": [{"label": FEATURE_LABELS.get(k, k), "n": v} for k, v in feats.most_common()],

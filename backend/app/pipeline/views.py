@@ -8,7 +8,7 @@ import yaml
 from app.core.config import Settings, get_settings
 from app.core.stages import ANALYSIS_STEPS, QUEUED_LABEL, STAGE_LABELS, Stage
 from app.pipeline.jobfiles import JobFiles
-from app.pipeline import release_info, rights
+from app.pipeline import demo, release_info, rights
 from app.pipeline.release import release_plan, submission_check
 from app.pipeline.render import SHORT_TEMPLATE, TEMPLATES, cover_file_or_none
 from app.schemas.common import AIGenerated, ErrorInfo
@@ -71,7 +71,8 @@ def job_status(jf: JobFiles, queue_position: int | None = None,
                      updated_at=datetime.fromisoformat(st["updated_at"]),
                      created_at=datetime.fromisoformat(st["created_at"]),
                      expires_at=expires_at(jf.job_id, st["created_at"]),
-                     retries=sum(1 for e in jf.events() if e["event"] == "retry"))
+                     retries=sum(1 for e in jf.events() if e["event"] == "retry"),
+                     demo=demo.is_demo(jf))
 
 
 def regen_remaining(settings: Settings, jf: JobFiles, item_id: str, events: list[dict] | None = None) -> int:

@@ -49,10 +49,11 @@ class Settings(BaseSettings):
     daily_jobs_per_ip: int = 30      # 같은 접속 IP 전체 상한 — 교실처럼 여럿이 한 와이파이를 써도 막히지 않게 넉넉히
     daily_jobs_per_band: int = 5     # 밴드(초대 코드)별 기본값 — 밴드마다 bands.daily_limit로 바꿀 수 있음
     daily_jobs_global: int = 60
+    daily_demo_per_client: int = 3   # 체험 모드(예시 곡) 사람별 — 내 곡 한도(DAILY_JOBS_PER_CLIENT)와 따로 셈
     band_code_required: bool = False  # true면 곡을 올릴 때 초대 코드(X-Band-Code) 필수 — 밴드 테스트 때 켬
     note_edits_per_job: int = 5
     cover_regen_per_job: int = 3
-    cover_candidates: int = Field(default=2, ge=1, le=3)  # 방향마다 만들 후보 수 — 2 이상이면 Gemini가 하나 고름, 1이면 끔
+    cover_candidates: int = Field(default=1, ge=1, le=3)  # 방향마다 만들 후보 수 — 2 이상이면 Gemini가 하나 고름, 1이면 끔 (10/17 팀 결정: 1)
     cover_judge_model: str = "gemini-3.5-flash-lite"  # 커버 고르기 전용 (하루 500회 — 듣기용 상위 모델 한도를 안 씀)
     retention_days: int = 7
     # 작업 보관 방식 (10/16, 동의서 v1.6 · DECISIONS #44): days = 업로드 RETENTION_DAYS일 뒤 삭제,
