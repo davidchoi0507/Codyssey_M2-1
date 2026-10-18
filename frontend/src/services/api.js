@@ -9,7 +9,7 @@
 export const API_BASE = (import.meta.env.VITE_API_BASE || 'https://api.201.n-e.kr').replace(/\/$/, '');
 
 // 업로드 화면 동의 문구 버전 — 서버 /studio 와 같은 문구를 쓴다 (동의서가 바뀌면 같이 바꾼다)
-export const CONSENT_VERSION = 'v1.3';
+export const CONSENT_VERSION = 'v1.6';
 
 // 화면의 유통사 이름 → 서버 유통사 id
 export const DISTRIBUTOR_IDS = { distrokid: 'distrokid', muse: 'muzeplatform' };

@@ -11,7 +11,7 @@ import GuideModal from './components/guide/GuideModal';
 import MyTracksModal from './components/me/MyTracksModal';
 import InteractiveBackground from './components/effects/InteractiveBackground';
 import MobileNav from './components/layout/MobileNav';
-import { tokenStorage, api } from './services/api';
+import { tokenStorage, api, toFileUrl } from './services/api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('studio'); // 'studio' | 'community'
@@ -160,7 +160,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <Footer onOpenPrivacy={() => alert('개인정보처리방침: 본 서비스는 닉네임 외의 개인정보를 수집하지 않으며, 업로드된 음원은 발매 검수 목적으로만 처리됩니다.')} />
+      <Footer onOpenPrivacy={() => window.open(toFileUrl('/privacy'), '_blank', 'noopener')} />
 
       {/* Modals */}
       <GuideModal

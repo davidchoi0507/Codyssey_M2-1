@@ -508,7 +508,7 @@ export default function CommunityFeed({ onStartNewRelease }) {
                   </label>
                   <label className="flex items-start gap-2 cursor-pointer">
                     <input type="checkbox" checked={quickConsent.public} onChange={(e) => setQuickConsent((c) => ({ ...c, public: e.target.checked }))} className="mt-0.5" />
-                    <span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응과 접속 IP(도배 방지용, 7일 보관)가 모여요. 공개 음원은 녹음될 수 있으니 발매 전 곡은 하이라이트만 공개하길 권해요</span>
+                    <span>[필수] 커뮤니티에 공개하고, 내가 내리거나 서비스 종료일(2026-10-31)까지 보관돼요. 듣는 사람의 반응과 접속 IP(도배 방지용, 7일 보관)가 모여요. 공개 음원은 녹음될 수 있으니 발매 전 곡은 하이라이트만 공개하길 권해요</span>
                   </label>
                 </div>
 

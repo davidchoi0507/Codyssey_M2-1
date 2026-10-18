@@ -77,7 +77,7 @@ export default function MyTracksModal({ isOpen, onClose, user, setUser, onSelect
 
             {/* My Tracks List */}
             <div className="space-y-2">
-              <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">내 발매 작업 기록 (7일 뒤 삭제)</span>
+              <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">내 발매 작업 기록 (2026-10-31 삭제)</span>
               {myData?.jobs?.length > 0 ? (
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                   {myData.jobs.map((job) => (

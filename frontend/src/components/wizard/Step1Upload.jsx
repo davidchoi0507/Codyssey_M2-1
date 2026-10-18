@@ -379,10 +379,10 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
           <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-white/5 space-y-2">
             <span className="block text-xs font-bold text-zinc-800 dark:text-zinc-200">동의 (동의서 {CONSENT_VERSION})</span>
             {[
-              ['privacy', <>[필수] 만 14세 이상이에요. 개인정보 수집·이용 — 곡 정보·음원·크레딧(참여자 이름)·발매 정보·접속 IP. 유통사 제출 준비표·ZIP도 이 정보로 만들어요. 업로드 7일 뒤 자동 삭제 (<a href={toFileUrl('/privacy')} target="_blank" rel="noopener noreferrer" className="underline">개인정보처리방침</a>)</>],
-              ['external_ai', '[필수] 외부 AI 전송(미국) — 음원은 Google Gemini(무료 등급, 학습에 쓰일 수 있음), 글·이미지는 코디세이 API(OpenAI 모델, 학습 미사용)로 처리'],
+              ['privacy', <>[필수] 만 14세 이상이에요. 개인정보 수집·이용 — 곡 정보·음원·크레딧(참여자 이름)·발매 정보·소리 지문·접속 IP(7일). 유통사 제출 준비표·ZIP도 이 정보로 만들어요. 서비스 종료일(2026-10-31)에 일괄 삭제 (<a href={toFileUrl('/privacy')} target="_blank" rel="noopener noreferrer" className="underline">개인정보처리방침</a>)</>],
+              ['external_ai', '[필수] 외부 AI·음원 DB 전송 — 음원 분석은 Google Gemini(미국, 무료 등급이라 학습에 쓰일 수 있음), 글·이미지는 코디세이 API를 거쳐 OpenAI(미국, 학습 미사용), 알려진 곡 확인은 AcoustID(소리 지문만)'],
               ['original', '[필수] 직접 만든 곡이거나 올릴 권리가 있고, 크레딧에 넣는 참여자에게 동의를 받았어요. 규격 검사·권리 자가진단은 참고용이라 유통사 통과를 보장하지 않아요. AI 결과물은 저작권이 인정되지 않을 수 있어요'],
-              ['showcase', '[선택] 결과물을 서비스 개선·발표 자료에 써도 돼요'],
+              ['showcase', '[선택] 결과물 썸네일·올린 사진을 서비스 개선·발표 자료에 써도 돼요 (음원 제외, 2026-10-31 삭제)'],
             ].map(([key, text]) => (
               <label key={key} className="flex items-start gap-2.5 cursor-pointer">
                 <input

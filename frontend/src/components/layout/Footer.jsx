@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Server, FileText } from 'lucide-react';
+import { ShieldCheck, Server } from 'lucide-react';
 
 export default function Footer({ onOpenPrivacy }) {
   return (
@@ -16,16 +16,6 @@ export default function Footer({ onOpenPrivacy }) {
             <Server className="w-3.5 h-3.5 text-emerald-500" />
             <span>FastAPI Core Server Online</span>
           </div>
-
-          <a 
-            href="https://api.201.n-e.kr/docs" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 transition-colors"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            API 문서
-          </a>
 
           <button 
             onClick={onOpenPrivacy}
