@@ -16,7 +16,7 @@ from app.core.errors import AppError
 from app.core.stages import STAGE_LABELS, Stage
 from app.pipeline import auth as a
 from app.pipeline import community as c
-from app.pipeline.jobfiles import JobFiles
+from app.pipeline.jobfiles import ACTIVE_STAGES, JobFiles, delete_job
 
 router = APIRouter(tags=["로그인·내 곡"])
 _JOB_ID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")  # ULID
@@ -188,6 +188,21 @@ def my_jobs(request: Request, s: Settings = Depends(settings)) -> list[MyJob]:
                          created_at=datetime.fromisoformat(r["created_at"]), track_id=r["track_id"],
                          demo=bool(r["demo"])))
     return out
+
+
+@router.delete("/me/jobs", response_model=dict, summary="(10/18 추가) 내 작업 모두 지우기 — 되돌릴 수 없음",
+               description=_ANON_NOTE + " GET /me/jobs에 나오는 작업을 모두 지운다(음원·결과물·기록). 만드는 중인 작업은 "
+                           "건너뛰고 skipped_busy로 알려 준다. 커뮤니티에 공개한 곡은 남는다(tracks_kept) — 관리 링크·'내 곡'에서 내린다.")
+def delete_my_jobs(request: Request, s: Settings = Depends(settings)) -> dict:
+    where, params = _owner(request, "j")
+    with db.connect() as conn:
+        rows = conn.execute("SELECT j.job_id, j.stage, t.track_id FROM jobs j LEFT JOIN tracks t ON t.job_id = j.job_id "
+                            f"WHERE {where}", params).fetchall()
+    done = [r for r in rows if r["stage"] not in ACTIVE_STAGES]
+    for r in done:
+        delete_job(s.jobs_dir, s.data_dir / "metrics_archive.jsonl", r["job_id"], "owner_all")
+    return {"deleted": len(done), "skipped_busy": len(rows) - len(done),
+            "tracks_kept": sum(1 for r in done if r["track_id"])}
 
 
 @router.get("/me/tracks", response_model=list[MyTrack], summary="내가 커뮤니티에 올린 곡 (관리 링크 포함)",

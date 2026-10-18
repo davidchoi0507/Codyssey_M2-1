@@ -1,4 +1,4 @@
-"""업로드·진행 화면: POST /jobs, POST /jobs/demo, GET /jobs/{job_id}, PATCH /jobs/{job_id}/info"""
+"""업로드·진행 화면: POST /jobs, POST /jobs/demo, GET /jobs/{job_id}, PATCH /jobs/{job_id}/info, DELETE /jobs/{job_id}"""
 import hashlib
 import tempfile
 import time
@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from app.api.auth import link_job
-from app.api.deps import current_user, file_url, job_files, person_key, runner, settings
+from app import db
+from app.api.deps import ANON_COOKIE, current_user, file_url, job_files, person_key, runner, settings
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.analysis.audio_io import check_magic
@@ -16,7 +17,7 @@ from app.pipeline import community, demo, reports
 from app.pipeline.intake import ALLOWED_EXT, create_job
 from app.pipeline.bands import find_band
 from app.pipeline.limits import check_daily_limits, check_demo_limits, client_ip, record_client
-from app.pipeline.jobfiles import JobFiles
+from app.pipeline.jobfiles import ACTIVE_STAGES, JobFiles, delete_job
 from app.pipeline.runner import JobRunner
 from app.pipeline.views import job_status
 from app.schemas.job import JobCreated, JobStatus
@@ -152,3 +153,39 @@ async def retry(jf: JobFiles = Depends(job_files), r: JobRunner = Depends(runner
         r.start_analysis(jf)
     jf.event("retry", step=st.get("step"))
     return job_status(jf, r.queue_position(jf.job_id), lambda p: file_url(jf, p))
+
+
+def can_delete(request: Request, row) -> bool:
+    """지울 수 있는 사람 (10/18): 계정에 붙은 작업은 그 계정, 브라우저 익명 ID로 만든 작업은 그 브라우저.
+    둘 다 없는 예전 작업(IP로만 구분)은 다른 작업 API와 같이 작업 ID를 아는 사람."""
+    user = current_user(request)
+    aid = request.cookies.get(ANON_COOKIE) or ""
+    if row["user_id"]:
+        return bool(user and user["user_id"] == row["user_id"]) or (bool(aid) and row["who"] == f"a:{aid}")
+    if (row["who"] or "").startswith("a:"):
+        return bool(aid) and row["who"] == f"a:{aid}"
+    return True
+
+
+def remove_job(s: Settings, jf: JobFiles, request: Request) -> bool:
+    """작업 하나를 지운다. 반환: 커뮤니티에 공개한 곡이 남았는지."""
+    with db.connect() as conn:
+        row = conn.execute("SELECT j.stage, j.user_id, j.who, t.track_id FROM jobs j "
+                           "LEFT JOIN tracks t ON t.job_id = j.job_id WHERE j.job_id = ?", (jf.job_id,)).fetchone()
+    if row is None:
+        raise AppError("JOB_NOT_FOUND", "작업을 찾을 수 없어요. 이미 지워졌을 수 있어요.", False, http_status=404)
+    if not can_delete(request, row):
+        raise AppError("NOT_OWNER", "이 작업을 만든 계정이나 브라우저에서만 지울 수 있어요.", False, http_status=403)
+    if row["stage"] in ACTIVE_STAGES:
+        raise AppError("JOB_BUSY", "지금 만드는 중이라 지울 수 없어요. 끝난 뒤에 지워 주세요.", True, http_status=409)
+    delete_job(s.jobs_dir, s.data_dir / "metrics_archive.jsonl", jf.job_id, "owner")
+    return row["track_id"] is not None
+
+
+@router.delete("/{job_id}", response_model=dict, summary="(10/18 추가) 작업 지우기 — 음원·결과물·기록 삭제, 되돌릴 수 없음",
+               description="만든 사람만 (계정에 붙은 작업은 그 계정, 로그인 없이 만든 작업은 그 브라우저 — 쿠키 aid). "
+                           "만드는 중(uploaded·analyzing·generating·rendering)이면 409 JOB_BUSY. 커뮤니티에 공개한 곡은 "
+                           "따로 보관돼 남는다 → 응답 track_kept=true면 '곡은 관리 링크에서 내릴 수 있어요'라고 안내. "
+                           "개인정보를 뺀 이용 통계 숫자만 남는다. 화면은 이 브라우저 작업 목록(localStorage)에서도 빼 준다.")
+def delete(request: Request, jf: JobFiles = Depends(job_files), s: Settings = Depends(settings)) -> dict:
+    return {"deleted": True, "track_kept": remove_job(s, jf, request)}

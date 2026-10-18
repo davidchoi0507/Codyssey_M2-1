@@ -19,9 +19,7 @@ from datetime import datetime, timedelta, timezone
 from app import db
 from app.core.config import get_settings
 from app.pipeline import community
-from app.pipeline.jobfiles import JobFiles
-
-FREE_TEXT = {"correction", "request", "message", "fields"}  # 지표 보관에서 빼는 값
+from app.pipeline.jobfiles import delete_job
 
 
 def main() -> int:
@@ -54,17 +52,8 @@ def main() -> int:
         return 0
 
     archive = s.data_dir / "metrics_archive.jsonl"
-    with archive.open("a", encoding="utf-8") as out:
-        for job_id in old:
-            jf = JobFiles(s.jobs_dir, job_id)
-            st = jf.status()
-            events = [{k: v for k, v in e.items() if k not in FREE_TEXT} for e in jf.events()]
-            out.write(json.dumps({"job_id": job_id, "final_stage": st["stage"], "events": events},
-                                 ensure_ascii=False) + "\n")
-            with db.connect() as conn:
-                for table in ("events", "consents", "jobs"):
-                    conn.execute(f"DELETE FROM {table} WHERE job_id = ?", (job_id,))
-            shutil.rmtree(jf.root, ignore_errors=True)
+    for job_id in old:
+        delete_job(s.jobs_dir, archive, job_id, "retention")
     for name in orphans:
         shutil.rmtree(s.jobs_dir / name, ignore_errors=True)
     # 커뮤니티 반응·신고에 남긴 접속 IP는 FEEDBACK_IP_RETENTION_DAYS 뒤 지운다 (동의서 v1.3 초안 제7조)

@@ -3,6 +3,7 @@
 결과물은 이 폴더에 파일로, 단계 상태·지표(events)·동의 기록은 SQLite(app/db.py)에 남긴다.
 """
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -160,3 +161,24 @@ class JobFiles:
                 "ON CONFLICT(job_id) DO UPDATE SET "
                 "stage = excluded.stage, step = excluded.step, error = excluded.error, updated_at = excluded.updated_at",
                 (self.job_id, str(stage), step, err, now, now))
+
+
+# ---- 작업 지우기 (보관 기간 정리 scripts/cleanup.py 와 사용자의 직접 삭제 DELETE /jobs/{id} 가 함께 쓴다) ----
+
+FREE_TEXT = {"correction", "request", "message", "fields"}  # 지표 보관에서 빼는 값 (자유 입력·에러 원문)
+ACTIVE_STAGES = {"uploaded", "analyzing", "generating", "rendering"}  # 만드는 중 — 지우면 진행 중인 단계가 깨진다
+
+
+def delete_job(jobs_dir: Path, archive: Path, job_id: str, reason: str) -> None:
+    """작업 폴더(음원·결과물)와 DB 기록(상태·지표·동의)을 지운다. 결과보고서용 지표만 개인정보·자유 입력을 빼고
+    archive(jsonl)에 한 줄 남긴다. 커뮤니티에 공개한 곡은 data/community/ 에 따로 있어 남는다."""
+    jf = JobFiles(jobs_dir, job_id)
+    st = jf.status() if jf.exists() else {"stage": None}
+    events = [{k: v for k, v in e.items() if k not in FREE_TEXT} for e in jf.events()]
+    with archive.open("a", encoding="utf-8") as out:
+        out.write(json.dumps({"job_id": job_id, "final_stage": st["stage"], "deleted": reason, "events": events},
+                             ensure_ascii=False) + "\n")
+    with db.connect() as conn:
+        for table in ("events", "consents", "jobs"):
+            conn.execute(f"DELETE FROM {table} WHERE job_id = ?", (job_id,))
+    shutil.rmtree(jf.root, ignore_errors=True)
