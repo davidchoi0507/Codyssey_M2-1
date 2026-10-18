@@ -88,6 +88,7 @@ async def regenerate(settings: Settings, jf: JobFiles, item_id: str, request: st
 
 
 MAX_OWN_IMAGE_MB = 20
+MIN_OWN_IMAGE_PX = 1000  # (10/18) DistroKid 커버 최소 1000×1000과 맞춤. 3000px로 키우므로 더 작으면 흐려진다
 MAX_OWN_IMAGE_PIXELS = 40_000_000  # 약 6300×6300. 열 때 가로×세로×3바이트를 쓰므로 메모리 상한 역할
 
 
@@ -110,8 +111,10 @@ def save_own_image(jf: JobFiles, data: bytes) -> int:
         img = ImageOps.exif_transpose(img).convert("RGB")
     except Exception as e:
         raise invalid from e
-    if min(img.size) < 800:
-        raise AppError("IMAGE_TOO_SMALL", "가로·세로 800px 이상인 사진을 올려 주세요.", False, http_status=422)
+    if min(img.size) < MIN_OWN_IMAGE_PX:
+        raise AppError("IMAGE_TOO_SMALL", f"사진이 작아요 (지금 {img.width}×{img.height}px). 가로·세로 모두 "
+                       f"{MIN_OWN_IMAGE_PX}px 이상인 사진을 올려 주세요. 3000×3000 정사각형이 가장 좋아요.", False, http_status=422)
+    source = list(img.size)
     side = min(img.size)
     img = img.crop(((img.width - side) // 2, (img.height - side) // 2,
                     (img.width + side) // 2, (img.height + side) // 2))
@@ -119,7 +122,7 @@ def save_own_image(jf: JobFiles, data: bytes) -> int:
     jf.own_cover(v).parent.mkdir(parents=True, exist_ok=True)
     img.resize((1024, 1024), Image.LANCZOS).save(jf.own_cover(v), "PNG")
     img.resize((3000, 3000), Image.LANCZOS).save(jf.own_cover(v, "_3000"), "PNG", optimize=True)
-    jf.event("own_image_uploaded", v=v, size=list(img.size))
+    jf.event("own_image_uploaded", v=v, size=list(img.size), source=source)
     return v
 
 

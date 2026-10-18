@@ -101,7 +101,8 @@ def sheet_files(info) -> dict[str, str]:
 def distributor_check(jf: JobFiles, dist_id: str, s: Settings) -> DistributorCheck:
     info, _ = release_info.load(jf)
     items = distributors.evaluate(dist_id, info, distributors.job_context(jf))
-    counts = {k: sum(1 for i in items if i.status == k) for k in ("ok", "warn", "fail", "todo")}
+    # (10/18) 알아 둘 정보(kind=info)는 세지 않는다 — 3·4단계 모두 "반려 위험 fail · 주의 warn"을 같은 숫자로 보여 주기
+    counts = {k: sum(1 for i in items if i.status == k and i.kind == "check") for k in ("ok", "warn", "fail", "todo")}
     token = make_token(s.download_token_secret, jf.job_id, f"sheet/{dist_id}", s.download_token_ttl_sec)
     return DistributorCheck(distributor=distributors.PROFILES[dist_id], items=items, counts=counts,
                             sheet_url=f"/jobs/{jf.job_id}/distributors/{dist_id}/sheet.csv?t={token}")

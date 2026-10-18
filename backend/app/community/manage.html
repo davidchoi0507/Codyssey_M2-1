@@ -41,6 +41,12 @@
   .fb.hidden { opacity:.45; }
   .fb small { color:var(--sub); }
   .link { background:none; border:none; color:var(--sub); text-decoration:underline; cursor:pointer; font:inherit; font-size:12px; padding:0; }
+  .q { margin-top:16px; } .q > b { display:block; font-size:14px; margin-bottom:8px; } .q .req { color:var(--danger); font-size:12px; font-weight:600; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; } .mrow { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:6px 0; } .mrow > span { width:84px; flex:none; font-size:13px; color:var(--sub); }
+  .chip { font:inherit; font-size:13px; padding:6px 12px; border-radius:999px; border:1px solid var(--line); background:var(--chip); color:var(--ink); cursor:pointer; }
+  .chip.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  textarea { width:100%; min-height:72px; font:inherit; color:var(--ink); background:var(--chip); border:1px solid var(--line); border-radius:12px; padding:10px 12px; resize:vertical; }
+  .done { display:flex; align-items:center; gap:10px; margin-top:14px; padding:12px 14px; border-radius:12px; background:color-mix(in srgb, var(--ok) 12%, transparent); color:var(--ok); font-weight:700; font-size:14px; }
   label.opt { display:flex; gap:10px; align-items:flex-start; margin:8px 0; cursor:pointer; padding:10px 12px; border:1px solid var(--line); border-radius:12px; }
   label.opt:has(input:checked) { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 8%, transparent); }
   input[type=radio] { accent-color:var(--accent); margin-top:4px; }
@@ -93,10 +99,10 @@
       <div style="margin-top:12px;display:flex;gap:8px;align-items:center"><button class="main" id="save">저장</button><span id="saveMsg"></span></div>
     </div>
 
-    <div class="box">
-      <h2>1분 설문</h2>
-      <div class="sub">써 보니 어땠나요? 이름·연락처 없이 짧게 답해 주시면 서비스를 고치는 데 써요.</div>
-      <p><a class="main" id="survey" href="#">설문 답하기</a></p>
+    <div class="box" id="surveyBox">
+      <h2>1분 설문 — 써 보니 어땠나요?</h2>
+      <div class="sub">이름·연락처는 받지 않고, 서비스를 고치는 데만 써요. 어디까지 썼는지는 자동으로 기록돼서 따로 묻지 않아요.</div>
+      <div id="survey"></div>
     </div>
 
     <div class="box">
@@ -158,10 +164,52 @@ function render(t) {
   document.querySelector(`input[name=pub][value="${t.comments_public ? 1 : 0}"]`).checked = true;
   $('#intro').value = t.intro;
   $('#manageUrl').textContent = location.href;
-  $('#survey').href = `/studio#/survey/track/${tid}/${encodeURIComponent(key)}`;
+}
+
+// 1분 설문 (10/18): 예전 /studio 설문 화면 대신 여기서 바로 답한다. 문항은 서버(GET .../survey)가 정한다
+let survey = null, answers = {};
+function chips(opts, cur, onPick) {
+  return el('div', { className: 'chips' }, ...Object.entries(opts).map(([v, label]) => {
+    const b = el('button', { type: 'button', className: 'chip' + (cur === v ? ' on' : ''), textContent: label });
+    b.onclick = () => onPick(v);
+    return b;
+  }));
+}
+function renderSurvey(editing = false) {
+  const box = $('#survey');
+  if (survey.answered_at && !editing) {
+    const again = el('button', { className: 'link', textContent: '답 고치기' });
+    again.onclick = () => renderSurvey(true);
+    box.replaceChildren(el('div', { className: 'done' }, '✓ 설문에 답해 주셔서 고마워요!', again));
+    return;
+  }
+  const kids = survey.questions.map((q) => {
+    const head = el('b', { textContent: q.question }, ...(q.required ? [' ', el('span', { className: 'req', textContent: '(필수)' })] : []));
+    if (q.type === 'choice') return el('div', { className: 'q' }, head, chips(q.options, answers[q.id], (v) => { answers[q.id] = v; renderSurvey(true); }));
+    if (q.type === 'matrix') return el('div', { className: 'q' }, head, ...Object.entries(q.rows).map(([r, label]) =>
+      el('div', { className: 'mrow' }, el('span', { textContent: label }),
+        chips(q.options, (answers[q.id] || {})[r], (v) => { answers[q.id] = { ...(answers[q.id] || {}), [r]: v }; renderSurvey(true); }))));
+    const t = el('textarea', { maxLength: q.max_length || 500, value: answers[q.id] || '' });
+    t.oninput = () => { answers[q.id] = t.value; };
+    return el('div', { className: 'q' }, head, t);
+  });
+  const msg = el('span', { className: 'err' });
+  const send = el('button', { className: 'main', textContent: '보내기' });
+  send.onclick = async () => {
+    const miss = survey.questions.find((q) => q.required && !answers[q.id]);
+    if (miss) { msg.textContent = `'${miss.question}'에 답해 주세요.`; return; }
+    send.disabled = true; msg.textContent = '';
+    try { survey = await api(`/community/tracks/${tid}/survey`, { method: 'PUT', body: JSON.stringify({ answers }) }); renderSurvey(); }
+    catch (e) { msg.textContent = e.message; send.disabled = false; }
+  };
+  box.replaceChildren(...kids, el('div', { style: 'margin-top:16px;display:flex;gap:10px;align-items:center' }, send, msg));
+}
+async function loadSurvey() {
+  try { survey = await api(`/community/tracks/${tid}/survey`); answers = { ...(survey.answers || {}) }; renderSurvey(); }
+  catch (e) { $('#surveyBox').hidden = true; }  // 설문을 못 불러오면 칸을 숨긴다 (곡 관리는 그대로)
 }
 async function load() {
-  try { render(await api(`/community/tracks/${tid}/owner`)); }
+  try { render(await api(`/community/tracks/${tid}/owner`)); if (!survey) loadSurvey(); }
   catch (e) { $('#err').textContent = e.message; }
 }
 $('#save').onclick = async () => {

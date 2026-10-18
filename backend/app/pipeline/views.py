@@ -81,6 +81,22 @@ def regen_remaining(settings: Settings, jf: JobFiles, item_id: str, events: list
     return max(settings.cover_regen_per_job - used, 0)
 
 
+def own_image_note(source: list[int] | None) -> str | None:
+    """직접 올린 사진을 어떻게 맞췄는지 한 줄 (10/18) — 화면이 올린 뒤 그대로 보여 준다."""
+    if not source:
+        return None
+    w, h = source
+    side = min(w, h)
+    steps = []
+    if w != h:
+        steps.append(f"가운데 {side}×{side}을 정사각형으로 잘랐어요")
+    if side < 3000:
+        steps.append("3000px로 키웠어요 (원본이 작으면 조금 흐려질 수 있어요)")
+    elif side > 3000:
+        steps.append("3000px로 줄였어요")
+    return f"원본 {w}×{h}" + (" → " + ", ".join(steps) if steps else " — 그대로 썼어요") + "."
+
+
 def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], str],
                   zip_url: str | None = None) -> Package:
     st = jf.status()
@@ -94,6 +110,7 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
         models.add("gemini:" + jf.read_json(jf.listening)["meta"]["model"])
     sel = jf.read_json(jf.selected_cover) if jf.selected_cover.exists() else None
     requests = {(e["item"], e["v"]): e.get("request") for e in events if e["event"] == "item_regenerated"}
+    own_src = {e["v"]: e.get("source") for e in events if e["event"] == "own_image_uploaded"}
 
     def link(p: Path) -> str | None:
         return url_for(p) if p.exists() else None
@@ -101,7 +118,9 @@ def build_package(jf: JobFiles, settings: Settings, url_for: Callable[[Path], st
     covers = []
     for item_id, direction_id, path in [(f"cover-{i}", f"c{i}", lambda v, s="", i=i: jf.cover(i, v, s)) for i in (1, 2, 3)]             + [("cover-own", "own", lambda v, s="": jf.own_cover(v, s))]:
         versions = [CoverVersion(v=v, url=url_for(path(v)), url_3000=link(path(v, "_3000")),
-                                 url_title=link(path(v, "_title")), request=requests.get((item_id, v)))
+                                 url_title=link(path(v, "_title")), request=requests.get((item_id, v)),
+                                 **({"source_size": own_src.get(v), "note": own_image_note(own_src.get(v))}
+                                    if item_id == "cover-own" else {}))
                     for v in range(1, (jf.latest_version(path) or 0) + 1)]
         if versions:
             picked = sel is not None and sel["item_id"] == item_id

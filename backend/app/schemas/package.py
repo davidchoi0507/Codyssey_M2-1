@@ -14,6 +14,9 @@ class CoverVersion(BaseModel):
     url_3000: str | None = None
     url_title: str | None = None
     request: str | None = Field(default=None, description="이 버전을 다시 만들 때 밴드가 쓴 요청 한 줄 (첫 버전·요청 없이 재생성은 null)")
+    source_size: list[int] | None = Field(default=None, description="(10/18 추가) 직접 올린 사진(cover-own)의 원본 [가로, 세로]")
+    note: str | None = Field(default=None, description="(10/18 추가) 직접 올린 사진을 어떻게 맞췄는지 한 줄 — 예: '원본 1200×800 → "
+                                                       "가운데 800×800을 정사각형으로 잘랐어요, 3000px로 키웠어요'. 화면에 그대로")
 
 
 class CoverItem(BaseModel):
@@ -91,6 +94,10 @@ class CheckItem(BaseModel):
     detail: str
     due_date: str | None = Field(default=None, description="(10/16 추가) 등록 시점(id=lead)만 — 이 날까지 유통사에 올리면 되는 날 "
                                                            "YYYY-MM-DD (발매일 − 유통사 권장 일수)")
+    fix: str | None = Field(default=None, description="(10/18 추가) 어떻게 고치나요 — 어느 화면에서 무엇을 하면 되는지 한 줄. "
+                                                      "통과(ok)면 없음. 화면에 그대로 보여 주면 된다 (지금은 유통사별 항목 group=dist만)")
+    kind: Literal["check", "info"] = Field(default="check", description="(10/18 추가) check 검사 항목 · info 알아 둘 정보 "
+                                                                       "(비용·알아 둘 것·레이블 — counts에 세지 않음, 따로 묶어 보여 주기)")
 
 
 class SubmissionCheck(BaseModel):

@@ -122,95 +122,124 @@ def lyrics_problems(lyrics: str) -> list[str]:
     return out
 
 
+_TAGS = re.compile(r"\s*\[(공식|2차|확인 필요|공식 화면)\]")
+LANG_NAMES = {"ko": "한국어", "en": "영어", "ja": "일본어"}
+
+
+def plain(text: str) -> str:
+    """화면에 보이는 문장에서 출처 표시([공식]·[2차]…)를 뺀다 — 출처는 profile.sources 에 따로 있다 (10/18)."""
+    return _TAGS.sub("", text).replace("2차 자료 — ", "").strip()
+
+
 def evaluate(dist_id: str, info: ReleaseInfo, ctx: dict, today: date | None = None) -> list[CheckItem]:
-    """이 유통사 기준으로 다시 본 항목 (group=dist). 공통 검사(곡 정보·음원·커버)는 제출 전 검수에 있다."""
+    """이 유통사 기준으로 다시 본 항목 (group=dist). 공통 검사(곡 정보·음원·커버)는 제출 전 검수에 있다.
+    (10/18) 항목마다 fix(어디서 무엇을 고치는지 — 화면에 그대로)와 kind(check 검사 / info 알아 둘 정보 — 개수에 안 셈)."""
     p = PROFILES[dist_id]
     today = today or today_kst()
     audio, cover_px, rights = ctx.get("audio"), ctx.get("cover_px"), ctx.get("rights") or {}
     items: list[CheckItem] = []
 
-    def add(id_, label, status, detail, **extra):
-        items.append(CheckItem(group="dist", id=id_, label=label, status=status, detail=detail, **extra))
+    def add(id_, label, status, detail, fix=None, kind="check", **extra):
+        items.append(CheckItem(group="dist", id=id_, label=label, status=status, detail=plain(detail),
+                               fix=fix if status != "ok" else None, kind=kind, **extra))
 
     # 일정 — (10/16 팀 피드백) 발매일에서 거꾸로 '언제까지 올리면 되는지' 날짜로 알려 준다
+    lead_note = plain(p.lead_time)
     if info.release_date:
         release = date.fromisoformat(info.release_date)
         left = (release - today).days
         due = release - timedelta(days=p.lead_days)
         due_txt = f"{due.month}월 {due.day}일"
         if left < 0:
-            detail = "발매일이 지났어요. 새 발매일을 정하세요."
+            detail, fix = "발매일이 지났어요.", "3. 발매 정보에서 새 발매 희망일을 정해 주세요."
         elif due >= today:
-            detail = f"발매까지 {left}일 — {due_txt}까지 등록하세요 (발매 {p.lead_days}일 전). {p.lead_time}"
+            detail, fix = f"발매까지 {left}일 — {due_txt}까지 {p.name}에 등록하면 돼요 (발매 {p.lead_days}일 전). {lead_note}", None
         else:
-            detail = (f"발매까지 {left}일 — 권장 등록일({due_txt})이 지났어요. 지금 바로 올리거나 발매일을 미루세요. "
-                      f"{p.lead_time}")
-        add("lead", "등록 시점", "ok" if left >= p.lead_days else "warn" if left >= 7 else "fail", detail,
+            detail = f"발매까지 {left}일 — 권장 등록일({due_txt})이 지났어요. {lead_note}"
+            fix = "지금 바로 등록하거나, 3. 발매 정보에서 발매 희망일을 뒤로 미뤄 주세요."
+        add("lead", "등록 시점", "ok" if left >= p.lead_days else "warn" if left >= 7 else "fail", detail, fix,
             due_date=due.isoformat() if left >= 0 else None)
     else:
-        add("lead", "등록 시점", "todo", f"발매일을 정하면 계산해요. {p.lead_time}")
-    # 음원 형식
+        add("lead", "등록 시점", "todo", f"발매일을 정하면 언제까지 등록해야 하는지 계산해 줘요. {lead_note}",
+            "3. 발매 정보에서 발매 희망일을 넣어 주세요.")
+    # 음원 형식 — DistroKid는 무손실을 '권장'(공식), 뮤즈는 공식 규격 미확인이라 mp3는 주의(warn)로 본다
     if audio is None:
-        add("audio", "음원 파일", "todo", p.audio)
+        add("audio", "음원 파일 형식", "todo", p.audio, "유통사에는 처음 만든 무손실 WAV(마스터 파일)를 올려 주세요.")
     elif audio.get("ext") == ".mp3":
-        add("audio", "음원 파일", "fail", f"mp3로 올렸어요. {p.audio}")
+        add("audio", "음원 파일 형식", "warn", f"mp3로 올렸어요. {p.audio}",
+            "유통사에는 mp3 대신 처음 만든 무손실 WAV(마스터 파일)를 올려 주세요. 이 서비스에서 만든 커버·홍보 자료는 그대로 써도 돼요.")
     else:
         ok = audio.get("sample_rate", 0) >= 44100 and audio.get("bits", 16) in (0, 16, 24, 32)
-        add("audio", "음원 파일", "ok" if ok else "warn", f"{audio.get('sample_rate', 0) / 1000:g}kHz"
-            f"{' / ' + str(audio['bits']) + 'bit' if audio.get('bits') else ''} 무손실 — {p.audio}")
+        add("audio", "음원 파일 형식", "ok" if ok else "warn", f"{audio.get('sample_rate', 0) / 1000:g}kHz"
+            f"{' / ' + str(audio['bits']) + 'bit' if audio.get('bits') else ''} 무손실 — {p.audio}",
+            "44.1kHz 이상으로 다시 내보낸 WAV를 올려 주세요.")
     # 커버
     if cover_px is None:
-        add("cover", "커버", "todo", p.cover)
+        add("cover", "커버 이미지", "todo", p.cover, "2. 비주얼 에셋에서 커버를 골라 주세요.")
     else:
-        add("cover", "커버", "ok" if cover_px >= 3000 else "warn", f"{cover_px}px — {p.cover}")
+        add("cover", "커버 이미지", "ok" if cover_px >= 3000 else "warn", f"{cover_px}px — {p.cover}",
+            "2. 비주얼 에셋에서 3000px 커버를 고르거나 더 큰 사진을 올려 주세요.")
     composers = [c for c in info.credits if c.role == "작곡"]
+    lyrics_missing = info.language != "instrumental" and not info.lyrics.strip()
+    lang = LANG_NAMES.get(info.language, info.language)
     if dist_id == "distrokid":
-        add("melon", "멜론 등 국내", "warn", p.melon)
+        add("melon", "국내 음원 사이트 (멜론 등)", "warn", p.melon,
+            "국내에도 내려면 위에서 '뮤즈플랫폼'을 골라 국내 유통사 기준도 확인해 보세요.")
         # 업로드 화면 Track 구역 (공식 도움말)
         st = rights.get("song_type")
-        add("songwriter", "Songwriter (자작곡/커버)", "ok" if st == "original" else "fail" if st in ("cover", "remix") else "todo",
+        add("songwriter", "곡 종류 (자작곡·커버)", "ok" if st == "original" else "fail" if st in ("cover", "remix") else "todo",
             "자작곡으로 표시해요." if st == "original"
-            else "커버곡이면 원곡 아티스트·곡 제목을 적고 커버 라이선스를 받아야 해요 (권리 자가진단 참고)." if st in ("cover", "remix")
-            else "권리 자가진단에서 곡 종류를 골라 주세요.")
+            else "커버·리메이크 곡은 원곡 아티스트·곡 제목을 적고 커버 라이선스를 받아야 해요." if st in ("cover", "remix")
+            else "아직 곡 종류를 고르지 않았어요.",
+            "원곡 정보를 확인하고 커버 라이선스를 받아 주세요 (2. 권리 자가진단 참고)." if st in ("cover", "remix")
+            else "2. 권리 자가진단 1번에서 곡 종류를 골라 주세요.")
         no_legal = not composers or any(not c.legal_name.strip() for c in composers)
-        add("composer", "Songwriter real name", "fail" if no_legal else "ok",
-            "자작곡이면 작곡가 실명을 반드시 적어요 (발매 정보의 크레딧)." if no_legal
-            else f"{', '.join(c.legal_name for c in composers)} — 실명이 있어요.")
+        add("composer", "작곡가 실명", "fail" if no_legal else "ok",
+            "DistroKid는 작곡가 실명이 꼭 있어야 해요 (활동명 아님)." if no_legal
+            else f"{', '.join(c.legal_name for c in composers)} — 실명이 있어요.",
+            "3. 발매 정보 아래 '크레딧(실명) 더 입력하기'를 열고 작곡가 실명을 넣어 주세요 (혼자 만들었으면 본인 실명).")
         roles = {c.role for c in info.credits}
         apple_ok = "프로듀서" in roles and bool(roles & {"보컬", "연주"})
-        add("apple", "Apple Music 추가 요건", "ok" if apple_ok else "warn",
+        add("apple", "Apple Music 크레딧", "ok" if apple_ok else "warn",
             "연주자(보컬·연주) 크레딧과 프로듀서 크레딧이 있어요." if apple_ok
-            else "Apple Music·iTunes로 보내려면 연주자 크레딧 1개 이상(보컬·연주)과 프로듀서 크레딧이 필요해요. "
-                 "발매 정보의 크레딧에 넣어 주세요 (혼자 만들었으면 본인 이름으로).")
-        if info.language != "instrumental" and info.lyrics.strip():
+            else "Apple Music·iTunes로 보내려면 연주자(보컬·연주) 1명 이상과 프로듀서 크레딧이 필요해요.",
+            "3. 발매 정보의 크레딧에 보컬 또는 연주자와 프로듀서를 넣어 주세요 (혼자 만들었으면 모두 본인 이름).")
+        if lyrics_missing:
+            add("lyrics_missing", "가사", "warn", f"가사 언어는 '{lang}'인데 가사가 비어 있어요.",
+                "3. 발매 정보에 가사를 넣거나, 가사 없는 곡이면 가사 언어를 '가사 없음'으로 바꿔 주세요.")
+        elif info.language != "instrumental":
             probs = lyrics_problems(info.lyrics)
             add("lyrics_format", "가사 형식", "warn" if probs else "ok",
-                " / ".join(probs) + " — 형식 요건을 통과해야 서비스로 전달돼요 (약 1~2주)." if probs
-                else "형식 요건에 걸릴 만한 곳이 없어요. distrokid.com/lyrics 에 붙여 넣어요.")
+                "형식 요건을 통과해야 스토어로 전달돼요 (약 1~2주)." if probs
+                else "형식 요건에 걸릴 만한 곳이 없어요. distrokid.com/lyrics 에 붙여 넣어요.",
+                "가사를 이렇게 고쳐 주세요: " + " / ".join(probs) if probs else None)
         if (d := ctx.get("duration")) and ctx.get("highlight_start") is not None and d > 76:
             hs = ctx["highlight_start"]
-            add("preview", "Preview clip start time", "ok",
-                f"{int(hs // 60)}:{int(hs % 60):02d} — AI 노트의 하이라이트 시작이에요. 미리듣기 시작 지점으로 쓰면 좋아요.")
+            add("preview", "미리듣기 시작 지점", "ok",
+                f"{int(hs // 60)}:{int(hs % 60):02d} — AI 노트의 하이라이트 시작이에요. DistroKid의 'Preview clip start time'에 넣으면 좋아요.")
     # 가사 (국내)
     if dist_id == "muzeplatform" and info.language != "instrumental":
         add("lyrics", "가사", "ok" if info.lyrics.strip() else "warn",
-            "가사 텍스트가 있어요. 앨범관리 화면의 가사 칸에 붙여 넣어요." if info.lyrics.strip()
-            else "앨범관리 화면에 가사 칸이 있어요. 가사를 넣어 주세요.")
+            "가사가 있어요. 뮤즈플랫폼 앨범관리 화면의 가사 칸에 붙여 넣어요." if info.lyrics.strip()
+            else f"가사 언어는 '{lang}'인데 가사가 비어 있어요. 뮤즈플랫폼 앨범관리 화면에 가사 칸이 있어요.",
+            "3. 발매 정보에 가사를 넣거나, 가사 없는 곡이면 가사 언어를 '가사 없음'으로 바꿔 주세요.")
+    # AI
+    ai = rights.get("ai_audio")
+    if ai == "generated":
+        add("ai", "AI 사용 표시", "warn", p.ai_policy,
+            "유통사에 올릴 때 'AI 생성' 질문에 '예'로 답하고 AI가 만든 부분을 골라 주세요." if dist_id == "distrokid"
+            else "유통사 안내에 AI 표시 항목이 있는지 가입 뒤 확인해 주세요.")
+    elif ai in ("none", "tool") and dist_id == "distrokid":
+        add("ai", "AI 사용 표시", "ok", "AI 표시 대상이 아니에요 (음정 보정·믹싱·마스터링 같은 도구로만 썼으면 해당 없음).")
+    # 알아 둘 정보 (검사가 아니라 개수에 안 셈)
     if dist_id == "muzeplatform":
         add("label", "레이블 이름 (처음 한 번)", "todo",
             "로그인하면 첫 화면에서 레이블 이름을 정해요. 한 번 정하면 바꿀 수 없고 모든 앨범·정산에 쓰여요. "
             "따로 레이블이 없으면 아티스트명이나 앞으로 계속 쓸 1인 레이블 이름으로 정하세요"
-            f"{f' (예: {info.artist})' if info.artist.strip() else ''}. 이름·휴대전화도 필수예요.")
-    # AI
-    ai = rights.get("ai_audio")
-    if ai == "generated":
-        add("ai", "AI 표기", "warn", p.ai_policy)
-    elif ai in ("none", "tool") and dist_id == "distrokid":
-        add("ai", "AI 표기", "ok", "AI 표기 대상이 아니에요 (도구로만 쓴 음정 보정·믹싱·마스터링은 해당 없음) [공식].")
-    # 비용·부가
-    add("cost", "비용", "todo", p.cost)
+            f"{f' (예: {info.artist})' if info.artist.strip() else ''}. 이름·휴대전화도 필수예요.", kind="info")
+    add("cost", "비용", "todo", p.cost, kind="info")
     if p.extras:
-        add("extras", "알아 둘 것", "todo", p.extras)
+        add("extras", "알아 둘 것", "todo", p.extras, kind="info")
     return items
 
 
