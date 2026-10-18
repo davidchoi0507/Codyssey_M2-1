@@ -9,7 +9,7 @@ from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.stages import Stage
 from app.core.tokens import make_token, read_token
-from app.pipeline import distributors, guide, release_info, rights, usage
+from app.pipeline import community, distributors, guide, release_info, rights, usage
 from app.pipeline.jobfiles import JobFiles
 from app.pipeline.render import forget_titled_renders, rename_in_texts
 from app.pipeline.runner import JobRunner
@@ -64,12 +64,15 @@ def get_release_info(jf: JobFiles = Depends(job_files)) -> ReleaseInfoView:
 
 @router.put("/jobs/{job_id}/release-info", response_model=ReleaseInfoView,
             summary="발매 정보 저장 (전체를 한 번에) → 검사 결과",
-            description="저장하면 곡 정보(제목·아티스트·장르·발매일·가사)도 같이 바뀌어 발매 캘린더·제출 전 검수·커뮤니티에 반영된다. "
+            description="저장하면 곡 정보(제목·아티스트·장르·발매일·가사)도 같이 바뀌어 발매 캘린더·제출 전 검수·커뮤니티에 반영된다 "
+                        "(이미 공개한 곡의 제목·아티스트·장르도 바로 바뀐다). "
                         "suggestions의 fields를 info에 덮어써서 다시 PUT하면 자동 교정이 적용된다.")
 async def put_release_info(body: ReleaseInfo, jf: JobFiles = Depends(job_files),
                            r: JobRunner = Depends(runner)) -> ReleaseInfoView:
     async with r.lock(jf.job_id):
         old = jf.read_json(jf.song)
+        # (10/18) 이미 커뮤니티에 공개한 곡이면 제목·아티스트·장르도 같이 바꾼다 (금칙어면 저장 전에 거절)
+        community.sync_from_job(jf.job_id, title=body.title, artist=body.artist, genre=body.genre_primary)
         release_info.save(jf, body)
         if (old.get("title"), old.get("artist")) != (body.title, body.artist):
             # (10/16) 제목·아티스트가 바뀌면: 글 안의 이름은 바로 바꿔 넣고, 글자가 박힌 이미지·영상은 다시 그린다 (40초 안팎)

@@ -73,11 +73,22 @@ def track_for_job(job_id: str) -> dict | None:
     return dict(r) if r else None
 
 
+# (10/18 미영님 피드백) 화면 필터는 영문(Indie·Pop…)인데 저장된 장르는 한글·영문이 섞여 있다 → 같은 뜻의 말로 찾는다.
+# LIKE는 영문 대소문자를 구분하지 않는다. Indie는 장르를 비워 둔 곡도 포함 (화면이 빈 장르를 Indie로 보여 줌).
+GENRE_ALIASES = {
+    "indie": ["indie", "인디"], "pop": ["pop", "팝"], "r&b": ["r&b", "soul", "소울", "알앤비"],
+    "hip-hop": ["hip", "힙합", "랩"], "rock": ["rock", "록", "락", "밴드"], "ballad": ["ballad", "발라드"],
+    "electronic": ["electro", "edm", "일렉"], "folk": ["folk", "acoustic", "포크", "어쿠스틱"],
+}
+
+
 def list_tracks(*, sort: str, genre: str | None, q: str | None, limit: int, offset: int) -> tuple[list[dict], int]:
     where, args = ["status = 'live'"], []
     if genre:
-        where.append("genre LIKE ?")
-        args.append(f"%{genre}%")
+        words = GENRE_ALIASES.get(genre.strip().lower(), [genre.strip()])
+        conds = ["genre LIKE ?"] * len(words) + (["trim(genre) = ''"] if genre.strip().lower() == "indie" else [])
+        where.append(f"({' OR '.join(conds)})")
+        args += [f"%{w}%" for w in words]
     if q:
         where.append("(title LIKE ? OR artist LIKE ?)")
         args += [f"%{q}%", f"%{q}%"]
@@ -262,6 +273,23 @@ def update(s: Settings, track_id: str, *, listen_mode: str | None = None, commen
             conn.execute(f"UPDATE tracks SET {', '.join(f'{k} = ?' for k in sets)} WHERE track_id = ?",
                          [*sets.values(), track_id])
     return get_track(track_id)
+
+
+def sync_from_job(job_id: str, *, title: str, artist: str, genre: str) -> str | None:
+    """(10/18 은희님 피드백) 발매 정보에서 제목·아티스트·장르를 바꾸면 이미 공개한 곡에도 반영. 바뀐 track_id 또는 None."""
+    t = track_for_job(job_id)
+    if not t:
+        return None
+    new = {"title": title.strip(), "artist": artist.strip(), "genre": genre.strip()}
+    sets = {k: v for k, v in new.items() if v and v != t[k]}
+    if not sets:
+        return None
+    check_public_text(sets.get("title", ""), sets.get("artist", ""), None)
+    sets["updated_at"] = now_iso()
+    with db.connect() as conn:
+        conn.execute(f"UPDATE tracks SET {', '.join(f'{k} = ?' for k in sets)} WHERE track_id = ?",
+                     [*sets.values(), t["track_id"]])
+    return t["track_id"]
 
 
 def remove(s: Settings, track_id: str) -> None:
