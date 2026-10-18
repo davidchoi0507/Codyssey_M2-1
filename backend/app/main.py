@@ -44,8 +44,10 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+# allow_credentials: 화면이 credentials: 'include'로 부르면 이 헤더가 있어야 브라우저가 응답을 읽는다 (10/18, Vercel 화면).
+# 허용 주소는 CORS_ORIGINS 목록으로만 정하므로 아무 사이트나 쿠키를 실어 부를 수는 없다
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list, allow_methods=["*"],
-                   allow_headers=["*"])
+                   allow_headers=["*"], allow_credentials=True)
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",      # 올린 파일을 브라우저가 다른 형식(HTML 등)으로 추측하지 않게
@@ -66,8 +68,11 @@ async def security_headers(request: Request, call_next):
     for k, v in SECURITY_HEADERS.items():
         response.headers.setdefault(k, v)
     if new_aid:
-        response.set_cookie(ANON_COOKIE, new_aid, max_age=180 * 86400, httponly=True, samesite="lax", path="/",
-                            secure=settings.public_base_url.startswith("https://"))
+        # 화면이 다른 주소(Vercel)에 있어도 fetch에 실려 오도록 https에서는 SameSite=None (10/18). 사파리·시크릿 창은
+        # 이런 쿠키를 막으므로 그때는 IP로 구분된다. http(로컬)에서는 None이 안 되니 Lax
+        https = settings.public_base_url.startswith("https://")
+        response.set_cookie(ANON_COOKIE, new_aid, max_age=180 * 86400, httponly=True, path="/",
+                            samesite="none" if https else "lax", secure=https)
     return response
 
 
