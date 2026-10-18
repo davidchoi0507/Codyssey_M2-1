@@ -156,33 +156,22 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
     }
   };
 
-  const handleLoadSample = () => {
-    setTitle('Midnight Echo (한밤의 잔향)');
-    setArtist('Lucid (루시드)');
-    setFeatured('feat. Stella');
-    setSongwriter('김루시드');
-    setProducer('Echo Lab');
-    setLyrics('자정의 시계탑 소리가 울리면\n길었던 하루의 기억들이 잔향처럼 흩어진다\n아무도 묻지 않는 밤의 끝에서...');
+  // 체험 모드: 서버의 예시 곡으로 실제 작업을 만든다 (노트는 바로 나오고, 커버·영상·글은 실제로 만들어짐)
+  const handleLoadSample = async () => {
     setError(null);
-    setJobData((prev) => ({
-      ...prev,
-      jobId: 'demo-sample-1',
-      title: 'Midnight Echo (한밤의 잔향)',
-      artist: 'Lucid (루시드)',
-      featured: 'feat. Stella',
-      songwriter: '김루시드',
-      producer: 'Echo Lab',
-      lyrics: '자정의 시계탑 소리가 울리면\n길었던 하루의 기억들이 잔향처럼 흩어진다',
-    }));
-    setNoteData({
-      bpm: 98,
-      key: 'E♭ major',
-      genre: 'Alternative Pop / Indie',
-      sound_characteristics: '차분한 어쿠스틱 피아노 도입부에서 후반부 감정 빌드업',
-      mood: '몽환적 / 새벽 / 잔향 / 서정 / 고요',
-      colors: ['#1b1f3b', '#53354a', '#e84545'],
-      concept_summary: '자정의 고요함을 닮은 공간계 사운드와 진솔한 가사가 돋보이는 곡이에요. 98 BPM의 느린 걸음 위에서 후반부로 갈수록 감정이 차오릅니다.',
-    });
+    setUploading(true);
+    try {
+      const { job_id: jobId } = await api.createDemoJob();
+      const info = (await api.getReleaseInfo(jobId)).info;
+      setTitle(info.title || '');
+      setArtist(info.artist || '');
+      setNoteData(null);
+      setJobData((prev) => ({ ...prev, jobId, demo: true, title: info.title || '', artist: info.artist || '' }));
+    } catch (err) {
+      setError(err.message || '체험 모드를 시작하지 못했어요.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   // 수락 전에 피처링·작곡가·프로듀서·가사를 발매 정보에 넣는다 (3단계 검사·제출 준비표에 쓰임)
@@ -233,11 +222,12 @@ export default function Step1Upload({ jobData, setJobData, onNextStep }) {
         <div className="pt-1">
           <button
             onClick={handleLoadSample}
+            disabled={uploading || analyzing}
             type="button"
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/30 transition-all shadow-sm"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>⚡ 파일이 없으신가요? [체험용 샘플 곡 자동 채우기] 원클릭</span>
+            <span>⚡ 파일이 없으신가요? 예시 곡으로 체험해 보기</span>
           </button>
         </div>
       </div>

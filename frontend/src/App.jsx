@@ -182,6 +182,7 @@ export default function App() {
           setJobData((prev) => ({
             ...prev,
             jobId: job.job_id,
+            demo: !!job.demo,
             title: job.title,
             artist: job.artist,
           }));

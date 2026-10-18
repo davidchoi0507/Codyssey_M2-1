@@ -9,6 +9,7 @@ export default function Step4Release({ jobData, onPrevStep, onGoToCommunity }) {
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(null); // 공개한 곡 (OwnerView: manage_url 포함)
   const isDemo = !jobData?.jobId || jobData.jobId.toString().startsWith('demo');
+  const isTrial = !!jobData?.demo; // 체험 모드(실제 작업): 결과는 받을 수 있고 커뮤니티 공개만 막힘
   const [pkg, setPkg] = useState(null);         // 서버 Package (zip_url 은 영상까지 끝나야 생김)
   const [check, setCheck] = useState(null);     // 서버 DistributorCheck (sheet_url)
   const [info, setInfo] = useState(null);       // 서버 ReleaseInfo
@@ -84,7 +85,7 @@ export default function Step4Release({ jobData, onPrevStep, onGoToCommunity }) {
   const counts = check?.counts || {};
 
   const handlePublishToggle = async (confirmOriginal = false) => {
-    if (published || isDemo) return;
+    if (published || isDemo || isTrial) return;
     if (!pubConsent.rights || !pubConsent.public) return setError('커뮤니티 공개 필수 동의 두 가지에 체크해 주세요.');
     setPublishing(true);
     setError(null);
@@ -241,6 +242,10 @@ export default function Step4Release({ jobData, onPrevStep, onGoToCommunity }) {
               <ExternalLink className="w-3.5 h-3.5" />
             </button>
           </div>
+        ) : isTrial ? (
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            체험용 예시 곡은 커뮤니티에 올릴 수 없어요. 내 곡을 올리면 공개할 수 있어요.
+          </span>
         ) : (
           <button
             onClick={() => handlePublishToggle(false)}
@@ -253,7 +258,7 @@ export default function Step4Release({ jobData, onPrevStep, onGoToCommunity }) {
       </div>
 
       {/* 공개 전: 들려줄 범위·반응 공개·필수 동의 / 공개 후: 관리 링크 */}
-      {!published && !isDemo && (
+      {!published && !isDemo && !isTrial && (
         <div className="glass-panel rounded-2xl p-5 space-y-3 text-xs text-zinc-700 dark:text-zinc-300">
           <div className="flex flex-wrap items-center gap-2">
             <b className="w-20">들려줄 범위</b>

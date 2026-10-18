@@ -95,6 +95,9 @@ export const api = {
     return await request('/jobs', { method: 'POST', body: formData });
   },
 
+  // 체험 모드 (10/17): 예시 곡으로 바로 노트 단계. 이후 흐름은 실제 작업과 같고 커뮤니티 공개만 막힘(403 DEMO_NO_PUBLISH)
+  createDemoJob: async () => request('/jobs/demo', { method: 'POST' }),
+
   getJobStatus: async (jobId) => request(`/jobs/${jobId}`),
 
   retryJob: async (jobId) => request(`/jobs/${jobId}/retry`, { method: 'POST' }),
