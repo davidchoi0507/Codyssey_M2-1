@@ -70,7 +70,10 @@ async def security_headers(request: Request, call_next):
     if new_aid:
         # 화면이 다른 주소(Vercel)에 있어도 fetch에 실려 오도록 https에서는 SameSite=None (10/18). 사파리·시크릿 창은
         # 이런 쿠키를 막으므로 그때는 IP로 구분된다. http(로컬)에서는 None이 안 되니 Lax
-        https = settings.public_base_url.startswith("https://")
+        # (10/18 밤) 팀장 화면 http://…:3000 은 프록시로 들어와서 서버는 https로 보이지만 브라우저는 http — Secure 쿠키를
+        # 저장하지 않아 요청마다 새 사람이 됐다. 화면 주소(Origin·Referer)가 http면 Lax로 보낸다.
+        page = request.headers.get("origin") or request.headers.get("referer") or ""
+        https = settings.public_base_url.startswith("https://") and not page.startswith("http://")
         response.set_cookie(ANON_COOKIE, new_aid, max_age=180 * 86400, httponly=True, path="/",
                             samesite="none" if https else "lax", secure=https)
     return response
