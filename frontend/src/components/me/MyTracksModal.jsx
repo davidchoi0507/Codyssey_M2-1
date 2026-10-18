@@ -6,6 +6,8 @@ import { api, tokenStorage, toFileUrl } from '../../services/api';
 export default function MyTracksModal({ isOpen, onClose, user, setUser, onSelectJob }) {
   const [loading, setLoading] = useState(false);
   const [myData, setMyData] = useState(null);
+  const [armed, setArmed] = useState(null); // 지우기 한 번 더 누르기 대기: job_id | 'all'
+  const [delMsg, setDelMsg] = useState('');
 
   useEffect(() => {
     if (isOpen && tokenStorage.get()) {
@@ -38,6 +40,25 @@ export default function MyTracksModal({ isOpen, onClose, user, setUser, onSelect
     tokenStorage.clear();
     setUser(null);
     setMyData(null);
+  };
+
+  // 지우기: 첫 클릭은 확인 문구로 바뀌고, 한 번 더 누르면 지운다 (브라우저 확인 창은 쓰지 않음)
+  const handleDelete = async (e, target) => {
+    e.stopPropagation();
+    if (armed !== target) { setArmed(target); setDelMsg(''); return; }
+    setArmed(null);
+    try {
+      if (target === 'all') {
+        const r = await api.deleteMyJobs();
+        setDelMsg(`작업 ${r.deleted}개를 지웠어요.${r.skipped_busy ? ` 만드는 중인 ${r.skipped_busy}개는 끝난 뒤 지울 수 있어요.` : ''}${r.tracks_kept ? ' 커뮤니티에 올린 곡은 남아 있어요.' : ''}`);
+      } else {
+        const r = await api.deleteJob(target);
+        setDelMsg(r.track_kept ? '작업을 지웠어요. 커뮤니티에 올린 곡은 남아 있어요 (아래에서 내릴 수 있어요).' : '작업을 지웠어요.');
+      }
+      fetchMyInfo();
+    } catch (err) {
+      setDelMsg(err.message || '지우지 못했어요.');
+    }
   };
 
   if (!isOpen) return null;
@@ -77,7 +98,15 @@ export default function MyTracksModal({ isOpen, onClose, user, setUser, onSelect
 
             {/* My Tracks List */}
             <div className="space-y-2">
-              <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">내 발매 작업 기록 (2026-10-31 삭제)</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">내 발매 작업 기록 (2026-10-31 삭제)</span>
+                {myData?.jobs?.length > 1 && (
+                  <button onClick={(e) => handleDelete(e, 'all')} className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline">
+                    {armed === 'all' ? '정말 모두 지울까요? (한 번 더)' : '모두 지우기'}
+                  </button>
+                )}
+              </div>
+              {delMsg && <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{delMsg}</p>}
               {myData?.jobs?.length > 0 ? (
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                   {myData.jobs.map((job) => (
@@ -93,9 +122,14 @@ export default function MyTracksModal({ isOpen, onClose, user, setUser, onSelect
                         <Disc3 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
                         <span className="text-xs font-bold text-zinc-900 dark:text-white truncate">{job.title || '작업 중인 곡'}</span>
                       </div>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        {job.stage_label}
-                      </span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold">
+                          {job.stage_label}
+                        </span>
+                        <button onClick={(e) => handleDelete(e, job.job_id)} className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 hover:underline">
+                          {armed === job.job_id ? '정말 지울까요?' : '지우기'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

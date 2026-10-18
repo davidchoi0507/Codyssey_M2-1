@@ -193,6 +193,9 @@ export const api = {
   getMe: async () => request('/auth/me'),
 
   getMyJobs: async () => request('/me/jobs'),
+  // (10/18) 작업 지우기 — 되돌릴 수 없음. 커뮤니티에 공개한 곡은 남는다(track_kept / tracks_kept)
+  deleteJob: async (jobId) => request(`/jobs/${jobId}`, { method: 'DELETE' }),
+  deleteMyJobs: async () => request('/me/jobs', { method: 'DELETE' }),
 
   getMyTracks: async () => request('/me/tracks'),
 
