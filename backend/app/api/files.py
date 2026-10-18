@@ -16,5 +16,5 @@ def get_file(token: str, s: Settings = Depends(settings)) -> FileResponse:
     root = (s.jobs_dir / job_id).resolve()
     path = (root / rel).resolve()
     if not path.is_relative_to(root) or not path.is_file():
-        raise AppError("FILE_NOT_FOUND", "파일을 찾을 수 없어요. 7일이 지나 삭제되었을 수 있어요.", False, http_status=404)
+        raise AppError("FILE_NOT_FOUND", "파일을 찾을 수 없어요. 삭제되었거나 아직 만들어지지 않았어요.", False, http_status=404)
     return FileResponse(path, filename=path.name)

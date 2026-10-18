@@ -27,7 +27,7 @@ def runner(request: Request) -> JobRunner:
 
 def find_job(job_id: str) -> JobFiles:
     """작업 폴더 찾기만 (권한 확인 없음 — 서명 링크처럼 따로 확인한 경우에만 쓴다)."""
-    not_found = AppError("JOB_NOT_FOUND", "작업을 찾을 수 없어요. 7일이 지나 삭제되었을 수 있어요.", False,
+    not_found = AppError("JOB_NOT_FOUND", "작업을 찾을 수 없어요. 주소가 틀렸거나 삭제된 작업이에요.", False,
                          http_status=404)
     if not _JOB_ID.match(job_id):
         raise not_found

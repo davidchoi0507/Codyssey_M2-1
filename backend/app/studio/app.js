@@ -1,9 +1,9 @@
-/* 인디 앨범 스튜디오 — 전체 흐름 시안 (2026-10-10). 한 파일 앱: 해시 주소로 화면을 바꾼다.
+/* 발매로 — 전체 흐름 시안 (2026-10-10). 한 파일 앱: 해시 주소로 화면을 바꾼다.
    화면: 홈 · 발매 안내 · 발매 준비(업로드 → 작업 공간 7단계) · 바로 공개 · 커뮤니티 · 내 곡.
    AI가 쓴 글·사용자 입력은 모두 esc()로 글자로만 넣는다 (HTML로 해석하지 않게). */
 "use strict";
 
-const CONSENT_VERSION = "v1.3";
+const CONSENT_VERSION = "v1.6";
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const view = $("#view");
@@ -219,10 +219,10 @@ async function newJob() {
     <label class="field"><span>가사 <em>선택 — 있으면 AI가 더 잘 해석해요</em></span><textarea name="lyrics" maxlength="5000"></textarea></label>
     <div class="notice">
       <b>동의 (동의서 ${CONSENT_VERSION})</b>
-      <label class="check"><input type="checkbox" name="c1" required><span>[필수] 만 14세 이상이에요. 개인정보 수집·이용 — 곡 정보·음원·크레딧(참여자 이름)·발매 정보·접속 IP. 유통사 제출 준비표·ZIP도 이 정보로 만들어요. 업로드 7일 뒤 자동 삭제 (<a href="/privacy" target="_blank">개인정보처리방침</a>)</span></label>
-      <label class="check"><input type="checkbox" name="c2" required><span>[필수] 외부 AI 전송(미국) — 음원은 Google Gemini(무료 등급, 학습에 쓰일 수 있음), 글·이미지는 코디세이 API(OpenAI 모델, 학습 미사용)로 처리</span></label>
+      <label class="check"><input type="checkbox" name="c1" required><span>[필수] 만 14세 이상이에요. 개인정보 수집·이용 — 곡 정보·음원·크레딧(참여자 이름)·발매 정보·소리 지문·접속 IP(7일). 유통사 제출 준비표·ZIP도 이 정보로 만들어요. 서비스 종료일(2026-10-31)에 일괄 삭제 (<a href="/privacy" target="_blank">개인정보처리방침</a>)</span></label>
+      <label class="check"><input type="checkbox" name="c2" required><span>[필수] 외부 AI·음원 DB 전송 — 음원 분석은 Google Gemini(미국, 무료 등급이라 학습에 쓰일 수 있음), 글·이미지는 코디세이 API를 거쳐 OpenAI(미국, 학습 미사용), 알려진 곡 확인은 AcoustID(소리 지문만)</span></label>
       <label class="check"><input type="checkbox" name="c3" required><span>[필수] 직접 만든 곡이거나 올릴 권리가 있고, 크레딧에 넣는 참여자에게 동의를 받았어요. 규격 검사·권리 자가진단은 참고용이라 유통사 통과를 보장하지 않아요. AI 결과물은 저작권이 인정되지 않을 수 있어요</span></label>
-      <label class="check"><input type="checkbox" name="c4"><span>[선택] 결과물을 서비스 개선·발표 자료에 써도 돼요</span></label>
+      <label class="check"><input type="checkbox" name="c4"><span>[선택] 결과물 썸네일·올린 사진을 서비스 개선·발표 자료에 써도 돼요 (음원 제외, 2026-10-31 삭제)</span></label>
     </div>
     <p class="err" id="upErr"></p>
     <button class="btn primary block" id="upBtn">올리고 AI에게 들려주기</button>
@@ -565,7 +565,7 @@ async function stepShare(p) {
         <button type="button" class="chip ${AI0 === "generated" ? "on" : ""}" data-v="generated">AI가 곡·목소리를 만들었어요</button></div>
         <p class="muted small">'AI가 만들었어요'를 고르면 곡에 'AI 활용' 표시가 붙어요. 숨긴 게 드러나면 신고로 내려갈 수 있어요.</p></div>
       <label class="check"><input type="checkbox" name="c1"><span>[필수] 만 14세 이상이고, 직접 만든 곡이거나 공개할 권리가 있어요</span></label>
-      <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응이 모여요. 공개 음원은 녹음될 수 있으니 발매 전 곡은 하이라이트만 공개하길 권해요</span></label>
+      <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내리거나 서비스 종료일(2026-10-31)까지 보관돼요. 듣는 사람의 반응이 모여요. 공개 음원은 녹음될 수 있으니 발매 전 곡은 하이라이트만 공개하길 권해요</span></label>
       <button class="btn primary block" id="pubBtn">커뮤니티에 올리기</button>
     </form>`;
   bindChips(p);
@@ -635,7 +635,7 @@ async function quick() {
         <p class="muted small">'AI가 만들었어요'를 고르면 곡에 'AI 활용' 표시가 붙어요. 숨긴 게 드러나면 신고로 내려갈 수 있어요.</p></div>
     <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
     <label class="check"><input type="checkbox" name="c1"><span>[필수] 만 14세 이상이고, 직접 만든 곡이거나 공개할 권리가 있어요</span></label>
-    <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내릴 때까지(서비스 종료일까지) 보관돼요. 듣는 사람의 반응과 접속 IP(도배 방지용, 7일 보관)가 모여요. 공개 음원은 녹음될 수 있으니 발매 전 곡은 하이라이트만 공개하길 권해요</span></label>
+    <label class="check"><input type="checkbox" name="c2"><span>[필수] 커뮤니티에 공개하고, 내가 내리거나 서비스 종료일(2026-10-31)까지 보관돼요. 듣는 사람의 반응과 접속 IP(도배 방지용, 7일 보관)가 모여요. 공개 음원은 녹음될 수 있으니 발매 전 곡은 하이라이트만 공개하길 권해요</span></label>
     <p class="err" id="qErr"></p>
     <button class="btn primary block" id="qBtn">바로 공개하기</button>
   </form>
@@ -730,7 +730,7 @@ async function trackView(id) {
         <textarea name="comment" maxlength="500" placeholder="한마디 (선택) — 욕설·광고·링크는 등록되지 않아요"></textarea>
         <div class="row"><input type="text" name="nickname" maxlength="20" placeholder="닉네임 (선택)" style="max-width:200px"><span class="sp"></span><button class="btn primary" id="fbBtn">남기기</button></div>
         <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
-        <p class="muted small">로그인 없이 남길 수 있어요. 도배 방지를 위해 접속 IP를 7일 동안 보관하고 화면에는 표시하지 않아요.</p>
+        <p class="muted small">반응은 곡을 올린 분과 (공개 설정 시) 다른 방문자에게 보여요. 도배 방지를 위해 접속 IP를 7일 동안 보관하고 화면에는 표시하지 않아요. 별점은 한 사람당 하나로 계산하려고 브라우저 익명 식별값을 써요. 욕설·광고·도배는 등록되지 않아요.</p>
         <p class="err" id="fbErr"></p>
       </form>
       <div id="fbList" style="margin-top:8px">${t.feedback.map((f, i, a) => fbItem(f, i, a, t.track_id)).join("")}</div>
@@ -865,7 +865,7 @@ async function me() {
     ${tracks.length ? `<div class="tracks" style="margin-top:14px">${tracks.map((t) => `<div><a class="track" href="${esc(t.manage_url)}" target="_blank" rel="noopener"><div class="cv"><img src="${esc(t.cover_url)}" alt="" loading="lazy"></div>
       <div class="t">${esc(t.title)}</div><div class="a">${esc(t.artist)}</div><div class="m">▶ ${t.plays} · 반응 ${t.reactions}${t.status !== "live" ? ` · <b style="color:var(--fail)">${t.status === "reported" ? "신고로 숨겨짐" : "내려감"}</b>` : ""}</div></a></div>`).join("")}</div>` : `<p class="muted">아직 없어요.</p>`}</div>
   <div class="card"><div class="row"><h3>발매 준비 중인 작업</h3><span class="sp"></span><a class="btn small" href="#/new">새 곡</a></div>
-    <p class="muted small">작업(음원·결과물)은 올린 지 7일 뒤 자동으로 지워져요. 커뮤니티에 올린 곡은 남아요.</p>
+    <p class="muted small">작업(음원·결과물)과 커뮤니티에 올린 곡은 서비스 종료일(2026-10-31)에 모두 지워져요.</p>
     ${jobs.length ? `<ul class="cal">${jobs.map((j) => `<li><div class="small muted">${new Date(j.created_at).toLocaleDateString("ko-KR")}</div><div class="row"><a href="#/job/${esc(j.job_id)}/listen"><b>${esc(j.title)}</b></a><span class="muted small">${esc(j.artist)}</span><span class="pill">${esc(j.stage_label)}</span>${j.track_id ? `<span class="pill ok">공개함</span>` : ""}</div></li>`).join("")}</ul>` : `<p class="muted">아직 없어요.</p>`}</div>
   <div class="card"><h3>이 브라우저에서 연 작업</h3>${recentList(recent)}</div>`;
   $("#logout").onclick = async () => { await api("POST", "/auth/logout"); await loadMe(); toast("로그아웃했어요."); route(); };

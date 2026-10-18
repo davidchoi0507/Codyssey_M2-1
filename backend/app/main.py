@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="인디 앨범 스튜디오 API",
+    title="발매로 API",
     description="곡 하나로 발매 캠페인까지 — AI A&R 노트, 커버, 숏폼, 채널 홍보 세트.\n\n"
                 "**초안**: 10/7 이후로는 필드를 추가만 하고 이름 변경·삭제는 하지 않습니다. "
                 "'예정'이 붙은 엔드포인트는 형식만 확정이고 지금은 501을 돌려줍니다.\n\n"

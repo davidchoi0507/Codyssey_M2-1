@@ -14,7 +14,7 @@ REQUIRED_CONSENTS = ("consent_original", "consent_privacy", "consent_external_ai
 def check_consent(consent: dict) -> None:
     if not all(consent.get(k) for k in REQUIRED_CONSENTS):
         raise AppError("CONSENT_REQUIRED",
-                       "필수 동의(자작곡 확약, 개인정보 7일 보관, 음원의 Gemini 전송·학습 가능성 고지)가 필요해요.", False)
+                       "필수 동의(자작곡 확약, 개인정보 수집·이용, 음원의 Gemini 전송·학습 가능성 고지)가 필요해요.", False)
     if not consent.get("consent_version"):
         raise AppError("CONSENT_REQUIRED", "동의 문구 버전이 없어요.", False)
 

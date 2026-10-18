@@ -47,7 +47,7 @@ async def create(
     genre: str = Form("", max_length=MAX_GENRE), description: str = Form("", max_length=MAX_DESCRIPTION),
     lyrics: str | None = Form(None, max_length=MAX_LYRICS),
     consent_original: bool = Form(description="자작곡(권리 보유) 확약 — 필수"),
-    consent_privacy: bool = Form(description="개인정보 수집·7일 보관 — 필수"),
+    consent_privacy: bool = Form(description="개인정보 수집·이용 (동의서 v1.6 제1조) — 필수"),
     consent_external_ai: bool = Form(description="음원의 Gemini 전송·무료 티어 학습 가능성 고지 — 필수"),
     consent_showcase: bool = Form(False, description="발표 사용 동의 — 선택"),
     consent_version: str = Form(max_length=20, description="동의 문구 버전"),

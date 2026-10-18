@@ -27,7 +27,7 @@ from app.pipeline.limits import _today_start_utc
 from app.pipeline import demo, fingerprint, moderation, reports
 from app.pipeline.render import cover_file_or_none
 
-CONSENT_VERSION = "community-v1"
+CONSENT_VERSION = "community-v1.6"  # 동의서 v1.6 제6·7조
 TAGS = ["멜로디가 좋아요", "목소리가 좋아요", "가사가 와닿아요", "분위기가 좋아요", "편곡이 좋아요", "또 듣고 싶어요"]
 FFMPEG_TIMEOUT_SEC = 180
 COVER_PX = 800
@@ -247,7 +247,7 @@ def update(s: Settings, track_id: str, *, listen_mode: str | None = None, commen
             except AppError:
                 jf = None
         if jf is None or jf.find_original() is None:
-            raise AppError("SOURCE_GONE", "원본 작업이 7일이 지나 삭제되어 공개 방식을 바꿀 수 없어요. "
+            raise AppError("SOURCE_GONE", "원본 작업이 삭제되어 공개 방식을 바꿀 수 없어요. "
                            "곡을 내리고 새로 올려 주세요.", False, http_status=409)
         sets["clip_start"], sets["clip_sec"] = _build_audio(jf, _note(jf), listen_mode, audio_path(s, track_id))
         sets["listen_mode"] = listen_mode
@@ -357,7 +357,7 @@ def _build_audio(jf: JobFiles, note: dict | None, mode: str, out: Path) -> tuple
     """공개용 mp3 (192kbps). highlight면 노트의 선택 구간만 잘라 앞뒤를 살짝 줄인다."""
     src = jf.find_original()
     if src is None:
-        raise AppError("SOURCE_GONE", "원본 음원이 없어요. 7일이 지나 삭제되었을 수 있어요.", False, http_status=409)
+        raise AppError("SOURCE_GONE", "원본 음원이 없어요. 작업이 삭제되었을 수 있어요.", False, http_status=409)
     duration = float(jf.read_json(jf.features)["duration_sec"]) if jf.features.exists() else None
     if mode == "highlight":
         if not note:
