@@ -1,0 +1,6 @@
+# Ignore backend and docs during Vercel builds
+backend/
+docs/
+*.pdf
+*.html
+*.json
