@@ -31,6 +31,12 @@ export default {
       fontFamily: {
         sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
       },
+      fontSize: {
+        '2xs': ['0.75rem', { lineHeight: '1.1rem' }],   // 12px
+        'xs': ['0.8125rem', { lineHeight: '1.25rem' }], // 13px
+        'sm': ['0.9375rem', { lineHeight: '1.4rem' }],  // 15px
+        'base': ['1.03125rem', { lineHeight: '1.6rem' }], // 16.5px
+      },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },

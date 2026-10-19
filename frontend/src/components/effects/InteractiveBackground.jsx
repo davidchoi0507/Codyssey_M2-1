@@ -1,211 +1,170 @@
-import React, { useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import React from 'react';
 
 export default function InteractiveBackground({ theme = 'dark' }) {
-  const canvasRef = useRef(null);
   const isDark = theme === 'dark';
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let animationFrameId;
-
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
-
-    const handleResize = () => {
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-    };
-    window.addEventListener('resize', handleResize);
-
-    // Mouse coordinates
-    let mouse = { x: width / 2, y: height / 2, targetX: width / 2, targetY: height / 2 };
-
-    const handleMouseMove = (e) => {
-      mouse.targetX = e.clientX;
-      mouse.targetY = e.clientY;
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-
-    const handleTouchMove = (e) => {
-      if (e.touches && e.touches[0]) {
-        mouse.targetX = e.touches[0].clientX;
-        mouse.targetY = e.touches[0].clientY;
-      }
-    };
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
-    window.addEventListener('touchstart', handleTouchMove, { passive: true });
-
-    // Audio Wave Nodes & Particles
-    const particleCount = 40;
-    const particles = Array.from({ length: particleCount }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      vx: (Math.random() - 0.5) * 0.35,
-      vy: (Math.random() - 0.5) * 0.35,
-      radius: Math.random() * 2 + 1,
-      alpha: Math.random() * 0.4 + 0.1,
-      baseAlpha: Math.random() * 0.4 + 0.1,
-    }));
-
-    let time = 0;
-
-    const render = () => {
-      time += 0.015;
-      mouse.x += (mouse.targetX - mouse.x) * 0.05;
-      mouse.y += (mouse.targetY - mouse.y) * 0.05;
-
-      ctx.clearRect(0, 0, width, height);
-
-      // 1. Draw Organic Audio Frequency Sine Waves
-      ctx.lineWidth = 1.2;
-      for (let wave = 0; wave < 3; wave++) {
-        ctx.beginPath();
-        const colorsDark = [
-          'rgba(99, 102, 241, 0.18)', // Indigo
-          'rgba(56, 189, 248, 0.14)', // Sky
-          'rgba(168, 85, 247, 0.10)', // Purple
-        ];
-        const colorsLight = [
-          'rgba(99, 102, 241, 0.09)', // Soft Indigo
-          'rgba(14, 165, 233, 0.07)', // Soft Sky
-          'rgba(139, 92, 246, 0.06)', // Soft Purple
-        ];
-        ctx.strokeStyle = isDark ? colorsDark[wave] : colorsLight[wave];
-
-        const waveHeight = 45 + wave * 25;
-        const speed = time * (0.8 + wave * 0.3);
-        const yOffset = height * (0.35 + wave * 0.15);
-
-        for (let x = 0; x < width; x += 6) {
-          const dx = x - mouse.x;
-          const dist = Math.abs(dx);
-          const mouseFactor = Math.max(0, 1 - dist / 300) * 40;
-
-          const y = yOffset + Math.sin(x * 0.003 + speed) * waveHeight + Math.cos(x * 0.007 + speed * 0.5) * 20 - mouseFactor;
-
-          if (x === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-      }
-
-      // 2. Draw Floating Particles & Connected Constellation
-      particles.forEach((p, i) => {
-        p.x += p.vx;
-        p.y += p.vy;
-
-        if (p.x < 0) p.x = width;
-        if (p.x > width) p.x = 0;
-        if (p.y < 0) p.y = height;
-        if (p.y > height) p.y = 0;
-
-        const dx = p.x - mouse.x;
-        const dy = p.y - mouse.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 150) {
-          p.alpha = Math.min(0.9, p.baseAlpha + (1 - dist / 150) * 0.6);
-        } else {
-          p.alpha = p.baseAlpha;
-        }
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = isDark
-          ? `rgba(165, 180, 252, ${p.alpha})`
-          : `rgba(99, 102, 241, ${p.alpha * 0.6})`;
-        ctx.fill();
-
-        for (let j = i + 1; j < particles.length; j++) {
-          const p2 = particles[j];
-          const dist2 = Math.hypot(p.x - p2.x, p.y - p2.y);
-          if (dist2 < 110) {
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = isDark
-              ? `rgba(99, 102, 241, ${(1 - dist2 / 110) * 0.12})`
-              : `rgba(99, 102, 241, ${(1 - dist2 / 110) * 0.07})`;
-            ctx.stroke();
-          }
-        }
-      });
-
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchstart', handleTouchMove);
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [isDark]);
-
   return (
-    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-      {/* 1. Interactive Canvas Wave & Constellation */}
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
-
-      {/* 2. Rotating 3D Vinyl Hologram Orbit */}
-      <div className={`absolute top-[8%] right-[-5%] lg:right-[3%] w-[420px] h-[420px] pointer-events-none ${
-        isDark ? 'opacity-35 mix-blend-screen' : 'opacity-20 mix-blend-multiply'
-      }`}>
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
-          className={`absolute inset-0 rounded-full border border-dashed ${
-            isDark ? 'border-indigo-500/30' : 'border-indigo-400/40'
-          }`}
-        />
-
-        <motion.div
-          animate={{ rotate: -360, scale: [1, 1.05, 1] }}
-          transition={{
-            rotate: { duration: 30, repeat: Infinity, ease: 'linear' },
-            scale: { duration: 6, repeat: Infinity, ease: 'easeInOut' }
+    <div 
+      className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none"
+      aria-hidden="true"
+    >
+      {/* 1. 라이트 모드 배경 레이어 (부드러운 크로스페이드) */}
+      <div 
+        className={`absolute inset-0 bg-[#f8fafc] transition-opacity duration-300 ease-in-out ${
+          !isDark ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{
+          backgroundColor: '#f8fafc',
+          backgroundImage: `
+            radial-gradient(at 12% 15%, rgba(199, 210, 254, 0.65) 0px, transparent 55%),
+            radial-gradient(at 88% 12%, rgba(186, 230, 253, 0.60) 0px, transparent 50%),
+            radial-gradient(at 8% 62%, rgba(233, 213, 255, 0.55) 0px, transparent 50%),
+            radial-gradient(at 92% 70%, rgba(199, 210, 254, 0.55) 0px, transparent 55%),
+            radial-gradient(at 48% 95%, rgba(224, 231, 255, 0.50) 0px, transparent 60%)
+          `,
+        }}
+      >
+        {/* 라이트 모드 소프트 오로라 */}
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            top: '-100px',
+            left: '15%',
+            width: '650px',
+            height: '480px',
+            background: 'radial-gradient(circle, rgba(199, 210, 254, 0.75) 0%, rgba(224, 231, 255, 0.35) 55%, transparent 75%)',
+            filter: 'blur(60px)',
           }}
-          className={`absolute inset-8 rounded-full border ${
-            isDark 
-              ? 'border-sky-400/25 border-t-indigo-400/60 shadow-[0_0_50px_rgba(99,102,241,0.2)]' 
-              : 'border-sky-500/20 border-t-indigo-500/40'
-          }`}
         />
-
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 16, repeat: Infinity, ease: 'linear' }}
-          className={`absolute inset-16 rounded-full border-4 border-double flex items-center justify-center backdrop-blur-[1px] ${
-            isDark 
-              ? 'border-indigo-600/40 bg-gradient-to-tr from-indigo-950/30 via-transparent to-sky-950/30' 
-              : 'border-indigo-300/40 bg-gradient-to-tr from-indigo-100/30 via-transparent to-sky-100/30'
-          }`}
-        >
-          <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-indigo-600 via-sky-500 to-indigo-400 p-0.5 shadow-lg shadow-indigo-500/30 flex items-center justify-center">
-            <div className={`w-6 h-6 rounded-full border-2 ${
-              isDark ? 'bg-[#09090b] border-indigo-300' : 'bg-white border-indigo-400'
-            }`} />
-          </div>
-        </motion.div>
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            top: '-60px',
+            right: '-5%',
+            width: '600px',
+            height: '450px',
+            background: 'radial-gradient(circle, rgba(186, 230, 253, 0.70) 0%, rgba(224, 242, 254, 0.3) 55%, transparent 75%)',
+            filter: 'blur(60px)',
+          }}
+        />
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            top: '40%',
+            left: '-8%',
+            width: '560px',
+            height: '500px',
+            background: 'radial-gradient(circle, rgba(233, 213, 255, 0.65) 0%, rgba(243, 232, 255, 0.25) 55%, transparent 75%)',
+            filter: 'blur(70px)',
+          }}
+        />
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            bottom: '-80px',
+            right: '12%',
+            width: '680px',
+            height: '460px',
+            background: 'radial-gradient(circle, rgba(199, 210, 254, 0.70) 0%, rgba(219, 234, 254, 0.3) 55%, transparent 75%)',
+            filter: 'blur(70px)',
+          }}
+        />
       </div>
 
-      {/* 3. Ambient Light Pools */}
-      {isDark ? (
-        <>
-          <div className="absolute top-[-10%] right-[-10%] w-[700px] h-[700px] bg-indigo-600/8 rounded-full blur-[160px]" />
-          <div className="absolute bottom-[-10%] left-[-10%] w-[650px] h-[650px] bg-sky-500/6 rounded-full blur-[150px]" />
-        </>
-      ) : (
-        <>
-          <div className="absolute top-[-10%] right-[-10%] w-[700px] h-[700px] bg-indigo-200/25 rounded-full blur-[160px]" />
-          <div className="absolute bottom-[-10%] left-[-10%] w-[650px] h-[650px] bg-sky-100/30 rounded-full blur-[150px]" />
-        </>
-      )}
+      {/* 2. 다크 모드 배경 레이어 (부드러운 크로스페이드) */}
+      <div 
+        className={`absolute inset-0 bg-[#09090b] transition-opacity duration-300 ease-in-out ${
+          isDark ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{
+          backgroundColor: '#09090b',
+          backgroundImage: `
+            radial-gradient(at 10% 12%, rgba(99, 102, 241, 0.32) 0px, transparent 55%),
+            radial-gradient(at 88% 10%, rgba(14, 165, 233, 0.28) 0px, transparent 50%),
+            radial-gradient(at 6% 58%, rgba(168, 85, 247, 0.24) 0px, transparent 50%),
+            radial-gradient(at 94% 65%, rgba(79, 70, 229, 0.28) 0px, transparent 55%),
+            radial-gradient(at 45% 92%, rgba(139, 92, 246, 0.22) 0px, transparent 55%)
+          `,
+        }}
+      >
+        {/* 상단 좌측: 웅장한 인디고 & 바이올렛 대형 오로라 */}
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            top: '-120px',
+            left: '12%',
+            width: '650px',
+            height: '500px',
+            background: 'radial-gradient(circle, rgba(99, 102, 241, 0.38) 0%, rgba(79, 70, 229, 0.18) 50%, transparent 75%)',
+            filter: 'blur(70px)',
+            transform: 'translate3d(0, 0, 0)',
+          }}
+        />
+
+        {/* 상단 우측: 상쾌한 일렉트릭 시안 / 스카이 블루 글로우 */}
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            top: '-80px',
+            right: '-5%',
+            width: '600px',
+            height: '480px',
+            background: 'radial-gradient(circle, rgba(14, 165, 233, 0.32) 0%, rgba(56, 189, 248, 0.15) 50%, transparent 75%)',
+            filter: 'blur(70px)',
+            transform: 'translate3d(0, 0, 0)',
+          }}
+        />
+
+        {/* 중앙 좌측: 무디 퍼플 / 마젠타 앰비언트 글로우 */}
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            top: '35%',
+            left: '-8%',
+            width: '580px',
+            height: '520px',
+            background: 'radial-gradient(circle, rgba(168, 85, 247, 0.26) 0%, rgba(147, 51, 234, 0.12) 50%, transparent 75%)',
+            filter: 'blur(80px)',
+            transform: 'translate3d(0, 0, 0)',
+          }}
+        />
+
+        {/* 중하단 우측: 딥 로열 블루 & 인디고 오로라 */}
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            top: '55%',
+            right: '-6%',
+            width: '680px',
+            height: '520px',
+            background: 'radial-gradient(circle, rgba(79, 70, 229, 0.32) 0%, rgba(37, 99, 235, 0.15) 50%, transparent 75%)',
+            filter: 'blur(80px)',
+            transform: 'translate3d(0, 0, 0)',
+          }}
+        />
+
+        {/* 최하단 중앙: 딥 나이트 퍼플 틴트 */}
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            bottom: '-120px',
+            left: '32%',
+            width: '720px',
+            height: '460px',
+            background: 'radial-gradient(circle, rgba(139, 92, 246, 0.25) 0%, rgba(99, 102, 241, 0.10) 50%, transparent 80%)',
+            filter: 'blur(80px)',
+            transform: 'translate3d(0, 0, 0)',
+          }}
+        />
+
+        {/* 은은한 상단 집중 하이라이트 */}
+        <div
+          className="absolute inset-0 pointer-events-none mix-blend-screen"
+          style={{
+            background: 'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 70%)',
+          }}
+        />
+      </div>
     </div>
   );
 }
