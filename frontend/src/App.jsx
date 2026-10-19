@@ -35,7 +35,22 @@ if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
 }
 
 export default function App() {
+  const [initialTrackId, setInitialTrackId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get('track') || null;
+    }
+    return null;
+  });
+
   const [activeTab, setActiveTab] = useState(() => {
+    // 1. URL에 ?track= 파라미터가 있으면 저장된 탭보다 먼저 커뮤니티 탭으로 이동!
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('track')) {
+        return 'community';
+      }
+    }
     try {
       const saved = sessionStorage.getItem('balmaero_active_tab');
       if (saved && ['home', 'studio', 'community', 'me'].includes(saved)) {
@@ -110,7 +125,7 @@ export default function App() {
       // 만약 팝업창에서 열려 리다이렉트된 경우 부모 창에 토큰 전달 후 스스로 닫힘 (은희님 피드백 해결)
       if (window.opener && window.opener !== window) {
         try {
-          window.opener.postMessage({ type: 'BALMAERO_AUTH_SUCCESS', token }, '*');
+          window.opener.postMessage({ type: 'BALMAERO_AUTH_SUCCESS', token }, window.location.origin);
           window.close();
           return;
         } catch (e) {
@@ -172,6 +187,7 @@ export default function App() {
   // 팝업창에서 전달된 로그인 성공 메시지 수신 처리
   useEffect(() => {
     const handleAuthMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
       if (event.data?.type === 'BALMAERO_AUTH_SUCCESS' && event.data.token) {
         tokenStorage.set(event.data.token);
         setActiveTab('me');
@@ -369,6 +385,7 @@ export default function App() {
 
         {activeTab === 'community' && (
           <CommunityFeed
+            initialTrackId={initialTrackId}
             onStartNewRelease={() => {
               handleTabChange('studio');
               setCurrentStep(1);

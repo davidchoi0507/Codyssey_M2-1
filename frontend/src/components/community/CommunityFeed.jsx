@@ -45,7 +45,7 @@ const GENRE_OPTIONS = [
   { value: 'Folk', label: '포크 / 어쿠스틱' },
 ];
 
-export default function CommunityFeed({ onStartNewRelease, onGoToStudio }) {
+export default function CommunityFeed({ onStartNewRelease, onGoToStudio, initialTrackId }) {
   const [tracks, setTracks] = useState([]);
   const [sort, setSort] = useState('new'); // 'new' | 'popular' | 'random'
   const [genreFilter, setGenreFilter] = useState('');
@@ -55,6 +55,7 @@ export default function CommunityFeed({ onStartNewRelease, onGoToStudio }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState(null);
+  const initialTrackHandled = useRef(false);
 
   // 뷰 모드 토글 상태 ('card' | 'list')
   const [viewMode, setViewMode] = useState(() => {
@@ -169,15 +170,21 @@ const matchesGenre = (trackGenre, selectedGenre) => {
       const apiSort =
         customSort === 'rating' || customSort === 'reactions' ? 'popular' : customSort;
       // 서버에서 genre=Indie 등 영문 필터가 한글 장르 및 빈 장르도 찾도록 배포 완료됨
-      const res = await api.getCommunityTracks({
-        sort: apiSort,
-        genre: customGenre || '',
-        q: customQ,
-        limit: 50,
-        offset: nextOffset,
-      });
-
-      let list = res.tracks || [];
+      let list = [];
+      let totalCount = 0;
+      try {
+        const res = await api.getCommunityTracks({
+          sort: apiSort,
+          genre: customGenre || '',
+          q: customQ,
+          limit: 50,
+          offset: nextOffset,
+        });
+        list = res.tracks || [];
+        totalCount = res.total || list.length;
+      } catch (feedErr) {
+        if (!initialTrackId) throw feedErr;
+      }
 
       // 스마트 장르 필터링 적용 (신미영님 피드백: Indie 및 한글 장르 필터링 완벽 지원)
       if (customGenre) {
@@ -202,12 +209,36 @@ const matchesGenre = (trackGenre, selectedGenre) => {
         });
       }
 
+      // 공유 링크(?track=ID)로 진입한 경우: api.getTrackDetail(id)로 해당 곡을 맨 위에 노출
+      if (reset && initialTrackId && !initialTrackHandled.current) {
+        initialTrackHandled.current = true;
+        try {
+          const sharedTrack = await api.getTrackDetail(initialTrackId);
+          if (sharedTrack && sharedTrack.track_id) {
+            list = list.filter((t) => t.track_id !== sharedTrack.track_id);
+            list.unshift(sharedTrack);
+            if (sharedTrack.feedback) {
+              setTrackDetails((prev) => ({
+                ...prev,
+                [sharedTrack.track_id]: {
+                  feedback: (sharedTrack.feedback || []).filter((f) => f.comment && !f.hidden),
+                  showAll: false,
+                  loading: false,
+                },
+              }));
+            }
+          }
+        } catch (detailErr) {
+          console.warn('Failed to fetch shared track detail:', detailErr);
+        }
+      }
+
       if (reset) {
         setTracks(list);
       } else {
         setTracks((prev) => [...prev, ...list]);
       }
-      setTotal(customGenre ? list.length : (res.total || list.length));
+      setTotal(customGenre ? list.length : (totalCount || list.length));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -406,13 +437,23 @@ const matchesGenre = (trackGenre, selectedGenre) => {
 
   const handleShareTrack = async (track) => {
     const url = `${window.location.origin}${window.location.pathname}?track=${track.track_id}`;
-    const ok = await copyToClipboard(url);
-    if (ok) {
-      setCopiedTrackId(track.track_id);
-      say(track.track_id, '곡 공유 링크가 클립보드에 복사되었어요 ✓');
-      setTimeout(() => setCopiedTrackId(null), 2000);
+    if (navigator.share && /Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+      try {
+        await navigator.share({
+          title: track.title,
+          text: `${track.artist || ''} - ${track.title}`,
+          url,
+        });
+      } catch {}
     } else {
-      say(track.track_id, '공유 링크 복사에 실패했어요. 브라우저 주소를 복사해 주세요.');
+      const ok = await copyToClipboard(url);
+      if (ok) {
+        setCopiedTrackId(track.track_id);
+        say(track.track_id, '곡 공유 링크가 클립보드에 복사되었어요 ✓');
+        setTimeout(() => setCopiedTrackId(null), 2000);
+      } else {
+        say(track.track_id, '공유 링크 복사에 실패했어요. 브라우저 주소를 복사해 주세요.');
+      }
     }
   };
 
