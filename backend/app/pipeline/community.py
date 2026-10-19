@@ -146,16 +146,20 @@ def check_public_text(title: str, artist: str, intro: str | None) -> None:
 
 
 def check_copy(s: Settings, src: Path, ext: str | None, *, user_id: str | None, who: str | None,
-               confirm_original: bool) -> tuple[dict | None, dict | None]:
+               confirm_original: bool, relink: bool = False) -> tuple[dict | None, dict | None, str | None]:
     """남의 곡 막기 (#40). (지문, AcoustID가 찾은 곡). 이미 공개된 곡과 같은 녹음이면 거절 — 내가 올린 곡이면
     ALREADY_PUBLISHED, 다른 사람 곡이면 DUPLICATE_TRACK (10/16: 본인도 두 번 공개 안 됨, 내린 곡은 비교에서 빠짐).
     알려진 곡과 비슷하면 올린 사람이 '직접 만든 곡이 맞다'고 다시 확인해야(confirm_original) 진행되고 운영자에게 알린다.
-    업로드(POST /jobs, 분석 전)와 공개 때 둘 다 쓴다."""
+    업로드(POST /jobs, 분석 전)와 공개 때 둘 다 쓴다. (지문, 알려진 곡, 이어 붙일 track_id).
+    (10/19) relink(업로드 때만): 내가 공개한 곡인데 이어진 작업이 없으면(바로 공개했거나 작업이 지워짐) 막지 않고 그 track_id를
+    돌려준다 — 커뮤니티에만 올린 곡도 원본을 올려 발매 준비를 할 수 있게. 이어진 작업이 살아 있으면 지금처럼 거절."""
     fp = fingerprint.compute(src, ext)
     if fp is None:
-        return None, None
+        return None, None, None
     if dup := fingerprint.find_duplicate(fp):
         mine = (user_id and dup["user_id"] == user_id) or (who and dup["who"] == who)
+        if mine and relink and not (dup["job_id"] and JobFiles(s.jobs_dir, dup["job_id"]).exists()):
+            return fp, None, dup["track_id"]  # 공개할 때 이미 남의 곡 확인을 거쳤다
         if mine:
             raise AppError("ALREADY_PUBLISHED", f"이미 커뮤니티에 공개한 곡이에요 ('{dup['artist']} — {dup['title']}'). "
                            "공개 방식을 바꾸려면 그 곡의 관리 화면이나 '내 곡'에서 바꿔 주세요.", False, http_status=409)
@@ -167,7 +171,18 @@ def check_copy(s: Settings, src: Path, ext: str | None, *, user_id: str | None, 
     if known and not confirm_original:
         raise AppError("KNOWN_SONG_MATCH", f"알려진 곡 '{known['artist']} — {known['title']}'과(와) 비슷해요. 직접 만든 곡이 맞다면 "
                        "확인하고 다시 올려 주세요. 다른 사람의 곡이면 올릴 수 없어요.", False, http_status=409)
-    return fp, known
+    return fp, known, None
+
+
+def relink_job(track_id: str, job_id: str, s: Settings) -> bool:
+    """(10/19) 이어진 작업이 없는 공개 곡에 새 작업을 잇는다. 그사이 다른 작업이 이어졌으면 False."""
+    t = get_track(track_id, include_hidden=True)
+    if t["job_id"] and JobFiles(s.jobs_dir, t["job_id"]).exists():
+        return False
+    with db.connect() as conn:
+        n = conn.execute("UPDATE tracks SET job_id = ? WHERE track_id = ? AND job_id IS ?",
+                         (job_id, track_id, t["job_id"])).rowcount
+    return n == 1
 
 
 def _check_publish_limit(s: Settings, client: str, who: str | None) -> None:
@@ -214,7 +229,7 @@ def publish(s: Settings, jf: JobFiles, *, listen_mode: str, comments_public: boo
     prior = jf.root / COPY_CHECK
     if not confirm_original and prior.exists() and json.loads(prior.read_text(encoding="utf-8")).get("confirmed"):
         confirm_original = True  # 업로드 때 '직접 만든 곡이 맞아요'를 이미 눌렀다
-    fp, known = check_copy(s, src, None, user_id=user_id, who=who, confirm_original=confirm_original) if src else (None, None)
+    fp, known, _ = check_copy(s, src, None, user_id=user_id, who=who, confirm_original=confirm_original) if src else (None, None, None)
     if ai_usage is None:  # 권리 자가진단에 답했으면 그 값
         from app.pipeline import rights
         ai_usage = rights.load(jf).get("ai_audio") or "none"
@@ -508,7 +523,7 @@ def publish_direct(s: Settings, src: Path, *, filename: str, title: str, artist:
     if round(duration, 1) < s.min_duration_sec:
         raise AppError("TOO_SHORT", f"{s.min_duration_sec}초 이상인 곡만 올릴 수 있어요.", False)
     _check_publish_limit(s, client, who)
-    fp, known = check_copy(s, src, ext, user_id=user_id, who=who, confirm_original=confirm_original)
+    fp, known, _ = check_copy(s, src, ext, user_id=user_id, who=who, confirm_original=confirm_original)
     track_id = new_job_id()
     tdir = track_dir(s, track_id)
     sec = s.highlight_sec
