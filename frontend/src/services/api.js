@@ -286,6 +286,30 @@ export const api = {
   reportFeedback: async (trackId, feedbackId, reason = 'abuse', detail = null) =>
     request(`/community/tracks/${trackId}/feedback/${feedbackId}/report`, json('POST', { reason, detail })),
 
+  // 곡 관리자 전용 (Owner Dashboard: /community/manage)
+  getTrackOwnerView: async (trackId, ownerKey) =>
+    request(`/community/tracks/${trackId}/owner`, {
+      headers: ownerKey ? { 'X-Owner-Key': ownerKey } : {},
+    }),
+
+  updateTrackOwner: async (trackId, patchData, ownerKey) =>
+    request(`/community/tracks/${trackId}`, {
+      ...json('PATCH', patchData),
+      headers: ownerKey ? { 'X-Owner-Key': ownerKey } : {},
+    }),
+
+  hideTrackFeedback: async (trackId, feedbackId, hidden, ownerKey) =>
+    request(`/community/tracks/${trackId}/feedback/${feedbackId}/hide`, {
+      ...json('POST', { hidden }),
+      headers: ownerKey ? { 'X-Owner-Key': ownerKey } : {},
+    }),
+
+  deleteTrackOwner: async (trackId, ownerKey) =>
+    request(`/community/tracks/${trackId}`, {
+      method: 'DELETE',
+      headers: ownerKey ? { 'X-Owner-Key': ownerKey } : {},
+    }),
+
   // 7. 마지막 설문·사용 기록 (10/14 회의: 피드백은 서버가 자동으로 파악하고 마지막에 짧게 묻는다)
   // kind: 'job'(발매 준비 작업) | 'track'(바로 공개한 곡 — ownerKey 필요)
   getSurvey: async (kind, id, ownerKey = null) =>

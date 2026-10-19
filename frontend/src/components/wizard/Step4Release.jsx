@@ -729,7 +729,7 @@ export default function Step4Release({ jobData, setJobData, onPrevStep, onGoToCo
             <div className="pt-1 flex flex-wrap items-center justify-between text-xs text-zinc-500">
               <span>이 브라우저에서 올린 모든 곡의 반응과 관리 링크는 내 곡 관리 페이지에서도 볼 수 있어요:</span>
               <a
-                href={toFileUrl(published.manage_url)}
+                href={toAppUrl(published.manage_url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"

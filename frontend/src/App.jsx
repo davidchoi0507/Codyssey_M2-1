@@ -9,6 +9,7 @@ import Step2Visual from './components/wizard/Step2Visual';
 import Step3Inspect from './components/wizard/Step3Inspect';
 import Step4Release from './components/wizard/Step4Release';
 import CommunityFeed from './components/community/CommunityFeed';
+import TrackManageView from './components/community/TrackManageView';
 import GuideModal from './components/guide/GuideModal';
 import MyTracksModal from './components/me/MyTracksModal';
 import InteractiveBackground from './components/effects/InteractiveBackground';
@@ -34,7 +35,31 @@ if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
   window.location.hostname = 'localhost';
 }
 
+function getManageInfoFromUrl() {
+  if (typeof window === 'undefined') return null;
+  const path = window.location.pathname;
+  const sp = new URLSearchParams(window.location.search);
+  const hash = window.location.hash.replace(/^#/, '');
+  const hp = new URLSearchParams(hash);
+
+  const isManagePath =
+    path.includes('/community/manage') ||
+    sp.has('manage') ||
+    sp.get('mode') === 'manage';
+
+  const trackId = sp.get('t') || sp.get('track_id') || sp.get('track') || '';
+  const ownerKey =
+    hp.get('key') || hp.get('k') || (!hash.includes('=') && hash.length > 5 ? hash : '') || '';
+
+  if (isManagePath && trackId) {
+    return { trackId, ownerKey };
+  }
+  return null;
+}
+
 export default function App() {
+  const [manageInfo, setManageInfo] = useState(() => getManageInfoFromUrl());
+
   const [initialTrackId, setInitialTrackId] = useState(() => {
     if (typeof window !== 'undefined') {
       const sp = new URLSearchParams(window.location.search);
@@ -149,12 +174,20 @@ export default function App() {
   }, []);
 
   const handleTabChange = (nextTab, pushHistory = true) => {
-    if (nextTab === activeTab) return;
+    if (manageInfo) {
+      setManageInfo(null);
+    }
+    if (nextTab === activeTab && !manageInfo) return;
     try {
       sessionStorage.setItem('balmaero_active_tab', nextTab);
     } catch {}
     if (pushHistory && typeof window !== 'undefined') {
-      window.history.pushState({ tab: nextTab }, '', window.location.pathname + window.location.search);
+      const isManagePath = window.location.pathname.includes('/community/manage');
+      window.history.pushState(
+        { tab: nextTab },
+        '',
+        isManagePath ? '/' : (window.location.pathname + window.location.search)
+      );
     }
     setActiveTab(nextTab);
   };
@@ -169,6 +202,12 @@ export default function App() {
       );
     }
     const onPopState = (e) => {
+      const currentManage = getManageInfoFromUrl();
+      if (currentManage) {
+        setManageInfo(currentManage);
+        return;
+      }
+      setManageInfo(null);
       if (e.state?.tab) {
         setActiveTab(e.state.tab);
       } else {
@@ -293,7 +332,7 @@ export default function App() {
 
       {/* Header */}
       <Header
-        activeTab={activeTab}
+        activeTab={manageInfo ? 'community' : activeTab}
         setActiveTab={handleTabChange}
         onOpenGuide={() => setGuideOpen(true)}
         onOpenMe={() => handleTabChange('me')}
@@ -305,13 +344,22 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-24 md:pb-12 z-10">
-        {activeTab === 'home' && (
-          <HomeLanding
-            onGoToStudio={() => handleTabChange('studio')}
+        {manageInfo ? (
+          <TrackManageView
+            trackId={manageInfo.trackId}
+            ownerKey={manageInfo.ownerKey}
+            onClose={() => handleTabChange('community')}
             onGoToCommunity={() => handleTabChange('community')}
-            onOpenGuide={() => setGuideOpen(true)}
           />
-        )}
+        ) : (
+          <>
+            {activeTab === 'home' && (
+              <HomeLanding
+                onGoToStudio={() => handleTabChange('studio')}
+                onGoToCommunity={() => handleTabChange('community')}
+                onOpenGuide={() => setGuideOpen(true)}
+              />
+            )}
 
         {activeTab === 'studio' && (
           <div className="max-w-5xl mx-auto space-y-6">
@@ -406,6 +454,8 @@ export default function App() {
             onGoToCommunity={() => handleTabChange('community')}
           />
         )}
+          </>
+        )}
       </main>
 
       {/* Footer */}
@@ -442,8 +492,8 @@ export default function App() {
 
       {/* Mobile Bottom Navigation Bar */}
       <MobileNav
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        activeTab={manageInfo ? 'community' : activeTab}
+        setActiveTab={handleTabChange}
         onOpenGuide={() => setGuideOpen(true)}
         onOpenMe={() => setActiveTab('me')}
         user={user}
