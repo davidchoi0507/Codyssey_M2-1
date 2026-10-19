@@ -1,6 +1,6 @@
-# Ignore backend and docs during Vercel builds
+# Ignore backend, docs, and scratch files during Vercel builds
 backend/
 docs/
 *.pdf
-*.html
-*.json
+scratch_*.json
+claude_frame.json

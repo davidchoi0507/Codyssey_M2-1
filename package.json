@@ -1,0 +1,7 @@
+{
+  "name": "codyssey-m2-1-root",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build"
+  }
+}
