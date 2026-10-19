@@ -379,15 +379,64 @@ const matchesGenre = (trackGenre, selectedGenre) => {
     setSubmittingReaction((prev) => ({ ...prev, [trackId]: true }));
     say(trackId, '피드백을 안전하게 등록하는 중이에요...');
     try {
-      await api.sendFeedback(trackId, {
-        rating: currentRating || null,
-        tags: currentTags.length > 0 ? currentTags : [],
-        comment: comment || null,
-        nickname: nick || '익명 리스너',
-      });
-      say(trackId, '소중한 피드백(별점·반응·한마디)이 등록되었어요 ✓');
+      // 1. 즉시 반응 (0ms 낙관적 UI 업데이트): 별점, 태그, 한마디, 총 반응 수 모두 즉각 반영
+      setTracks((prev) =>
+        prev.map((t) => {
+          if (t.track_id !== trackId) return t;
 
-      // 감상평 낙관적 렌더링 & 댓글창 자동 열기 (미영님·은희님 피드백 반영)
+          // 신규 반응 여부 (기존에 반응이 없었으면 총 반응수 +1)
+          const hadReactionBefore = Boolean(t.my_rating || (t.my_tags && t.my_tags.length > 0));
+          const isNewReaction = !hadReactionBefore && (currentRating > 0 || currentTags.length > 0 || Boolean(comment));
+          const newReactions = (t.reactions || 0) + (isNewReaction ? 1 : 0);
+
+          // 별점 통계 계산
+          let nextRatingAvg = t.stats?.rating_avg || null;
+          let nextRatingCount = t.stats?.rating_count || 0;
+          const nextRatingDist = { ...(t.stats?.rating_dist || {}) };
+
+          if (currentRating > 0) {
+            const prevRating = t.my_rating || 0;
+            if (prevRating > 0) {
+              const totalSum = (Number(t.stats?.rating_avg) || 0) * nextRatingCount - prevRating + currentRating;
+              nextRatingAvg = Math.round((totalSum / nextRatingCount) * 10) / 10;
+              nextRatingDist[String(prevRating)] = Math.max(0, (nextRatingDist[String(prevRating)] || 1) - 1);
+              nextRatingDist[String(currentRating)] = (nextRatingDist[String(currentRating)] || 0) + 1;
+            } else {
+              const totalSum = (Number(t.stats?.rating_avg) || 0) * nextRatingCount + currentRating;
+              nextRatingCount += 1;
+              nextRatingAvg = Math.round((totalSum / nextRatingCount) * 10) / 10;
+              nextRatingDist[String(currentRating)] = (nextRatingDist[String(currentRating)] || 0) + 1;
+            }
+          }
+
+          // 태그 통계 계산
+          const nextTags = { ...(t.stats?.tags || {}) };
+          currentTags.forEach((tag) => {
+            if (!(t.my_tags || []).includes(tag)) {
+              nextTags[tag] = (nextTags[tag] || 0) + 1;
+            }
+          });
+
+          return {
+            ...t,
+            my_rating: currentRating || t.my_rating,
+            my_tags: currentTags.length > 0 ? currentTags : t.my_tags,
+            reactions: newReactions,
+            comment_count: comment ? (t.comment_count || 0) + 1 : t.comment_count,
+            stats: {
+              ...(t.stats || {}),
+              reactions: newReactions,
+              comments: comment ? (t.stats?.comments || 0) + 1 : (t.stats?.comments || 0),
+              rating_avg: nextRatingAvg,
+              rating_count: nextRatingCount,
+              rating_dist: nextRatingDist,
+              tags: nextTags,
+            },
+          };
+        })
+      );
+
+      // 한마디(댓글) 등록 시 댓글창 낙관적 렌더링 & 댓글창 자동 열기
       if (comment) {
         setTrackDetails((prev) => {
           const prevList = prev[trackId]?.feedback || [];
@@ -406,27 +455,39 @@ const matchesGenre = (trackGenre, selectedGenre) => {
             },
           };
         });
-
-        // 은희님 피드백: 댓글 등록 즉시 뱃지 숫자 1 증가
-        setTracks((prev) =>
-          prev.map((t) =>
-            t.track_id === trackId
-              ? {
-                  ...t,
-                  comment_count: (t.comment_count || 0) + 1,
-                  reactions: (t.reactions || 0) + 1,
-                }
-              : t
-          )
-        );
-
         setOpenCommentsId(trackId);
       }
 
+      // 2. 서버로 피드백 전송
+      await api.sendFeedback(trackId, {
+        rating: currentRating || null,
+        tags: currentTags.length > 0 ? currentTags : [],
+        comment: comment || null,
+        nickname: nick || '익명 리스너',
+      });
+      say(trackId, '소중한 피드백(별점·반응·한마디)이 등록되었어요 ✓');
       setCommentInput((prev) => ({ ...prev, [trackId]: '' }));
-      await fetchTracks({ reset: false });
-      if (comment || openCommentsId === trackId) {
-        await loadTrackDetail(trackId, true);
+
+      // 3. 서버 계산 결과로 최신 동기화 (별점 평균, 전체 태그 분포, 피드백 목록 최신화)
+      try {
+        const freshTrack = await api.getTrackDetail(trackId);
+        if (freshTrack && freshTrack.track_id) {
+          setTracks((prev) =>
+            prev.map((t) => (t.track_id === trackId ? { ...t, ...freshTrack } : t))
+          );
+          if (freshTrack.feedback) {
+            setTrackDetails((prev) => ({
+              ...prev,
+              [trackId]: {
+                feedback: (freshTrack.feedback || []).filter((f) => f.comment && !f.hidden),
+                showAll: prev[trackId]?.showAll || false,
+                loading: false,
+              },
+            }));
+          }
+        }
+      } catch (freshErr) {
+        console.warn('Failed to refresh track detail after feedback:', freshErr);
       }
     } catch (err) {
       say(trackId, err.message);

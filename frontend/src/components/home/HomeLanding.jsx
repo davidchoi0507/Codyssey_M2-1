@@ -247,11 +247,11 @@ export default function HomeLanding({
          ───────────────────────────────────────────────────────────── */}
       <section className="max-w-5xl mx-auto px-4 space-y-10">
         <div className="text-center space-y-2">
-          <span className="text-xs font-black tracking-widest uppercase text-indigo-600 dark:text-indigo-400">
+          <span className="text-sm font-black tracking-widest uppercase text-indigo-600 dark:text-indigo-400">
             WHY BALMAERO
           </span>
           <h2 className="text-3xl font-extrabold text-zinc-900 dark:text-white">
-            인디 뮤지션의 첫 발매, 왜 이렇게 달랐을까요?
+            인디 뮤지션의 첫 발매, 왜 이렇게 어려웠을까요?
           </h2>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             음악을 만드는 것만으로도 벅찬 아티스트에게 발매 준비는 또 다른 큰 장벽이었습니다.
@@ -317,7 +317,7 @@ export default function HomeLanding({
          ───────────────────────────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-4 space-y-12">
         <div className="text-center max-w-2xl mx-auto space-y-2">
-          <span className="text-xs font-black tracking-widest uppercase text-indigo-600 dark:text-indigo-400">
+          <span className="text-sm font-black tracking-widest uppercase text-indigo-600 dark:text-indigo-400">
             HOW IT WORKS
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-white">
