@@ -1,0 +1,225 @@
+"""SQLite(WAL): 작업 상태·이벤트(지표)·동의 기록 (DECISIONS #9, #10).
+
+결과물(음원·노트·커버 등)은 계속 작업 폴더 data/jobs/<job_id>/ 에 파일로 둔다. 여기는 상태와 기록만.
+연결은 호출마다 새로 연다 — 동기 라우트는 스레드풀에서 돌고, 쿼리가 작아서 연결 비용이 문제 되지 않는다.
+"""
+import json
+import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+
+from app.core.config import get_settings
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS jobs (
+    job_id     TEXT PRIMARY KEY,
+    stage      TEXT NOT NULL,
+    step       TEXT,
+    error      TEXT,              -- JSON {code, message, retryable}
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS jobs_stage ON jobs(stage);
+
+CREATE TABLE IF NOT EXISTS events (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id  TEXT NOT NULL,
+    ts      TEXT NOT NULL,
+    event   TEXT NOT NULL,
+    payload TEXT NOT NULL         -- JSON
+);
+CREATE INDEX IF NOT EXISTS events_job ON events(job_id, id);
+
+CREATE TABLE IF NOT EXISTS bands (
+    code        TEXT PRIMARY KEY,  -- 초대 코드 (정규화: 대문자, 하이픈 없음)
+    name        TEXT NOT NULL,
+    daily_limit INTEGER NOT NULL,
+    active      INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL,
+    note        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS consents (
+    job_id  TEXT PRIMARY KEY,
+    record  TEXT NOT NULL         -- JSON (동의 항목, 문구 버전, 시각, Gemini 티어)
+);
+
+-- 커뮤니티 (DECISIONS #31): 작업에서 꺼내 공개한 곡. 작업(7일 삭제)과 따로 data/community/<track_id>/ 에 보관
+CREATE TABLE IF NOT EXISTS tracks (
+    track_id        TEXT PRIMARY KEY,
+    job_id          TEXT UNIQUE,       -- 작업이 7일 뒤 지워져도 곡은 남는다 (작업당 한 곡)
+    title           TEXT NOT NULL,
+    artist          TEXT NOT NULL,
+    genre           TEXT NOT NULL DEFAULT '',
+    intro           TEXT NOT NULL DEFAULT '',
+    listen_mode     TEXT NOT NULL,     -- full | highlight
+    clip_start      REAL,              -- highlight일 때 원곡 기준 구간
+    clip_sec        REAL NOT NULL,     -- 공개 음원 길이
+    comments_public INTEGER NOT NULL,  -- 1: 의견을 누구나 봄, 0: 올린 사람만
+    colors          TEXT NOT NULL DEFAULT '[]',
+    moods           TEXT NOT NULL DEFAULT '[]',
+    plays           INTEGER NOT NULL DEFAULT 0,
+    status          TEXT NOT NULL DEFAULT 'live',  -- live | hidden(운영자가 내림)
+    band_code       TEXT,
+    client          TEXT,
+    consent         TEXT NOT NULL,     -- JSON (공개 동의 항목, 문구 버전, 시각)
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS tracks_created ON tracks(status, created_at);
+
+CREATE TABLE IF NOT EXISTS feedback (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    track_id  TEXT NOT NULL,
+    ts        TEXT NOT NULL,
+    nickname  TEXT,
+    rating    INTEGER,            -- 1~5, 없을 수 있음
+    tags      TEXT NOT NULL,      -- JSON 목록 (정해진 반응 태그)
+    comment   TEXT,
+    client    TEXT,               -- 접속 IP — 남용 제한용, 화면엔 안 나감
+    hidden    INTEGER NOT NULL DEFAULT 0  -- 올린 사람·운영자가 숨김
+);
+CREATE INDEX IF NOT EXISTS feedback_track ON feedback(track_id, id);
+
+-- 로그인 (DECISIONS #34): 곡 올리는 사람만. 카카오·구글이 주는 고유 식별값과 닉네임만 저장
+CREATE TABLE IF NOT EXISTS users (
+    user_id      TEXT PRIMARY KEY,
+    provider     TEXT NOT NULL,          -- kakao | google | dev
+    provider_uid TEXT NOT NULL,
+    nickname     TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    last_login   TEXT NOT NULL,
+    UNIQUE (provider, provider_uid)
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,         -- 세션 토큰의 sha256 (토큰 원문은 저장하지 않음)
+    user_id    TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+
+-- 신고 (DECISIONS #33): 서로 다른 접속에서 REPORT_HIDE_THRESHOLD번이면 자동 숨김
+CREATE TABLE IF NOT EXISTS reports (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    track_id    TEXT NOT NULL,
+    feedback_id INTEGER,                 -- 반응 신고면 반응 id, 곡 신고면 NULL
+    reason      TEXT NOT NULL,           -- abuse | ad | stolen | other
+    detail      TEXT,
+    client      TEXT,                    -- 접속 IP — 같은 사람 중복 신고 막기, FEEDBACK_IP_RETENTION_DAYS 뒤 삭제
+    ts          TEXT NOT NULL,
+    resolved    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS reports_target ON reports(track_id, feedback_id);
+
+-- 소리 지문 (#40): 공개한 곡 원본 전체의 Chromaprint — 남의 곡·이미 올라온 곡 다시 올리기 막기
+CREATE TABLE IF NOT EXISTS track_fingerprints (
+    track_id TEXT PRIMARY KEY,
+    fp       TEXT NOT NULL,      -- JSON 정수 배열
+    duration REAL NOT NULL
+);
+
+-- 마지막 설문 (10/14 회의): 작업 하나(또는 바로 공개한 곡 하나)에 응답 하나. 이름·연락처 없음, 작업이 지워져도 남긴다
+CREATE TABLE IF NOT EXISTS surveys (
+    subject    TEXT PRIMARY KEY,   -- job:<job_id> | track:<track_id>
+    version    TEXT NOT NULL,      -- 문항 버전 (문항을 고치면 올린다)
+    answers    TEXT NOT NULL,      -- JSON {문항 id: 값}
+    context    TEXT NOT NULL,      -- JSON 응답 시점 이용 요약 (어디까지 했는지 — 작업이 지워져도 분석 가능)
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+"""
+
+_initialized: set[Path] = set()
+
+
+@contextmanager
+def connect(db_path: Path | None = None) -> Iterator[sqlite3.Connection]:
+    path = Path(db_path or get_settings().db_path)
+    if path not in _initialized:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path, timeout=10)
+    conn.row_factory = sqlite3.Row
+    try:
+        if path not in _initialized:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.executescript(SCHEMA)
+            _migrate(conn)
+            _initialized.add(path)
+        conn.execute("PRAGMA busy_timeout=10000")
+        with conn:  # 블록이 끝나면 commit, 예외면 rollback
+            yield conn
+    finally:
+        conn.close()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """나중에 추가한 열. 이미 있으면 그대로."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}
+    if "client" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN client TEXT")  # 업로드한 IP — 하루 생성 한도용
+        conn.execute("CREATE INDEX IF NOT EXISTS jobs_client ON jobs(client, created_at)")
+    if "band_code" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN band_code TEXT")  # 올린 밴드 (초대 코드) — 밴드별 한도·통계
+        conn.execute("CREATE INDEX IF NOT EXISTS jobs_band ON jobs(band_code, created_at)")
+    if "user_id" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN user_id TEXT")  # 로그인해서 올린 사람 — '내 곡'
+        conn.execute("CREATE INDEX IF NOT EXISTS jobs_user ON jobs(user_id, created_at)")
+    if "demo" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN demo INTEGER NOT NULL DEFAULT 0")  # 체험 모드 작업 (10/17) — 한도를 따로 셈
+    tcols = {r[1] for r in conn.execute("PRAGMA table_info(tracks)")}
+    if "user_id" not in tcols:
+        conn.execute("ALTER TABLE tracks ADD COLUMN user_id TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS tracks_user ON tracks(user_id)")
+    if "source" not in tcols:
+        conn.execute("ALTER TABLE tracks ADD COLUMN source TEXT NOT NULL DEFAULT 'job'")  # job | direct(AI 없이 바로 공개)
+    if "ai_usage" not in tcols:
+        conn.execute("ALTER TABLE tracks ADD COLUMN ai_usage TEXT NOT NULL DEFAULT 'none'")  # none | tool | generated (#40)
+    if "known_match" not in tcols:
+        conn.execute("ALTER TABLE tracks ADD COLUMN known_match TEXT")  # AcoustID가 찾은 비슷한 곡 JSON (올린 사람이 확인하고 올림)
+    if "owner_views" not in tcols:  # 올린 사람이 반응을 확인했는지 (10/14 피드백 자동 수집)
+        conn.execute("ALTER TABLE tracks ADD COLUMN owner_views INTEGER NOT NULL DEFAULT 0")
+        conn.execute("ALTER TABLE tracks ADD COLUMN owner_seen_at TEXT")
+        conn.execute("ALTER TABLE tracks ADD COLUMN owner_seen_reactions INTEGER NOT NULL DEFAULT 0")  # 마지막으로 볼 때 반응 수
+    fcols = {r[1] for r in conn.execute("PRAGMA table_info(feedback)")}
+    if "hidden_reason" not in fcols:
+        conn.execute("ALTER TABLE feedback ADD COLUMN hidden_reason TEXT")  # owner | reported | spam | operator
+    # 같은 사람 구분 (10/16): u:<계정> | a:<브라우저 익명 ID> | ip:<IP>. IP만 쓰면 같은 와이파이의 여러 사람이 한 사람이 된다
+    rcols = {r[1] for r in conn.execute("PRAGMA table_info(reports)")}
+    for table, cols_ in (("jobs", cols), ("tracks", tcols), ("feedback", fcols), ("reports", rcols)):
+        if "who" not in cols_:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN who TEXT")
+            conn.execute(f"CREATE INDEX IF NOT EXISTS {table}_who ON {table}(who)")
+
+
+def import_legacy_files(jobs_dir: Path) -> int:
+    """DB 도입 전 작업 폴더의 status.json / events.jsonl / consent.json 을 한 번 옮긴다 (이미 있으면 건너뜀)."""
+    if not jobs_dir.exists():
+        return 0
+    imported = 0
+    with connect() as conn:
+        known = {r["job_id"] for r in conn.execute("SELECT job_id FROM jobs")}
+        for d in sorted(p for p in jobs_dir.iterdir() if p.is_dir() and p.name not in known):
+            status_p = d / "status.json"
+            if not status_p.exists():
+                continue
+            st = json.loads(status_p.read_text(encoding="utf-8"))
+            events = []
+            if (d / "events.jsonl").exists():
+                events = [json.loads(line) for line in (d / "events.jsonl").read_text(encoding="utf-8").splitlines()
+                          if line.strip()]
+            created = events[0]["ts"] if events else st["updated_at"]
+            conn.execute("INSERT INTO jobs (job_id, stage, step, error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                         (d.name, st["stage"], st.get("step"),
+                          json.dumps(st["error"], ensure_ascii=False) if st.get("error") else None,
+                          created, st["updated_at"]))
+            conn.executemany("INSERT INTO events (job_id, ts, event, payload) VALUES (?, ?, ?, ?)",
+                             [(d.name, e.pop("ts"), e.pop("event"), json.dumps(e, ensure_ascii=False))
+                              for e in events])
+            if (d / "consent.json").exists():
+                conn.execute("INSERT OR IGNORE INTO consents VALUES (?, ?)",
+                             (d.name, (d / "consent.json").read_text(encoding="utf-8")))
+            imported += 1
+    return imported

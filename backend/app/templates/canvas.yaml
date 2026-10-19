@@ -1,0 +1,13 @@
+# Spotify Canvas (9:16, 무음, 처음과 끝이 이어지는 반복 영상). 글자 없음 (Spotify 가이드: 텍스트·로고 지양).
+size: [1080, 1920]
+fps: 30
+duration: 8
+background:
+  blur: 36
+  darken: 0.55
+cover:
+  size: 900
+  zoom_peak: 1.05   # 0초 1.0 → 4초 최대 → 8초 다시 1.0 (이음매 없음)
+video:
+  crf: 22
+  preset: veryfast

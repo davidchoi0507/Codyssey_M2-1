@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>발매로(Balmaero) 발표 피드백 수렴 및 최종 반영 확정안</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 11mm 13mm;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", sans-serif;
+      color: #1e293b;
+      background-color: #ffffff;
+      line-height: 1.5;
+      font-size: 11.5px;
+    }
+    .page {
+      page-break-after: always;
+      position: relative;
+    }
+    .page:last-child {
+      page-break-after: avoid;
+    }
+    
+    /* Document Header */
+    .doc-header {
+      border-bottom: 2px solid #4f46e5;
+      padding-bottom: 10px;
+      margin-bottom: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .doc-title-box h1 {
+      font-size: 18.5px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+      margin-bottom: 3px;
+    }
+    .doc-title-box p {
+      font-size: 11px;
+      color: #4f46e5;
+      font-weight: 600;
+    }
+    .doc-meta {
+      text-align: right;
+      font-size: 10.5px;
+      color: #64748b;
+      line-height: 1.4;
+    }
+    .doc-meta strong {
+      color: #0f172a;
+    }
+
+    /* Section Styling */
+    .section {
+      margin-bottom: 13px;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1e1b4b;
+      background-color: #f8fafc;
+      padding: 5px 10px;
+      border-left: 4px solid #4f46e5;
+      border-radius: 0 4px 4px 0;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+    .badge-indigo { background-color: #e0e7ff; color: #4338ca; }
+    .badge-emerald { background-color: #d1fae5; color: #065f46; }
+    .badge-amber { background-color: #fef3c7; color: #92400e; }
+
+    /* Cards & Containers */
+    .card {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 9px 12px;
+      background: #ffffff;
+      margin-bottom: 8px;
+    }
+    .card-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-desc {
+      font-size: 11px;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      margin-bottom: 8px;
+    }
+
+    .quote-box {
+      background-color: #eef2ff;
+      border-left: 3px solid #6366f1;
+      padding: 7px 11px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      color: #312e81;
+      font-weight: 600;
+      margin: 5px 0;
+    }
+
+    /* Table Styling */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5px;
+      margin-bottom: 8px;
+    }
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 5px 8px;
+      text-align: left;
+      vertical-align: middle;
+    }
+    th {
+      background-color: #f1f5f9;
+      color: #334155;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    tr:nth-child(even) td {
+      background-color: #fafbfc;
+    }
+    .tech-old {
+      color: #dc2626;
+      text-decoration: line-through;
+      font-weight: 600;
+    }
+    .tech-new {
+      color: #16a34a;
+      font-weight: 700;
+    }
+    .tech-loc {
+      color: #6366f1;
+      font-weight: 600;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    /* Lists */
+    ul {
+      padding-left: 14px;
+      margin-top: 3px;
+    }
+    li {
+      margin-bottom: 2px;
+    }
+
+    /* Footer */
+    .doc-footer {
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 7px;
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PAGE 1: 서비스 정의, 피드백 스토리라인, 테스터 장표 운영 방식 -->
+  <div class="page">
+    <div class="doc-header">
+      <div class="doc-title-box">
+        <h1>발매로 (Balmaero) 피드백 수렴 및 최종 반영 확정안</h1>
+        <p>팀 피드백 검토 완료에 따른 발표 기준 통일, 팩트 교정 및 슬라이드 반영 지침</p>
+      </div>
+      <div class="doc-meta">
+        <div><strong>작성일</strong>: 2026. 10. 19</div>
+        <div><strong>작성/검토</strong>: 프로젝트 팀장</div>
+        <div><strong>수신</strong>: 발매로 개발팀 전원</div>
+      </div>
+    </div>
+
+    <!-- 1. 서비스 정의 및 슬로건 통일 -->
+    <div class="section">
+      <div class="section-title">
+        <span>1. 서비스 정의 및 슬로건 통일 (과장 표현 배제)</span>
+        <span class="badge badge-indigo">기준 문장 확정</span>
+      </div>
+      <div class="card">
+        <div class="card-title">📌 기존 혼용 표현 정리 및 기준 문장</div>
+        <p class="card-desc">
+          "유통", "올인원 스튜디오", "발매 허브" 등의 단어 혼용을 배제하고, 서비스의 본질인 <strong>'발매 준비'</strong>에 집중하여 모든 발표 문장을 통일합니다.
+        </p>
+        <div class="quote-box">
+          "발매로는 완성된 음원 한 곡을 분석해, 발매에 필요한 기획·비주얼·메타데이터를 하나의 릴리즈 팩으로 만들어 주는 AI 발매 준비 플랫폼입니다."
+        </div>
+        <div style="margin-top: 5px; font-size: 11px; color: #475569;">
+          • <strong>공식 슬로건</strong>: <span style="color: #4f46e5; font-weight: 700;">"음원 한 곡에서, 발매 가능한 릴리즈 팩까지."</span><br>
+          • <strong>유통 범위 명확화</strong>: 유통사 직접 전송이 아닌, <strong>"유통사 제출 규격 패키징"</strong>으로 정의하며, 유통사 직접 연동은 '향후 제휴 로드맵'으로 구분합니다.
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 피드백 스토리라인 -->
+    <div class="section">
+      <div class="section-title">
+        <span>2. 피드백 스토리라인: '실제 히스토리(DECISIONS #30)'로 정공법 채택</span>
+        <span class="badge badge-amber">방어 논리 구축</span>
+      </div>
+      <div class="card">
+        <div class="card-title">🔄 가공의 인용문 대신 실제 피봇 히스토리 반영 (#02~#03 슬라이드)</div>
+        <div class="grid-2" style="margin-top: 5px; margin-bottom: 0;">
+          <div style="background: #f8fafc; padding: 7px 10px; border-radius: 4px; border: 1px solid #e2e8f0;">
+            <strong style="color: #0f172a; font-size: 11px;">1차 시도 (인디밴드 대상)</strong>
+            <ul style="font-size: 10.5px; color: #475569;">
+              <li><strong>가설</strong>: AI A&R이 앨범 커버 및 홍보물을 대신 제작해 주면 효용을 느낄 것이다.</li>
+              <li><strong>반응(한계)</strong>: 인디밴드는 뚜렷한 예술적 주관이 있어 AI 커버에 만족하지 못함. 프롬프트 개선을 시도했으나 "전문가 시장에서 AI 비주얼만으로는 승산이 없다"고 판단.</li>
+            </ul>
+          </div>
+          <div style="background: #eef2ff; padding: 7px 10px; border-radius: 4px; border: 1px solid #c7d2fe;">
+            <strong style="color: #312e81; font-size: 11px;">2차 전환 (처음 발매하는 누구나)</strong>
+            <ul style="font-size: 10.5px; color: #3730a3;">
+              <li><strong>타겟 전환</strong>: 전문 밴드 ➔ 개인, 음악 전공생, 학생 등 처음 발매하는 일반 창작자.</li>
+              <li><strong>중심 이동</strong>: 커버 디자인 ➔ <strong>발매 절차·규격 검사·홍보·커뮤니티 반응</strong>으로 이동. 커버는 핵심에서 보조로 전환.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. #08 테스터 피드백 장표 운영 방식 -->
+    <div class="section">
+      <div class="section-title">
+        <span>3. #08 테스터 피드백 장표 운영 방식 (화면 표기 vs 구두 발표)</span>
+        <span class="badge badge-emerald">10분 시간 엄수</span>
+      </div>
+      <div class="grid-2">
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-header font-bold" style="font-size: 11px; color: #0f172a; margin-bottom: 4px;">
+            🖥 슬라이드 화면 표기 (시각적 검증 증빙)
+          </div>
+          <ul style="font-size: 10.5px; color: #475569;">
+            <li><strong>설문 항목 및 수치 카드 배치</strong>: 만족도 4.67/5, 노트 직접 수정률 71%, 홍보글 적합도 100%.</li>
+            <li><strong>정직한 모수 병기</strong>: <span style="color: #64748b;">(서버 기록 7건, 설문 3명 참여 실측)</span>를 명시하여 꼬리 질문 원천 차단.</li>
+            <li><strong>Before / After 캡처</strong>: 커버 생성 시간 최적화, 연필 아이콘 추가 화면 제시.</li>
+          </ul>
+        </div>
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-header font-bold" style="font-size: 11px; color: #0f172a; margin-bottom: 4px;">
+            🎤 구두 발표 스피치 (핵심 2가지 집중)
+          </div>
+          <ul style="font-size: 10.5px; color: #475569;">
+            <li><strong>인사이트 1 (제품 철학 입증)</strong>:<br>"노트 수정률이 71%였습니다. 이는 AI가 알아서 다 끝내는 것이 아니라, <strong>'AI가 먼저 듣고 사람이 고치는 협업 초안 도구'</strong>로 기획 의도대로 잘 작동했음을 증명합니다."</li>
+            <li><strong>인사이트 2 (피드백 기반 성능 개선)</strong>:<br>"커버 생성에 5분 이상 걸리던 병목을 <strong>API 키 로테이션과 후보 최적화로 81초로 단축</strong>시키는 등 실사용 피드백을 즉시 반영했습니다."</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-footer">
+      <span>발매로(Balmaero) 프로젝트 개발팀 │ 피드백 수렴 및 최종 반영 확정안</span>
+      <span>Page 1 of 2</span>
+    </div>
+  </div>
+
+  <!-- PAGE 2: 기술 스택 팩트 교정표 & 데모/AI윤리 지침 -->
+  <div class="page">
+    <div class="doc-header">
+      <div class="doc-title-box">
+        <h1>기술 스택 팩트 교정 & 데모·윤리 운영 지침</h1>
+        <p>깃허브 저장소·제출 문서와 100% 일치화 및 오프라인 심사 대비 안전장치</p>
+      </div>
+      <div class="doc-meta">
+        <div><strong>상태</strong>: 검증 완료</div>
+        <div><strong>문서 버전</strong>: v1.2 Final</div>
+      </div>
+    </div>
+
+    <!-- 4. 기술 스택 팩트 9가지 전면 교정표 -->
+    <div class="section">
+      <div class="section-title">
+        <span>4. 기술 스택 팩트 9가지 전면 교정 (깃허브 코드와 100% 일치)</span>
+        <span class="badge badge-emerald">심사위원 대조 완벽 대응</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 5%; text-align: center;">No</th>
+            <th style="width: 25%;">기존 기획안 표기 (수정 대상)</th>
+            <th style="width: 52%;">실제 구현 팩트 (슬라이드 반영 내용)</th>
+            <th style="width: 18%; text-align: center;">해당 장표</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="text-align: center; font-weight: 700;">1</td>
+            <td><span class="tech-old">DALL-E 3 아트워크 3종</span></td>
+            <td><span class="tech-new">gpt-image-2 (코디세이 API) ➔ 3000px 업스케일</span></td>
+            <td class="tech-loc">#04 시연</td>
+          </tr>
+          <tr>
+            <td style="text-align: center; font-weight: 700;">2</td>
+            <td><span class="tech-old">Gemini 2.5 Flash</span></td>
+            <td><span class="tech-new">Gemini 3.8 Flash (3.7 ➔ 3.6 ➔ 3.5 Fallback 체인)</span></td>
+            <td class="tech-loc">#05~#07 기술</td>
+          </tr>
+          <tr>
+            <td style="text-align: center; font-weight: 700;">3</td>
+            <td><span class="tech-old">LangGraph 기반</span></td>
+            <td><span class="tech-new">LangChain 기반</span></td>
+            <td class="tech-loc">#05~#07 기술</td>
+          </tr>
+          <tr>
+            <td style="text-align: center; font-weight: 700;">4</td>
+            <td><span class="tech-old">3대 ReAct 에이전트, 도구 호출</span></td>
+            <td><span class="tech-new">4개 순차/병렬 에이전트 (A&R ➔ 비주얼·카피·피칭) + JSON 파서</span></td>
+            <td class="tech-loc">#05~#07 기술</td>
+          </tr>
+          <tr>
+            <td style="text-align: center; font-weight: 700;">5</td>
+            <td><span class="tech-old">Resend 이메일 발송</span></td>
+            <td><span class="tech-new">제외 (화면에 없음, 슬라이드 및 멘트에서 완전 삭제)</span></td>
+            <td class="tech-loc">#05~#07 기술</td>
+          </tr>
+          <tr>
+            <td style="text-align: center; font-weight: 700;">6</td>
+            <td><span class="tech-old">Render 배포</span></td>
+            <td><span class="tech-new">Oracle Cloud VM (api.201.n-e.kr) + Vercel</span></td>
+            <td class="tech-loc">#08~#10 배포</td>
+          </tr>
+          <tr>
+            <td style="text-align: center; font-weight: 700;">7</td>
+            <td><span class="tech-old">Canvas 주파수 반응형 비주얼라이저</span></td>
+            <td><span class="tech-new">ffmpeg 숏폼(15초) + Spotify Canvas(8초) 영상 생성</span></td>
+            <td class="tech-loc">#03, #04 시연</td>
+          </tr>
+          <tr>
+            <td style="text-align: center; font-weight: 700;">8</td>
+            <td><span class="tech-old">유통 메타데이터 단순 자동 추출</span></td>
+            <td><span class="tech-new">발매 정보 검사·자동교정, 권리 자가진단, 마감일 계산, CSV 표, ZIP</span></td>
+            <td class="tech-loc">#03, #04 시연</td>
+          </tr>
+          <tr>
+            <td style="text-align: center; font-weight: 700;">9</td>
+            <td><span class="tech-old">3-Step 워크플로우</span></td>
+            <td><span class="tech-new">실제 화면 구조에 맞춰 "4단계 (Step 4/4)"로 표기</span></td>
+            <td class="tech-loc">#04 시연</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size: 10px; color: #64748b; margin-top: 2px;">
+        * 필수 기술 2개 이상 요건 충족: <strong>① 멀티모달 오디오 분석(Gemini)</strong> + <strong>② LangChain 멀티에이전트 협업 및 이미지 생성(코디세이 API)</strong>으로 완벽 증명.
+      </p>
+    </div>
+
+    <!-- 5. 데모 안정성 및 AI 윤리 보강 -->
+    <div class="section">
+      <div class="section-title">
+        <span>5. 데모 안정성 및 AI 윤리 보강 지침</span>
+        <span class="badge badge-indigo">발표 당일 운영</span>
+      </div>
+      <div class="grid-2">
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-title">🎥 데모 안정성 확보 (#04 장표)</div>
+          <ul class="card-desc">
+            <li><strong>60~90초 백업 시연 영상 상시 대기</strong>: 현장 와이파이 장애 또는 Gemini API 503 오류 발생 시 즉시 영상으로 전환.</li>
+            <li><strong>예시 곡 체험 모드 활용</strong>: 파일 탐색 및 업로드 시간 단축을 위해 내장된 체험 모드 우선 활용.</li>
+            <li><strong>미리 생성된 결과물 ZIP 사전 준비</strong>: 발표 당일 생성 대기 시간 없이 최종 산출물 즉시 확인.</li>
+          </ul>
+        </div>
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-title">⚖️ AI 윤리 실천 사항 (#10 장표)</div>
+          <ul class="card-desc">
+            <li><strong>AI 생성물 명시</strong>: 텍스트 및 아트워크 메타데이터에 AI 생성물 표기.</li>
+            <li><strong>음원 'AI 활용' 고지</strong>: 업로드 음원의 AI 활용 여부 명확히 기재.</li>
+            <li><strong>소리 지문 (Audio Fingerprint)</strong>: 타인의 음원 무단 도용 방지.</li>
+            <li><strong>개인정보 & 저작권</strong>: 서비스 이용 동의서 v1.6 적용, <strong>10월 31일 테스트 데이터 일괄 삭제</strong> 명시.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Next Step Callout -->
+    <div style="background-color: #f1f5f9; border-radius: 6px; padding: 7px 10px; margin-top: 9px; font-size: 10.5px; color: #334155;">
+      <strong>🚀 슬라이드 제작 진행 계획</strong>: 본 확정안을 기준으로 12장 슬라이드(PPTX) 초안 작성을 시작합니다. 팀원분들의 추가 요청 사항이 있으면 편하게 전달해 주세요.
+    </div>
+
+    <div class="doc-footer">
+      <span>발매로(Balmaero) 프로젝트 개발팀 │ 피드백 수렴 및 최종 반영 확정안</span>
+      <span>Page 2 of 2</span>
+    </div>
+  </div>
+
+</body>
+</html>
+

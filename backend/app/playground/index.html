@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>백엔드 흐름 테스트</title>
+<style>
+  :root { --bg:#f6f5f2; --card:#fff; --ink:#1d1d1f; --mute:#6b6b70; --line:#e2e0da; --accent:#3b5bdb; --ok:#2b8a3e; --bad:#c92a2a; --warn:#e8590c; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 0 0 12px; }
+  .sub { color: var(--mute); font-size: 13px; margin-bottom: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  label { display:block; font-size:13px; color:var(--mute); margin:10px 0 4px; }
+  input[type=text], textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff; }
+  textarea { min-height: 70px; resize: vertical; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .row > * { flex: 1 1 180px; }
+  button { padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:#fff; font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.5; cursor:default; }
+  .consent { border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin-top:12px; }
+  .consent .full { max-height:320px; overflow:auto; font-size:13px; background:#fafaf8; border-radius:6px; padding:8px 12px; margin-top:6px; }
+  .consent .full h4 { font-size:13px; margin:10px 0 2px; }
+  .chk label { display:flex; gap:8px; align-items:center; color:var(--ink); margin:4px 0; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; } .bar > i { display:block; height:100%; background:var(--accent); transition: width .4s; }
+  .steps { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; } .steps span { font-size:12px; padding:3px 8px; border-radius:999px; background:#eee; }
+  .steps .done { background:#d3f9d8; } .steps .running { background:#dbe4ff; } .steps .failed { background:#ffe3e3; }
+  .err { background:#fff5f5; border:1px solid #ffc9c9; color:var(--bad); padding:10px; border-radius:8px; margin-top:10px; }
+  .hint { color:var(--mute); font-size:12px; }
+  .pill { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; background:#f1f3f5; margin-right:4px; }
+  .interp { font-size:17px; line-height:1.6; margin: 6px 0 10px; }
+  .swatches { display:flex; gap:8px; } .swatches input { width:56px; height:36px; border:1px solid var(--line); border-radius:6px; padding:2px; }
+  .cand { border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin:6px 0; cursor:pointer; } .cand.sel { border-color:var(--accent); background:#f3f6ff; }
+  .covers { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; } .covers img { width:100%; border-radius:8px; display:block; }
+  .copy { white-space:pre-wrap; background:#fafaf8; border:1px solid var(--line); border-radius:8px; padding:10px; font-size:14px; }
+  canvas { width:100%; height:60px; display:block; }
+  .log { font:12px/1.5 ui-monospace, Consolas, monospace; color:var(--mute); max-height:160px; overflow:auto; white-space:pre-wrap; }
+  .hide { display:none !important; }  /* .working 같은 display 규칙보다 항상 우선 */
+  .guide summary { cursor:pointer; font-size:15px; }
+  .notice { color:var(--bad); font-weight:600; background:#fff5f5; border:1px solid #ffc9c9; border-radius:8px; padding:10px 12px; margin:14px 0 4px; }
+  .working { display:flex; align-items:center; gap:10px; background:#f3f6ff; border:1px solid #c5d2ff; color:var(--accent); border-radius:8px; padding:10px 12px; margin:6px 0 12px; font-weight:600; }
+  .spinner { width:18px; height:18px; border:3px solid #c5d2ff; border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; flex:0 0 auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .guide .gbody { margin-top:10px; font-size:14px; }
+  .guide h3 { font-size:14px; margin:14px 0 4px; }
+  .guide ul, .guide ol { margin:4px 0; padding-left:20px; } .guide li { margin:3px 0; }
+  @media (max-width: 640px) { .covers { grid-template-columns:1fr; } }
+  #zoom { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; z-index: 100; cursor: zoom-out; padding: 16px; }
+  #zoom img { max-width: 100%; max-height: calc(100vh - 80px); object-fit: contain; border-radius: 6px; }
+  #zoom a { color: #fff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>인디 앨범 스튜디오 — 백엔드 흐름 테스트</h1>
+  <div class="sub">이 서버의 API를 그대로 호출하는 <b>백엔드 흐름 확인용</b> 페이지입니다. 실제 화면(디자인)은 프론트에서 만듭니다.</div>
+
+  <!-- 테스트 가이드 · 확인 요청 (팀 공유용) -->
+  <section class="card guide">
+    <details>
+      <summary><b>📋 테스트 방법</b> — 처음이면 꼭 읽어 주세요</summary>
+      <div class="gbody">
+        <p class="hint">이 페이지는 <b>백엔드가 실제로 어떻게 동작하는지</b> 확인하는 페이지예요. 버튼 배치·색·글꼴 같은 화면 디자인은 팀장님이 만드는 실제 화면에서 정해집니다.
+          AI를 쓰는 버튼에는 횟수가 표시돼 있어요.</p>
+
+        <h3>빠르게 둘러보기 (AI 사용 없음)</h3>
+        <ul>
+          <li>1번 칸 아래 <b>샘플곡 1~3</b>: 결과물까지 만들어진 작업이에요. 커버·영상·채널 글·피칭 메일·ZIP을 바로 볼 수 있어요.</li>
+          <li><b>노트 수정 테스트용 (수락 전)</b>: A&R 노트 단계에 멈춰 있는 작업이에요. 노트 수정·다시 듣기를 해 볼 수 있어요.</li>
+          <li>샘플은 여러 사람이 같이 쓰는 작업이라, 누군가 고치면 다른 사람에게도 바뀐 채로 보여요. 마음껏 고치려면 직접 곡을 올려 주세요.</li>
+        </ul>
+
+        <h3>전체 흐름 (직접 곡 올리기)</h3>
+        <ol>
+          <li><b>초대 코드</b> — 밴드 테스트 때는 밴드마다 초대 코드를 하나씩 드리고, <b>코드가 있어야 올릴 수 있어요(밴드당 하루 5곡)</b>.
+            지금 팀 테스트 기간에는 코드 없이도 올릴 수 있어요(같은 인터넷에서 하루 10곡). 팀 테스트용 코드를 넣고 "코드 확인"을 눌러 보셔도 돼요.</li>
+          <li><b>곡 올리기</b> — mp3/wav(<b>15초~10분</b>, 200MB 이하), 곡 제목·아티스트 필수. 가사·곡 소개는 선택(넣으면 해석·피칭 메일에 반영). 동의서 제1~3조는 필수, 제4조는 선택.
+            같은 곡을 2분 안에 다시 올리면 새로 만들지 않고 앞 작업을 열어요(연속 클릭 방지).</li>
+          <li><b>진행 상태</b> — 업로드 → 수치 재는 중(BPM·키·에너지, 수 초) → 곡을 듣는 중(AI가 실제로 들음, 20~70초) → 해석 쓰는 중.
+            수치를 재면 BPM·파형이 먼저 보여요. 다른 곡이 처리 중이면 "차례를 기다리는 중 (n번째)"이 떠요.</li>
+          <li><b>A&R 노트 확인</b> — AI가 곡을 듣고 쓴 해석이에요. 아래 방법으로 고칠 수 있어요.
+            <ul>
+              <li><b>한 줄 수정</b>: "이게 아니라 이거야"를 한 줄로 쓰면 AI가 해석·키워드·색·커버 방향을 그 방향으로 다시 써요(약 7초). 예: "터지는 게 아니라 체념이야"</li>
+              <li><b>다시 듣기</b>: AI가 곡을 처음부터 다시 듣고 해석을 새로 써요(20~70초). 가사를 나중에 추가했거나, 해석이 곡과 많이 다를 때 써요. 밴드가 한 줄 수정한 방향은 다시 들어도 유지돼요.</li>
+              <li><b>AI 다시 쓰기·다시 듣기 남은 횟수</b>: 한 줄 수정 + 다시 듣기를 <b>합쳐서 작업당 5회</b>예요. 다시 듣기가 실패하면 횟수는 돌려줘요.</li>
+              <li><b>직접 편집 (횟수 제한 없음)</b>: 아래 값을 고친 뒤 <b>"직접 편집 저장"</b>을 눌러야 저장돼요.
+                <ul>
+                  <li>무드 키워드: 쉼표로 구분, 1~5개</li>
+                  <li>색 3개: <b>색 칸을 눌러</b> 색 고르기 (곡의 처음→절정→끝 느낌)</li>
+                  <li>커버 방향 3개: 커버를 그릴 때 쓰는 문장을 직접 고쳐 쓰기 (예: "비 오는 창가, 수채 일러스트")</li>
+                  <li>하이라이트 구간(숏폼 15초): 후보(★ = AI 추천)를 누르거나 <b>슬라이더</b>로 시작 지점을 옮기고 <b>▶ 이 구간 듣기</b>로 확인</li>
+                </ul>
+              </li>
+              <li>해석 문장 자체는 직접 고칠 수 없고 한 줄 수정으로만 바뀌어요(해석과 근거 수치가 어긋나지 않게).</li>
+            </ul>
+          </li>
+          <li><b>수락</b> — "이 해석으로 수락"을 누르면 커버 3장·채널 홍보 글 4개·피칭 메일(영·한)을 동시에 만들어요(약 40초). 수락하면 노트는 더 못 고쳐요.</li>
+          <li><b>결과물</b>
+            <ul>
+              <li><b>이 커버로 만들기</b>: 고른 커버로 숏폼 15초·Spotify Canvas 8초·채널별 이미지·제목 얹은 커버를 만들어요(약 40초, AI 사용 없음).
+                다른 커버를 골라도 되고, 한 번 만든 커버로 다시 돌아가면 바로 보여요. 글(채널 글·피칭)은 어떤 커버를 골라도 같아요.</li>
+              <li><b>다시 / 다시 쓰기</b>: 커버·채널 글·피칭 메일을 하나씩 다시 만들어요. 요청 칸에 한 줄 쓰면 반영돼요(예: "사람 없이", "더 짧게"). <b>AI를 쓰고, 항목마다 3회</b>예요. 이전 버전도 남아요.</li>
+              <li><b>직접 올린 사진</b>: 밴드 사진을 올리면 커버 후보(cover-own)로 들어가요. 골라서 영상까지 만들 수 있어요.</li>
+              <li><b>ZIP 다운로드</b>: 영상까지 만든 뒤 생겨요. 커버·영상·채널별 글과 이미지·피칭 메일·릴리즈 브리프가 들어 있어요.</li>
+              <li>틱톡·인스타그램(릴스)에는 숏폼 영상이 같이 붙어요. 피칭 메일의 <mark>[대괄호]</mark>는 밴드가 직접 채우는 칸이에요.</li>
+            </ul>
+          </li>
+        </ol>
+        <p class="hint">맨 아래 "호출 기록"에 어떤 요청을 보냈고 얼마나 걸렸는지 남아요. 오류를 알려 주실 때 작업 ID(진행 상태 옆)와 같이 캡처해 주세요.</p>
+      </div>
+    </details>
+  </section>
+
+  <section class="card guide">
+    <details>
+      <summary><b>🙋 팀에 확인 요청 드리는 것</b> — 10/6 1차 의견 반영 완료, 계속 받아요</summary>
+      <div class="gbody">
+        <h3>모두</h3>
+        <ul>
+          <li><b>여러 곡으로 다양하게</b> 테스트하고 오류·이상한 점을 알려 주세요: 긴 곡/짧은 곡, 보컬 없는 곡, 영어 가사, wav/mp3, 큰 파일, 중간에 새로고침하거나 창을 닫았다 다시 열기(작업 ID로 열기), 버튼 연속으로 누르기 등.</li>
+          <li><b>A&R 노트</b>: 해석이 곡과 맞는지, 방향성(말투·길이·근거 수치 정도)이 괜찮은지, 키워드·색·커버 방향이 곡에 어울리는지, 하이라이트 추천 구간이 정말 좋은 구간인지.</li>
+          <li><b>커버 3종</b>: 디자인 방향, 세 장이 서로 충분히 다른지, 곡 분위기와 맞는지, 이상한 그림(글자·손 모양 등)이 없는지.</li>
+          <li><b>영상</b>: 숏폼(훅 문구·확대 속도·파형·제목 위치·페이드)과 Canvas의 느낌, 샘플 영상으로 SNS에 올릴 만한지, 바꾸고 싶은 템플릿 요소.</li>
+          <li><b>채널 홍보 글</b>: 인스타·틱톡·스레드·X 각각의 말투·길이·해시태그가 실제 채널에 맞는지, 어색한 표현.</li>
+          <li><b>피칭 메일</b>: 영어·한국어 메일 품질, 큐레이터가 읽을 만한지, 빠진 정보(예: 발매일·링크·SNS).</li>
+          <li><b>추가하고 싶은 기능·빼도 될 기능</b>, 기다리는 시간이 너무 긴 곳.</li>
+        </ul>
+        <h3>팀장님 (화면)</h3>
+        <ul>
+          <li><b>초대 코드 입력 화면</b>(첫 화면): 코드 입력 칸 + "코드 확인"(<code>GET /band</code>, 헤더 <code>X-Band-Code</code>) → 밴드 이름·오늘 남은 곡 수 표시 → 코드는 브라우저에 저장해 두고 곡을 올릴 때(<code>POST /jobs</code>) 같은 헤더로 보내기. 틀린 코드·코드 없음·한도 초과 안내 문구도 필요해요.</li>
+          <li><b>보안 변경 (10/8)</b>: 밴드 코드로 올린 작업은 <code>/jobs/{id}/…</code> 모든 호출에 같은 <code>X-Band-Code</code> 헤더가 있어야 해요(없거나 다르면 403 <code>BAND_CODE_MISMATCH</code>). 코드 없이 올린 작업(팀 QA·샘플)은 예전처럼 열려요. ZIP은 패키지의 <code>zip_url</code>을 그대로 링크로 쓰면 돼요(서명이 붙어 있어 헤더 불필요, 24시간 유효). 입력 길이 상한: 제목·아티스트 100자, 장르 50자, 곡 소개 1000자, 가사 5000자(넘으면 422). 틀린 코드를 10분에 20번 넘게 넣으면 429 <code>TOO_MANY_ATTEMPTS</code>. AI가 쓴 글은 HTML이 아니라 텍스트로 넣어 주세요.</li>
+          <li><b>내 작업 목록</b>(10/5 추가): 같은 코드로 <code>GET /band/jobs</code> → 그 밴드의 작업(곡 제목·진행 단계·올린 날·삭제 예정일) → 눌러서 이어하기. 코드 없이 만든 작업도 다시 열 수 있게 작업 ID를 브라우저에도 저장해 주세요. (이 페이지 1번 칸에 예시가 있어요)</li>
+          <li>진행 화면 단계 이름(업로드 → 수치 재는 중 → 곡을 듣는 중 → 해석 쓰는 중)과 문구, 기다리는 동안 보여줄 것(먼저 나오는 BPM·파형 활용).</li>
+          <li>A&R 노트 화면 구성 — 한 줄 수정·직접 편집·하이라이트 슬라이더·다시 듣기 배치. 미리 듣기는 응답의 <code>audio_url</code>로 가능.</li>
+          <li>API 응답 구조에서 바꾸거나 추가해야 할 필드.</li>
+          <li>숏폼 템플릿 2·3번째 스펙(위치·색·글꼴·움직임), 채널 이미지 비율, 커버 위 제목 배치.</li>
+        </ul>
+        <h3>동의·개인정보</h3>
+        <ul>
+          <li><b>동의서 v1.6 반영</b>(10/18): 체크 4개(제1~3조 필수, 제4조 선택). 로그인(제5조)은 로그인 화면, 커뮤니티(제6·7조)는 공개·반응 화면에서 안내해요. 화면에서 <code>consent_version</code>을 <code>"v1.6"</code>으로 보내 주세요.</li>
+          <li>개인정보 보호책임자 이원일 · admin@201.n-e.kr.</li>
+          <li>지금 받는 정보: 음원 파일, 곡 제목·아티스트·장르·곡 소개·가사(선택), 초대 코드, 접속 IP(하루 한도용), 올린 사진, 동의 여부와 시각, 밴드가 쓴 수정 문장. <b>서비스 종료일(2026-10-31)에 모두 삭제</b>(접속 IP는 7일).</li>
+        </ul>
+        <p class="notice">의견은 화면 캡처 + 작업 ID + "무엇을 했더니 → 어떻게 됐고 → 어떻게 되길 원하는지"로 보내 주시면 반영할게요.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- 1. 시작 -->
+  <section class="card" id="start">
+    <h2>1. 곡 올리기 또는 기존 작업 열기</h2>
+    <div class="row">
+      <div><label>밴드 초대 코드 (밴드마다 하나, 하루 5곡) — 지금 팀 테스트 기간에는 없어도 올릴 수 있어요</label><input type="text" id="bandCode" placeholder="예: K7QM-3XPA" autocomplete="off"></div>
+      <div style="flex:0 0 auto;align-self:flex-end"><button id="bandCheck">코드 확인</button></div>
+    </div>
+    <div class="hint" id="bandInfo"></div>
+    <div class="hint" id="bandJobs"></div>
+    <div class="row">
+      <div><label>음원 (mp3 / wav, 15초~10분)</label><input type="file" id="file" accept=".mp3,.wav"><div class="hint" id="fileInfo"></div></div>
+    </div>
+    <div class="row">
+      <div><label>곡 제목</label><input type="text" id="title" placeholder="예: 새벽의 끝"></div>
+      <div><label>아티스트</label><input type="text" id="artist" placeholder="예: 샘플 밴드"></div>
+      <div><label>장르 (선택)</label><input type="text" id="genre"></div>
+    </div>
+    <label>곡 소개 (선택, 비슷한 아티스트를 쓰면 피칭 메일에 반영)</label><input type="text" id="desc">
+    <label>가사 (선택)</label><textarea id="lyrics"></textarea>
+    <!-- 동의서 v1.6 (2026-10-17 시행, indie/docs/part2/개인정보수집이용동의서_v1.6.md). 전문은 /privacy 한 곳에만 둔다. 문구를 바꾸면 CONSENT_VERSION도 올린다 -->
+    <div class="consent">
+      <b>서비스 이용 및 개인정보 수집·이용 동의</b> <span class="hint">(동의서 v1.6)</span>
+      <div class="hint">곡 정보·음원·크레딧·발매 정보·소리 지문·올린 사진을 결과물과 유통사 제출 자료를 만드는 데 쓰고 <b>서비스 종료일(2026-10-31)에 모두 삭제</b>해요(접속 IP는 7일). 음원은 Google Gemini(미국)로, 글·이미지는 코디세이 API를 거쳐 OpenAI(미국)로, 소리 지문은 AcoustID로 보내요. <b>Gemini 무료 버전은 음원을 Google의 AI 학습에 쓸 수 있어요.</b> 올리는 곡·사진의 권리와 크레딧 참여자 동의는 미리 확보해야 해요. 만 14세 이상만 이용할 수 있어요. 개인정보 보호책임자 이원일 · admin@201.n-e.kr (<a href="/privacy" target="_blank">개인정보처리방침 전문</a>)</div>
+      <div class="chk">
+        <label><input type="checkbox" id="cAll"> <b>모두 동의</b></label>
+        <label><input type="checkbox" id="c2"> (필수) 제1조 개인정보 수집 및 이용에 동의합니다.</label>
+        <label><input type="checkbox" id="c3"> (필수) 제2조 외부 AI API 제3자 제공 및 위탁 처리에 동의합니다.</label>
+        <label><input type="checkbox" id="c1"> (필수) 제3조 저작권·결과물 이용 및 규격·권리 검사 정책에 동의합니다.</label>
+        <label><input type="checkbox" id="c4"> (선택) 제4조 서비스 개선 및 발표 활용에 동의합니다.</label>
+      </div>
+      <div class="hint">동의 일시는 올릴 때 서버에 자동으로 기록돼요.</div>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="primary" id="upload">올리고 분석 시작</button><span class="hint">Gemini 1회 사용</span></div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:18px 0">
+    <div class="row">
+      <div><label>기존 작업 ID</label><input type="text" id="jobid" placeholder="01M4…"></div>
+      <div style="flex:0 0 auto;align-self:flex-end"><button id="open">열기</button></div>
+    </div>
+    <div class="hint" style="margin-top:6px">샘플: <a href="#" data-job="01M427T4Y9Z2QA70A8HJ9W81JT">샘플곡 1 (결과까지)</a> ·
+      <a href="#" data-job="01M427VYXAYMFEDW8XXQ265X01">샘플곡 2 (결과까지)</a> ·
+      <a href="#" data-job="01M427MZC8RGQW3PBR2CVAQMGT">샘플곡 3 (결과까지)</a> ·
+      <a href="#" data-job="01M4273XRE1ABK6SXKRVDYVEMK">노트 수정 테스트용 (수락 전)</a></div>
+    <div class="hint" id="recentJobs" style="margin-top:6px"></div>
+  </section>
+
+  <!-- 2. 진행 -->
+  <section class="card hide" id="progress">
+    <h2>2. 진행 상태 <span class="hint" id="jobLabel"></span></h2>
+    <div class="row"><strong id="stageLabel">-</strong><span class="hint" id="queue"></span></div>
+    <div id="progWorking" class="working hide"><div class="spinner"></div><span id="progWorkingText">처리 중…</span></div>
+    <div class="bar" style="margin-top:8px"><i id="bar" style="width:0"></i></div>
+    <div class="steps" id="steps"></div>
+    <div id="early" class="hide"><div class="hint" id="earlySummary"></div><canvas id="wave" width="880" height="60"></canvas></div>
+    <div id="statusErr" class="err hide"></div>
+    <div class="row" style="margin-top:10px"><button id="retry" class="hide">실패한 단계부터 다시 시도</button></div>
+  </section>
+
+  <!-- 3. 노트 -->
+  <section class="card hide" id="note">
+    <h2>3. A&R 노트 <span class="pill" id="noteVer"></span><span class="pill" id="edits"></span></h2>
+    <div class="interp" id="interp"></div>
+    <div class="hint" id="evidence"></div>
+    <div class="hint" id="correctionNow"></div>
+
+    <label>한 줄 수정 — "이게 아니라 이거야" (AI가 해석·키워드·색·커버 방향을 다시 씀, AI 횟수 1 사용)</label>
+    <div class="row"><input type="text" id="correction" placeholder="예: 터지는 게 아니라 체념이야"><button style="flex:0 0 auto" id="sendCorrection">해석 다시 쓰기</button></div>
+
+    <div class="hint" style="margin-top:14px"><b>직접 편집</b> — 아래 값을 고친 뒤 "직접 편집 저장"을 누르세요. AI를 쓰지 않아 횟수 제한이 없어요.</div>
+    <label>무드 키워드 (쉼표로 구분, 1~5개)</label><input type="text" id="kw">
+    <label>색 3개 (색 칸을 눌러 바꾸기 — 곡의 처음→절정→끝 느낌)</label><div class="swatches" id="colors"></div>
+    <label>커버 방향 (커버 3장을 그릴 때 쓰는 문장, 직접 고쳐 쓰기)</label><div id="covdirs"></div>
+    <label>하이라이트 구간 (숏폼에 쓰일 15초) — 후보를 누르거나, 슬라이더로 시작 지점을 옮기고 ▶로 들어 보세요</label>
+    <div id="cands"></div>
+    <canvas id="hlWave" width="880" height="56" style="margin-top:8px"></canvas>
+    <input type="range" id="hlRange" min="0" max="100" step="0.5" style="width:100%">
+    <div class="row"><button id="hlPlay" style="flex:0 0 auto">▶ 이 구간 듣기</button><span class="hint" id="hlNow"></span></div>
+    <audio id="hlAudio" preload="none"></audio>
+    <div class="row" style="margin-top:12px">
+      <button id="saveDirect" title="키워드·색·커버 방향·하이라이트 구간 — AI를 쓰지 않아 횟수 제한 없음">직접 편집 저장 (횟수 제한 없음)</button>
+      <button id="relisten" title="Gemini가 곡을 처음부터 다시 듣고 해석을 새로 써요. 가사를 추가했거나 해석이 곡과 많이 다를 때">다시 듣기 (AI 횟수 1 사용)</button>
+      <button class="primary" id="accept">이 해석으로 수락 → 결과물 만들기</button>
+    </div>
+    <div id="noteErr" class="err hide"></div>
+  </section>
+
+  <!-- 4. 결과 -->
+  <section class="card hide" id="result">
+    <h2>4. 결과물 <span class="hint" id="resultHint"></span></h2>
+    <div id="working" class="working hide"><div class="spinner"></div><span id="workingText">작업 중…</span></div>
+    <div id="resultErr" class="err hide"></div>
+    <!-- 순서(10/9 방향 논의): 하이라이트 숏폼·홍보 세트 → 발매 준비(에디토리얼 피칭·캘린더·검수) → 커버 → 피칭 메일(선택).
+         커버를 골라야 영상을 만들 수 있으므로 커버 선택 전에는 커버를 맨 위로 올린다 (loadPackage). -->
+    <div id="resultBody" style="display:flex;flex-direction:column">
+      <div id="coverBlock" style="order:7;margin-top:14px">
+        <h2 id="coverTitle">커버</h2>
+        <div class="covers" id="covers"></div>
+        <div class="row" style="margin-top:10px">
+          <div><label>직접 올린 사진으로 (jpg·png, 800px 이상 — 정사각으로 잘림)</label><input type="file" id="ownFile" accept="image/*"></div>
+          <div style="flex:0 0 auto;align-self:flex-end"><button id="ownUpload">사진 올리기</button></div>
+        </div>
+      </div>
+      <div id="videos" style="order:1;margin-top:14px"></div>
+      <div class="row" style="order:2;margin-top:10px"><a id="zip" class="hide" href="#"><button class="primary">ZIP 다운로드</button></a><span class="hint" id="zipInfo" style="cursor:help"></span></div>
+      <div id="channels" style="order:3;margin-top:14px"></div>
+      <div id="editorial" style="order:4;margin-top:14px"></div>
+      <div id="plan" style="order:5;margin-top:14px"></div>
+      <div id="check" style="order:6;margin-top:14px"></div>
+      <div id="pitch" style="order:8;margin-top:14px"></div>
+    </div>
+  </section>
+
+  <section class="card hide" id="community">
+    <h2>5. 커뮤니티에 올리기 <span class="hint">— <a href="/community" target="_blank">커뮤니티 보기</a> (10/9 새 기능, 임시 화면)</span></h2>
+    <div id="commNow" class="hint"></div>
+    <label>어떻게 들려줄까요?</label>
+    <div class="row"><label style="flex:0 0 auto"><input type="radio" name="commMode" value="highlight" checked> 하이라이트만 (노트에서 고른 15초)</label>
+      <label style="flex:0 0 auto"><input type="radio" name="commMode" value="full"> 전곡</label></div>
+    <label>들은 사람의 의견은?</label>
+    <div class="row"><label style="flex:0 0 auto"><input type="radio" name="commPub" value="1" checked> 공개 (곡 페이지에 보임)</label>
+      <label style="flex:0 0 auto"><input type="radio" name="commPub" value="0"> 나만 보기</label></div>
+    <label>한 줄 소개 (선택, 비우면 곡 소개)</label><input type="text" id="commIntro" maxlength="500">
+    <div class="consent" style="margin-top:8px">
+      <label><input type="checkbox" id="cc1"> (필수) 내가 만든 곡이거나 공개할 권리가 있어요.</label>
+      <label><input type="checkbox" id="cc2"> (필수) 커뮤니티에 공개하고, 직접 내리거나 서비스 종료일(2026-10-31)까지 보관하는 데 동의해요.</label>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="primary" id="commPublish">커뮤니티에 올리기</button></div>
+    <div id="commErr" class="err hide"></div>
+  </section>
+
+  <section class="card"><h2>호출 기록</h2><div class="log" id="log"></div></section>
+</main>
+
+<script>
+const API = "";  // 같은 서버에서 열리므로 상대 경로
+const $ = (id) => document.getElementById(id);
+let jobId = null, pollTimer = null, note = null, lastStatus = null, renderingShown = false, workStart = null, progStart = null;
+
+function log(msg) { const t = new Date().toLocaleTimeString(); $("log").textContent = `${t}  ${msg}\n` + $("log").textContent; }
+function show(id, on = true) { $(id).classList.toggle("hide", !on); }
+function fmt(sec) { sec = Math.max(0, Math.round(sec)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`; }
+
+async function api(method, path, body, isForm, headers) {
+  const opt = { method, headers: { ...(headers || {}) } };
+  // 밴드 코드로 올린 작업은 같은 코드가 있어야 열린다 → 작업 API에는 입력해 둔 코드를 같이 보낸다
+  const savedCode = $("bandCode").value.trim();
+  if (savedCode && path.startsWith("/jobs/") && !opt.headers["X-Band-Code"]) opt.headers["X-Band-Code"] = savedCode;
+  if (body && isForm) opt.body = body;
+  else if (body) { opt.body = JSON.stringify(body); opt.headers["Content-Type"] = "application/json"; }
+  const t = performance.now();
+  const res = await fetch(API + path, opt);
+  const data = await res.json().catch(() => ({}));
+  log(`${method} ${path} → ${res.status} (${Math.round(performance.now() - t)}ms)${res.ok ? "" : "  " + (data.code || "") + " " + (data.message || "")}`);
+  if (!res.ok) throw data;
+  return data;
+}
+
+// ---------- 1. 시작 ----------
+$("upload").onclick = async () => {
+  const f = $("file").files[0];
+  if (!f) return alertBox("statusErr", "음원 파일을 골라 주세요.");
+  const fd = new FormData();
+  fd.append("file", f);
+  fd.append("title", $("title").value || f.name.replace(/\.[^.]+$/, ""));
+  fd.append("artist", $("artist").value || "테스트 밴드");
+  fd.append("genre", $("genre").value); fd.append("description", $("desc").value);
+  if ($("lyrics").value.trim()) fd.append("lyrics", $("lyrics").value);
+  fd.append("consent_original", $("c1").checked); fd.append("consent_privacy", $("c2").checked);
+  fd.append("consent_external_ai", $("c3").checked); fd.append("consent_showcase", $("c4").checked);
+  fd.append("consent_version", CONSENT_VERSION);
+  if (!["c1", "c2", "c3"].every(id => $(id).checked)) { show("progress"); return alertBox("statusErr", "동의서 제1~3조(필수)에 동의해 주세요."); }
+  const dur = await fileDuration(f);
+  if (dur !== null && (dur < MIN_SEC || dur > MAX_SEC)) {
+    show("progress"); return alertBox("statusErr", `${MIN_SEC}초~${MAX_SEC / 60}분 곡만 올릴 수 있어요. 고른 곡은 ${fmt(dur)}예요.`);
+  }
+  const code = $("bandCode").value.trim();
+  $("upload").disabled = true; $("upload").textContent = "올리는 중…";
+  try {
+    const r = await api("POST", "/jobs", fd, true, code ? { "X-Band-Code": code } : null);
+    rememberJob(r.job_id, $("title").value.trim() || f.name.replace(/\.[^.]+$/, ""));
+    openJob(r.job_id);
+    if (r.duplicate) alertBox("statusErr", "방금 올린 같은 곡이 있어서 새로 만들지 않고 그 작업을 열었어요.");
+    if (code) checkBand();
+  }
+  catch (e) { show("progress"); alertBox("statusErr", e.message || "업로드 실패"); }
+  finally { $("upload").disabled = false; $("upload").textContent = "올리고 분석 시작"; }
+};
+const CONSENT_VERSION = "v1.6", MIN_SEC = 15, MAX_SEC = 600;
+// 올리기 전에 길이 확인 (서버도 같은 기준으로 막음). 브라우저가 못 읽는 형식이면 null → 서버가 판단
+function fileDuration(f) {
+  return new Promise(resolve => {
+    const a = new Audio(), url = URL.createObjectURL(f);
+    let settled = false;
+    const done = (v) => { if (settled) return; settled = true; URL.revokeObjectURL(url); resolve(v); };
+    a.preload = "metadata"; a.onloadedmetadata = () => done(isFinite(a.duration) ? a.duration : null); a.onerror = () => done(null);
+    setTimeout(() => done(null), 5000); a.src = url;
+  });
+}
+$("file").onchange = async () => {
+  const f = $("file").files[0]; $("fileInfo").textContent = "";
+  if (!f) return;
+  const d = await fileDuration(f);
+  if (d === null) return;
+  const bad = d < MIN_SEC ? `${MIN_SEC}초보다 짧아서 올릴 수 없어요` : d > MAX_SEC ? `${MAX_SEC / 60}분보다 길어서 올릴 수 없어요` : "";
+  $("fileInfo").innerHTML = `길이 ${fmt(d)} · ${(f.size / 1048576).toFixed(1)}MB` + (bad ? ` — <span style="color:var(--bad)">${bad}</span>` : "");
+};
+const CONSENTS = ["c1", "c2", "c3", "c4"];
+$("cAll").onchange = () => CONSENTS.forEach(id => $(id).checked = $("cAll").checked);
+CONSENTS.forEach(id => $(id).addEventListener("change", () => $("cAll").checked = CONSENTS.every(i => $(i).checked)));
+async function checkBand() {
+  const code = $("bandCode").value.trim();
+  if (!code) { $("bandInfo").textContent = ""; return; }
+  try {
+    const b = await api("GET", "/band", null, false, { "X-Band-Code": code });
+    $("bandInfo").innerHTML = `✅ <b>${esc(b.name)}</b> · 오늘 ${b.used_today}/${b.daily_limit}곡 사용 (남은 ${b.remaining_today}곡)`;
+    try { localStorage.setItem("bandCode", code); } catch (e) {}
+    loadBandJobs(code);
+  } catch (e) { $("bandInfo").innerHTML = `<span style="color:var(--bad)">${esc(e.message || "코드를 확인하지 못했어요")}</span>`; }
+}
+$("bandCheck").onclick = checkBand;
+
+// 작업 ID를 몰라도 이어서 열기: 밴드 코드로 받은 목록(GET /band/jobs) + 이 브라우저에서 열었던 작업
+function day(iso) { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()}`; }
+function hm(iso) { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
+function jobLinks(el, title, items) {
+  el.innerHTML = items.length ? `${title}: ` + items.map(j =>
+    (j.title ? `<a href="#" data-open="${j.job_id}">${esc(j.title)}</a> <span class="hint">(${j.note ? esc(j.note) + " · " : ""}#${j.job_id.slice(-6)})</span>`
+             : `<a href="#" data-open="${j.job_id}">작업 #${j.job_id.slice(-6)}</a>${j.note ? ` <span class="hint">(${esc(j.note)})</span>` : ""}`)).join(" · ") : "";
+  el.querySelectorAll("[data-open]").forEach(a => a.onclick = (e) => { e.preventDefault(); openJob(a.dataset.open); });
+}
+async function loadBandJobs(code) {
+  try {
+    const r = await api("GET", "/band/jobs", null, false, { "X-Band-Code": code });
+    const hideFailed = $("hideFailed") ? $("hideFailed").checked : true;
+    const nFailed = r.jobs.filter(j => j.stage === "failed").length;
+    jobLinks($("bandJobs"), "📂 이 밴드의 작업", r.jobs.filter(j => !(hideFailed && j.stage === "failed")).map(j => ({ ...j,
+      note: `${j.stage_label} · ${hm(j.created_at)} 올림` + (j.expires_at ? ` · ${day(j.expires_at)} 삭제` : "") })));
+    if (nFailed) {
+      $("bandJobs").insertAdjacentHTML("beforeend", ` <label style="display:inline;margin-left:6px"><input type="checkbox" id="hideFailed" ${hideFailed ? "checked" : ""}> 실패한 작업 ${nFailed}개 숨기기</label>`);
+      $("hideFailed").onchange = () => loadBandJobs(code);
+    }
+  } catch (e) { $("bandJobs").textContent = ""; }
+}
+function rememberJob(id, title) {
+  try {
+    const all = JSON.parse(localStorage.getItem("recentJobs") || "[]");
+    const prev = all.find(j => j.job_id === id), list = all.filter(j => j.job_id !== id);
+    list.unshift({ job_id: id, title: title || (prev && prev.title) || "", at: (prev && prev.at) || new Date().toISOString() });
+    localStorage.setItem("recentJobs", JSON.stringify(list.slice(0, 10)));
+  } catch (e) {}
+  showRecent();
+}
+function showRecent() {
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem("recentJobs") || "[]"); } catch (e) {}
+  jobLinks($("recentJobs"), "🕘 이 브라우저에서 열었던 작업", list.map(j => ({ ...j, note: j.at ? `${hm(j.at)} 처음 엶` : "" })));
+}
+showRecent();
+try { const saved = localStorage.getItem("bandCode"); if (saved) { $("bandCode").value = saved; checkBand(); } } catch (e) {}
+$("open").onclick = () => $("jobid").value.trim() && openJob($("jobid").value.trim());
+document.querySelectorAll("[data-job]").forEach(a => a.onclick = (e) => { e.preventDefault(); openJob(a.dataset.job); });
+
+function openJob(id) {
+  jobId = id; $("jobid").value = id; $("jobLabel").textContent = id;
+  rememberJob(id);
+  ["note", "result", "community"].forEach(s => show(s, false));
+  show("progress"); poll();
+}
+
+// ---------- 2. 진행 ----------
+// 상태 조회 간격: 처음 3초 → 조금씩 늘려 최대 10초. 단계가 바뀌면 다시 3초. 끝나거나 실패하면 멈추고,
+// 탭을 숨기면 쉬었다가 돌아오면 바로 조회 (팀 테스트 P2-2)
+let pollDelay = 3000;
+function nextPoll() {
+  if (document.hidden) return;  // 숨긴 탭은 다음 조회를 예약하지 않음 → 돌아오면 visibilitychange가 이어서 조회
+  pollTimer = setTimeout(poll, pollDelay); pollDelay = Math.min(10000, Math.round(pollDelay * 1.25));
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) clearTimeout(pollTimer);
+  else if (jobId && lastStatus && ["uploaded", "analyzing", "generating", "rendering"].includes(lastStatus.stage)) { pollDelay = 3000; poll(); }
+});
+async function poll() {
+  clearTimeout(pollTimer);
+  let st;
+  try { st = await api("GET", `/jobs/${jobId}`); } catch (e) { alertBox("statusErr", e.message); return; }
+  if (!lastStatus || lastStatus.job_id !== st.job_id || lastStatus.stage !== st.stage) pollDelay = 3000;
+  renderStatus(st); lastStatus = st;
+  if (st.stage === "note_ready") { await loadNote(); show("result", false); return; }
+  if (st.stage === "rendering") {
+    // 렌더링 중에는 결과 화면을 한 번만 그리고(버튼 잠금), 이후엔 위쪽 진행 상태만 갱신 → 깜빡이지 않게
+    if (!renderingShown) { show("note", false); await loadPackage(st.stage); renderingShown = true; }
+    showWorking(st.queue_position ? `차례를 기다리는 중 (${st.queue_position}번째)…` : "영상·채널 이미지를 만드는 중이에요 (보통 40초 안팎)");
+    nextPoll(); return;
+  }
+  renderingShown = false; hideWorking();
+  if (["awaiting_cover", "done"].includes(st.stage)) { show("note", false); await loadPackage(st.stage); return; }
+  if (st.stage === "failed") return;
+  nextPoll();
+}
+
+function renderStatus(st) {
+  $("stageLabel").textContent = st.stage_label;
+  $("jobLabel").textContent = st.job_id + (st.expires_at ? ` · ${day(st.expires_at)} 이후 삭제` : "");
+  $("queue").textContent = st.queue_position ? `대기 ${st.queue_position}번째` : "";
+  $("bar").style.width = `${Math.round(st.progress * 100)}%`;
+  const STEP = { done: "✓", running: "진행 중", pending: "대기", failed: "실패" };
+  $("steps").innerHTML = st.steps.map(s => `<span class="${esc(s.status)}">${esc(s.label)} ${STEP[s.status] || ""}</span>`).join("");
+  if (st.early) {
+    show("early"); $("earlySummary").textContent = `먼저 나온 수치: ${st.early.summary}`;
+    drawWave(st.early.waveform);
+  }
+  if (st.error) alertBox("statusErr", st.error.message +
+    (st.retries ? ` 다시 시도 ${st.retries}번 했지만 또 실패했어요.` : "") +
+    (st.error.retryable ? " 아래 버튼으로 다시 시도할 수 있어요 (하루 곡 수·AI 횟수는 쓰지 않아요)." : " 다시 시도해도 해결되지 않는 문제라 새로 올려 주세요.") +
+    ` (오류 코드 ${st.error.code})`);
+  else show("statusErr", false);
+  show("retry", st.stage === "failed" && st.error && st.error.retryable);
+  const busy = { uploaded: "곡을 받았어요. 곧 시작해요", analyzing: "AI가 곡을 듣고 해석하는 중이에요 (보통 30초~1분 30초)",
+                 generating: "커버 3장·채널 글·피칭 메일을 만드는 중이에요 (보통 40초 안팎)",
+                 rendering: "영상·채널 이미지를 만드는 중이에요 (보통 40초 안팎)" }[st.stage];
+  if (busy) {
+    if (!progStart) progStart = workStart || Date.now();  // 버튼을 누른 순간부터 같이 셈
+    $("progWorkingText").textContent = `${st.queue_position ? `차례를 기다리는 중 (${st.queue_position}번째)` : busy} · ${Math.round((Date.now() - progStart) / 1000)}초 지남`;
+    show("progWorking");
+  } else { progStart = null; show("progWorking", false); }
+}
+$("retry").onclick = async () => {
+  $("retry").disabled = true;
+  try { await api("POST", `/jobs/${jobId}/retry`); show("statusErr", false); show("retry", false); progStart = Date.now(); pollDelay = 3000; setTimeout(poll, 1000); }
+  catch (e) { alertBox("statusErr", e.message); }
+  finally { $("retry").disabled = false; }
+};
+
+function drawWave(w) {
+  const c = $("wave"), g = c.getContext("2d"); g.clearRect(0, 0, c.width, c.height);
+  g.fillStyle = "#3b5bdb"; const bw = c.width / w.length;
+  w.forEach((v, i) => { const h = Math.max(1, v * c.height); g.fillRect(i * bw, (c.height - h) / 2, Math.max(1, bw - 0.5), h); });
+}
+
+// ---------- 3. 노트 ----------
+async function loadNote() {
+  note = await api("GET", `/jobs/${jobId}/note`);
+  show("note");
+  $("noteVer").textContent = `v${note.version}`;
+  $("edits").textContent = `AI 다시 쓰기·다시 듣기 남은 횟수 ${note.edits_remaining} (합쳐서 5회)`;
+  $("interp").textContent = note.interpretation;
+  const ev = note.evidence;
+  $("evidence").textContent = `근거: ${ev.bpm} BPM${ev.bpm_measured && ev.bpm_measured !== ev.bpm ? ` (측정 ${ev.bpm_measured})` : ""} · ${ev.key} · ${ev.energy_change}  |  ${note.ai_generated.models.join(", ")}`;
+  $("correctionNow").textContent = note.user_correction ? `반영된 밴드 수정: “${note.user_correction}”` : "";
+  $("kw").value = note.mood_keywords.join(", ");
+  $("colors").innerHTML = note.colors.map(c => `<input type="color" value="${/^#[0-9A-Fa-f]{6}$/.test(c) ? c : "#000000"}">`).join("");
+  $("covdirs").innerHTML = note.cover_directions.map(c => `<div class="row" style="margin:4px 0"><span style="flex:0 0 32px" class="pill">${esc(c.id)}</span><input type="text" data-cid="${esc(c.id)}" value="${esc(c.text)}"></div>`).join("");
+  const sel = note.highlight.selected;
+  $("cands").innerHTML = note.highlight.candidates.map(c =>
+    `<div class="cand" data-start="${c.start}">${c.id === note.highlight.recommended_id ? "★ 추천 " : ""}<b>${fmt(c.start)}~${fmt(c.end)}</b> ${esc(c.reason)}</div>`).join("");
+  const dur = (lastStatus && lastStatus.early && lastStatus.early.duration_sec) || (sel.end + HL);
+  $("hlRange").max = Math.max(0, dur - HL); $("hlRange").value = sel.start;
+  document.querySelectorAll(".cand").forEach(el => el.onclick = () => { $("hlRange").value = el.dataset.start; drawHighlight(); });
+  $("hlRange").oninput = drawHighlight;
+  const audioUrl = lastStatus && lastStatus.audio_url;
+  $("hlPlay").disabled = !audioUrl; $("hlPlay").title = audioUrl ? "" : "미리 듣기 음원이 없어요";
+  if (audioUrl) $("hlAudio").src = API + audioUrl;
+  drawHighlight();
+  show("noteErr", false);
+}
+
+function directEdits() {
+  const body = {};
+  const kw = $("kw").value.split(",").map(s => s.trim()).filter(Boolean);
+  if (kw.join() !== note.mood_keywords.join()) body.mood_keywords = kw;
+  const colors = [...$("colors").querySelectorAll("input")].map(i => i.value.toUpperCase());
+  if (colors.join() !== note.colors.join()) body.colors = colors;
+  const dirs = [...document.querySelectorAll("[data-cid]")].map(i => ({ id: i.dataset.cid, text: i.value.trim() }))
+    .filter(d => d.text !== note.cover_directions.find(c => c.id === d.id).text);
+  if (dirs.length) body.cover_directions = dirs;
+  const start = parseFloat($("hlRange").value);
+  if (Math.abs(start - note.highlight.selected.start) >= 0.5) body.highlight_start = start;
+  return body;
+}
+
+async function patch(body, btn) {
+  btn.disabled = true; const label = btn.textContent; btn.textContent = "처리 중…";
+  try { await api("PATCH", `/jobs/${jobId}/note`, body); await loadNote(); $("correction").value = ""; }
+  catch (e) { alertBox("noteErr", `[${e.code}] ${e.message}`); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+$("sendCorrection").onclick = () => {
+  const c = $("correction").value.trim();
+  if (!c) return alertBox("noteErr", "수정할 문장을 써 주세요.");
+  patch({ correction: c, ...directEdits() }, $("sendCorrection"));
+};
+$("saveDirect").onclick = () => {
+  const body = directEdits();
+  if (!Object.keys(body).length) return alertBox("noteErr", "바뀐 내용이 없어요.");
+  patch(body, $("saveDirect"));
+};
+$("relisten").onclick = async () => {
+  try { await api("POST", `/jobs/${jobId}/note/relisten`); show("note", false); poll(); }
+  catch (e) { alertBox("noteErr", `[${e.code}] ${e.message}`); }
+};
+$("accept").onclick = async () => {
+  if (Object.keys(directEdits()).length && !confirm("저장하지 않은 직접 편집이 있어요. 그대로 수락할까요?")) return;
+  try { await api("POST", `/jobs/${jobId}/note/accept`, { version: note.version }); show("note", false); poll(); }
+  catch (e) { alertBox("noteErr", `[${e.code}] ${e.message}`); }
+};
+
+const HL = 15;  // 하이라이트 길이(초)
+function drawHighlight() {
+  const start = parseFloat($("hlRange").value), w = note.waveform, c = $("hlWave"), g = c.getContext("2d");
+  const dur = parseFloat($("hlRange").max) + HL;
+  g.clearRect(0, 0, c.width, c.height);
+  const x0 = start / dur * c.width, x1 = (start + HL) / dur * c.width;
+  g.fillStyle = "#dbe4ff"; g.fillRect(x0, 0, x1 - x0, c.height);
+  const bw = c.width / w.length;
+  w.forEach((v, i) => { const x = i * bw, h = Math.max(1, v * c.height); g.fillStyle = (x >= x0 && x <= x1) ? "#3b5bdb" : "#adb5bd"; g.fillRect(x, (c.height - h) / 2, Math.max(1, bw - 0.5), h); });
+  const saved = Math.abs(start - note.highlight.selected.start) < 0.5;
+  $("hlNow").textContent = `선택: ${fmt(start)}~${fmt(start + HL)}` + (saved ? " (저장됨)" : " — 저장하려면 '직접 편집 저장'");
+  document.querySelectorAll(".cand").forEach(el => el.classList.toggle("sel", Math.abs(parseFloat(el.dataset.start) - start) < 0.5));
+}
+let hlStop = null;
+$("hlPlay").onclick = () => {
+  const a = $("hlAudio"), start = parseFloat($("hlRange").value);
+  if (!a.paused) { a.pause(); $("hlPlay").textContent = "▶ 이 구간 듣기"; return; }
+  a.currentTime = start; a.play(); $("hlPlay").textContent = "■ 멈춤";
+  clearInterval(hlStop);
+  hlStop = setInterval(() => { if (a.currentTime >= start + HL || a.paused) { a.pause(); clearInterval(hlStop); $("hlPlay").textContent = "▶ 이 구간 듣기"; } }, 200);
+};
+
+// ---------- 4. 결과 ----------
+let stage_now = null;
+async function loadPackage(stage) {
+  stage_now = stage;
+  const p = await api("GET", `/jobs/${jobId}/package`);
+  show("result");
+  $("resultHint").textContent = stage === "awaiting_cover" ? "— 커버를 하나 고르면 숏폼·Canvas·채널 이미지를 만들어요"
+    : stage === "rendering" ? "— 영상·이미지 만드는 중 (40초 안팎, 위쪽 진행 상태에서 확인)… 끝나면 자동으로 바뀌어요" : "— 완료";
+  const choosing = stage === "awaiting_cover";
+  $("coverBlock").style.order = choosing ? 0 : 7;
+  $("coverTitle").textContent = choosing ? "커버 고르기 — 하나 고르면 숏폼·채널 이미지를 만들어요" : "커버 (발매용 3000px)";
+  $("covers").innerHTML = p.covers.map(c => {
+    const v = c.versions[c.versions.length - 1];
+    const picked = c.selected ? ` · <b>선택됨</b>` : "";
+    const regen = c.item_id === "cover-own" ? "" :
+      `<div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 사람 없이)" data-req="${c.item_id}"><button style="flex:0 0 auto" data-regen="${c.item_id}" ${c.regenerate_remaining ? "" : "disabled"}>다시 만들기 · ${c.regenerate_remaining}회 남음</button></div>`;
+    return `<figure style="margin:0"><a href="${API + (v.url_title || v.url_3000 || v.url)}" data-zoom><img src="${API + v.url}" alt="${c.item_id}" style="${c.selected ? "outline:3px solid var(--accent)" : ""}"></a>
+      <figcaption class="hint">${coverName(c.item_id)}${v.v > 1 ? ` · ${v.v}번째 버전` : ""}${picked}${v.url_title ? " · 누르면 제목 얹은 3000px 크게 보기" : " · 누르면 3000px 크게 보기"} · <a href="${API + (v.url_title || v.url_3000 || v.url)}" download>다운로드</a>${v.request ? `<br>요청: ${esc(v.request)}` : ""}</figcaption>
+      <div class="row" style="margin-top:4px"><button data-select="${c.item_id}" data-v="${v.v}" ${stage === "rendering" ? "disabled" : ""}>이 커버로 만들기</button></div>${regen}</figure>`;
+  }).join("");
+  document.querySelectorAll("[data-select]").forEach(b => b.onclick = () => selectCover(b.dataset.select, parseInt(b.dataset.v)));
+  document.querySelectorAll("[data-regen]").forEach(b => b.onclick = () => regen(b.dataset.regen, b));
+
+  $("videos").innerHTML = p.videos.length ? "<h2>하이라이트 숏폼 · Canvas</h2><div class='row' style='align-items:flex-start'>" + p.videos.map(v =>
+    `<div style="flex:0 0 240px"><video src="${API + v.url}" controls ${v.kind === "canvas" ? "loop muted autoplay" : ""} style="width:240px;border-radius:8px"></video><div class="hint">${v.kind === "short" ? "숏폼 " + v.duration + "초" : "Spotify Canvas " + v.duration + "초 (무음 반복)"}</div></div>`).join("") + "</div>" : "";
+  if (p.zip_url) { $("zip").href = API + p.zip_url; show("zip"); } else show("zip", false);
+  $("zipInfo").textContent = p.zip_files ? `${p.zip_files.length}개 파일, 약 ${(p.zip_size_bytes / 1048576).toFixed(1)}MB` : "";
+  $("zipInfo").title = p.zip_files ? p.zip_files.join("\n") : "";
+
+  $("channels").innerHTML = "<h2>채널 홍보 글</h2>" + Object.entries(p.channels).map(([ch, c]) => {
+    const imgs = c.images ? `<div class="row" style="margin-top:6px">${Object.entries(c.images).map(([r, u]) => `<figure style="flex:0 0 auto;margin:0"><a href="${API + u}" data-zoom><img src="${API + u}" style="height:120px;border-radius:6px;display:block"></a><figcaption class="hint">${ratioName(r)} · <a href="${API + u}" download>다운로드</a></figcaption></figure>`).join("")}</div>` : "";
+    const vid = c.video ? `<div style="margin-top:6px"><video src="${API + c.video}" controls preload="metadata" style="height:200px;border-radius:6px"></video><span class="hint"> ← 이 채널에 올릴 숏폼</span></div>` : "";
+    return `<label>${CH_NAME[ch] || ch}${c.v > 1 ? ` · ${c.v}번째 버전` : ""}${c.hook ? ` — 훅: “${esc(c.hook)}”` : ""}</label><div class="copy">${esc(c.text)}${c.hashtags ? "\n\n" + esc(c.hashtags.join(" ")) : ""}</div>${vid}${imgs}
+      <div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 더 짧게)" data-req="${c.item_id}"><button style="flex:0 0 auto" data-regen="${c.item_id}" ${c.regenerate_remaining ? "" : "disabled"}>다시 쓰기 · ${c.regenerate_remaining}회 남음</button></div>`;
+  }).join("");
+  renderRelease(p);
+  loadCommunity();
+  $("pitch").innerHTML = Object.keys(p.pitch).length ? "<h2>피칭 메일 <span class='hint'>(선택 — 웹진·라디오·해외 큐레이터)</span></h2>" + Object.entries(p.pitch).map(([lang, m]) =>
+    `<label>${lang === "en" ? "영어" : "한국어"}${m.v > 1 ? ` · ${m.v}번째 버전` : ""} — 제목: ${esc(m.subject)}</label><div class="copy">${esc(m.body).replace(/(\[[^\]]+\])/g, '<mark>$1</mark>')}</div>
+     <div class="row" style="margin-top:4px"><input type="text" placeholder="요청 (예: 더 짧고 캐주얼하게)" data-req="${m.item_id}"><button style="flex:0 0 auto" data-regen="${m.item_id}" ${m.regenerate_remaining ? "" : "disabled"}>다시 쓰기 · ${m.regenerate_remaining}회 남음</button></div>`).join("") : "";
+  document.querySelectorAll("#channels [data-regen], #pitch [data-regen], #editorial [data-regen]").forEach(b => b.onclick = () => regen(b.dataset.regen, b));
+  log(`AI 사용 모델: ${p.ai_generated.models.join(", ")}`);
+  show("resultErr", false);
+}
+
+// ---------- 발매 준비 (10/9): 에디토리얼 피칭 · 발매 캘린더 · 제출 전 검수 ----------
+const CHECK_MARK = { ok: ["✓", "#2b8a3e"], warn: ["!", "#e67700"], fail: ["✕", "#c92a2a"], todo: ["□", "#868e96"] };
+const CHECK_GROUP = { meta: "곡 정보", audio: "음원", cover: "커버", rights: "권리 (직접 확인)", extra: "유통과 별개로 챙길 것" };
+function renderRelease(p) {
+  const e = p.editorial;
+  const req = (id, ph) => `<div class="row" style="margin-top:4px"><input type="text" placeholder="${ph}" data-req="${id}">`;
+  $("editorial").innerHTML = "<h2>에디토리얼 피칭 <span class='hint'>— 발매 전 플랫폼에 내는 글</span></h2>" + (e ? `
+    <label>Spotify for Artists 곡 설명 · 한국어 (${e.spotify_ko.length}/500자)${e.v > 1 ? ` · ${e.v}번째 버전` : ""}</label><div class="copy">${esc(e.spotify_ko)}</div>
+    <label>Spotify for Artists 곡 설명 · English (${e.spotify_en.length}/500)</label><div class="copy">${esc(e.spotify_en)}</div>
+    <div class="hint">피칭 화면에서 고를 항목 추천 — ${Object.entries(e.tags).filter(([, v]) => v.length).map(([k, v]) => `${{ genres: "장르", moods: "무드", instruments: "악기" }[k] || esc(k)}: ${v.map(esc).join(", ")}`).join(" · ")}</div>
+    <label>국내 음원 사이트 소개글 (유통사 제출용)</label><div class="copy">${esc(e.dsp_intro_ko).replace(/(\[[^\]]+\])/g, "<mark>$1</mark>")}</div>
+    ${req("editorial", "요청 (예: 더 담백하게)")}<button style="flex:0 0 auto" data-regen="editorial" ${e.regenerate_remaining ? "" : "disabled"}>다시 쓰기 · ${e.regenerate_remaining}회 남음</button></div>`
+    : p.covers.length ? `<div class="hint">이 작업은 기능이 생기기 전에 만들어졌어요.</div>${req("editorial", "요청 (선택)")}<button style="flex:0 0 auto" data-regen="editorial">에디토리얼 피칭 만들기</button></div>` : "");
+
+  const plan = p.release_plan;
+  $("plan").innerHTML = plan ? `<h2>발매 캘린더</h2>
+    <div class="row"><div style="flex:0 0 auto"><label>발매일</label><input type="date" id="relDate" value="${esc(plan.release_date || "")}"></div>
+      <div style="flex:0 0 auto;align-self:flex-end"><button id="relSave">발매일 저장</button></div></div>
+    ${plan.warnings.map(w => `<div class="hint" style="color:#e67700;margin-top:6px">⚠ ${esc(w)}</div>`).join("")}
+    <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:14px">${plan.steps.map(s => `
+      <tr style="border-top:1px solid var(--line);${s.status === "past" ? "opacity:.5" : ""}${s.status === "today" ? "background:#fff9db" : ""}">
+        <td style="padding:6px 8px 6px 0;white-space:nowrap;vertical-align:top"><b>${esc(s.label)}</b><br><span class="hint">${esc(s.date || "")}</span></td>
+        <td style="padding:6px 0"><b>${esc(s.title)}</b><br><span class="hint">${esc(s.detail)}</span></td></tr>`).join("")}</table>` : "";
+  if ($("relSave")) $("relSave").onclick = async () => {
+    const d = $("relDate").value;
+    if (!d) return alertBox("resultErr", "발매일을 골라 주세요.");
+    try { await api("PATCH", `/jobs/${jobId}/info`, { release_date: d }); await loadPackage(stage_now); }
+    catch (err) { alertBox("resultErr", `[${err.code}] ${err.message}`); }
+  };
+
+  const c = p.submission_check;
+  $("check").innerHTML = c ? `<h2>유통사 제출 전 검수 <span class="hint">통과 ${c.counts.ok} · 확인 필요 ${c.counts.warn} · 고쳐야 함 ${c.counts.fail} · 직접 확인 ${c.counts.todo}</span></h2>
+    <div class="hint">${esc(c.notice)}</div>` + Object.entries(CHECK_GROUP).map(([g, name]) => {
+      const rows = c.items.filter(i => i.group === g);
+      return rows.length ? `<label>${name}</label>` + rows.map(i => `<div style="display:flex;gap:8px;margin:3px 0;font-size:14px">
+        <b style="color:${CHECK_MARK[i.status][1]};flex:0 0 14px">${CHECK_MARK[i.status][0]}</b><div><b>${esc(i.label)}</b> <span class="hint">${esc(i.detail)}</span></div></div>`).join("") : "";
+    }).join("") : "";
+}
+
+async function selectCover(itemId, v) {
+  showWorking("요청 보내는 중…");
+  document.querySelectorAll("[data-select]").forEach(b => b.disabled = true);
+  try { await api("POST", `/jobs/${jobId}/cover/select`, { item_id: itemId, v }); poll(); }
+  catch (e) { hideWorking(); alertBox("resultErr", `[${e.code}] ${e.message}`); document.querySelectorAll("[data-select]").forEach(b => b.disabled = false); }
+}
+function showWorking(text) {
+  if (!workStart) workStart = progStart || Date.now();
+  const sec = Math.round((Date.now() - workStart) / 1000);
+  $("workingText").textContent = `${text} · ${sec}초 지남`;
+  show("working");
+}
+function hideWorking() { workStart = null; show("working", false); }
+setInterval(() => { if (workStart && !$("working").classList.contains("hide")) {
+  const t = $("workingText").textContent.replace(/ · \d+초 지남$/, "");
+  $("workingText").textContent = `${t} · ${Math.round((Date.now() - workStart) / 1000)}초 지남`;
+} }, 1000);
+async function regen(itemId, btn) {
+  const input = document.querySelector(`[data-req="${itemId}"]`);
+  btn.disabled = true; const label = btn.textContent; btn.textContent = "만드는 중…";
+  try { await api("POST", `/jobs/${jobId}/items/${itemId}/regenerate`, { request: input && input.value.trim() || null }); await poll(); }
+  catch (e) { alertBox("resultErr", `[${e.code}] ${e.message}`); btn.disabled = false; btn.textContent = label; }
+}
+$("ownUpload").onclick = async () => {
+  const f = $("ownFile").files[0]; if (!f) return alertBox("resultErr", "사진을 골라 주세요.");
+  const fd = new FormData(); fd.append("file", f);
+  try { await api("POST", `/jobs/${jobId}/own-image`, fd, true); poll(); } catch (e) { alertBox("resultErr", `[${e.code}] ${e.message}`); }
+};
+
+const CH_NAME = { instagram: "인스타그램", tiktok: "틱톡", threads: "스레드", x: "X" };
+function coverName(id) { return id === "cover-own" ? "직접 올린 사진" : `커버 ${id.split("-")[1]}`; }
+function ratioName(r) { const [w, h] = r.split(/[x:]/).map(Number); const kind = w === h ? "정사각" : w < h ? "세로" : "가로"; return h ? `${kind} ${w}:${h}` : r; }
+// AI가 쓴 글·밴드 입력은 전부 esc를 거쳐 innerHTML에 넣는다 (속성값에도 쓰므로 따옴표까지)
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
+// ---------- 5. 커뮤니티 (10/9) ----------
+function commShow(t) {
+  const full = location.origin + t.manage_url;
+  $("commNow").innerHTML = `<b>올라가 있어요</b> — ${t.listen_mode === "highlight" ? "하이라이트 " + Math.round(t.clip_sec) + "초" : "전곡"} · 의견 ${t.comments_public ? "공개" : "나만 보기"} · 재생 ${t.plays} · 반응 ${t.stats.reactions}<br>
+    <a href="/community#${t.track_id}" target="_blank">커뮤니티에서 보기</a> · <a href="${esc(full)}" target="_blank">내 곡 반응 보기 (관리 링크 — 따로 저장해 두세요)</a>`;
+  document.querySelector(`input[name=commMode][value=${t.listen_mode}]`).checked = true;
+  document.querySelector(`input[name=commPub][value="${t.comments_public ? 1 : 0}"]`).checked = true;
+  $("commPublish").textContent = "설정 바꾸기";
+}
+async function loadCommunity() {
+  show("community");
+  try { commShow(await api("GET", `/jobs/${jobId}/community`)); }
+  catch (e) { $("commNow").textContent = "아직 올리지 않았어요."; $("commPublish").textContent = "커뮤니티에 올리기"; }
+}
+$("commPublish").onclick = async () => {
+  show("commErr", false);
+  try {
+    commShow(await api("POST", `/jobs/${jobId}/community`, {
+      listen_mode: document.querySelector("input[name=commMode]:checked").value,
+      comments_public: document.querySelector("input[name=commPub]:checked").value === "1",
+      intro: $("commIntro").value.trim() || null, consent_rights: $("cc1").checked, consent_public: $("cc2").checked }));
+  } catch (e) { alertBox("commErr", e.message || "올리지 못했어요."); }
+};
+
+function alertBox(id, msg) { const el = $(id); el.textContent = msg; show(id); }
+</script>
+<div id="zoom" class="hide"><img alt=""><div><a download>다운로드</a> · <span style="color:#ccc">아무 데나 누르거나 Esc로 닫기</span></div></div>
+<script>
+// 이미지를 누르면 크게 보기 (파일 주소가 다운로드로 내려와서, 새 탭으로 열면 저장만 되던 문제 — 팀 음원 테스트 피드백 10/7)
+document.addEventListener("click", e => {
+  const a = e.target.closest("a[data-zoom]");
+  if (!a) return;
+  e.preventDefault();
+  const z = document.getElementById("zoom");
+  z.querySelector("img").src = a.href;
+  z.querySelector("a").href = a.href;
+  z.classList.remove("hide");
+});
+document.getElementById("zoom").addEventListener("click", e => { if (!e.target.closest("a")) e.currentTarget.classList.add("hide"); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") document.getElementById("zoom").classList.add("hide"); });
+</script>
+</body>
+</html>

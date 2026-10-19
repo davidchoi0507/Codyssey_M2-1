@@ -1,0 +1,261 @@
+"""로그인·내 곡: /auth/*, /me/* (DECISIONS #34). 곡 올리는 사람만 쓰는 선택 기능."""
+import hmac
+import re
+import logging
+from datetime import datetime
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse, RedirectResponse
+from pydantic import BaseModel, Field
+
+from app import db
+from app.api.deps import ANON_COOKIE, ANON_ID, current_user, require_user, session_token, settings
+from app.core.config import Settings
+from app.core.errors import AppError
+from app.core.stages import STAGE_LABELS, Stage
+from app.pipeline import auth as a
+from app.pipeline import community as c
+from app.pipeline.jobfiles import ACTIVE_STAGES, JobFiles, delete_job
+
+router = APIRouter(tags=["로그인·내 곡"])
+_JOB_ID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")  # ULID
+log = logging.getLogger(__name__)
+Provider = Literal["kakao", "google"]
+
+
+class Providers(BaseModel):
+    kakao: bool
+    google: bool
+    dev: bool = Field(description="로컬 확인용 가짜 로그인 (서버에서는 항상 false)")
+
+
+class Me(BaseModel):
+    user_id: str
+    provider: str
+    nickname: str
+    created_at: datetime
+
+
+class MyJob(BaseModel):
+    job_id: str
+    title: str
+    artist: str
+    stage: str
+    stage_label: str
+    created_at: datetime
+    track_id: str | None = Field(default=None, description="커뮤니티에 올렸으면 곡 ID")
+    demo: bool = Field(default=False, description="(10/17 추가) 체험 모드(예시 곡) 작업")
+
+
+class MyTrack(BaseModel):
+    track_id: str
+    title: str
+    artist: str
+    status: str = Field(description="live 공개 중 · reported 신고로 숨겨짐(운영자 확인 중) · hidden 운영자가 내림")
+    listen_mode: str
+    plays: int
+    reactions: int
+    cover_url: str
+    manage_url: str
+    created_at: datetime
+
+
+def _cookie_secure(s: Settings) -> bool:
+    return s.public_base_url.startswith("https://")
+
+
+def _finish(s: Settings, user: dict, next_url: str) -> RedirectResponse:
+    token = a.new_session(s, user["user_id"])
+    target = f"{next_url}#session={token}" if a.is_external(s, next_url) else next_url
+    resp = RedirectResponse(target, status_code=303)
+    resp.set_cookie(a.COOKIE, token, max_age=s.session_ttl_days * 86400, httponly=True, secure=_cookie_secure(s),
+                    samesite="lax", path="/")
+    resp.delete_cookie(a.STATE_COOKIE, path="/auth")
+    return resp
+
+
+@router.get("/auth/providers", response_model=Providers, summary="쓸 수 있는 로그인 (키가 등록된 것만 true)")
+def providers(s: Settings = Depends(settings)) -> Providers:
+    return Providers(**a.enabled(s))
+
+
+@router.api_route("/auth/kakao/unlink", methods=["GET", "POST"], include_in_schema=False)
+async def kakao_unlink(request: Request, s: Settings = Depends(settings)) -> JSONResponse:
+    """카카오 연결 해제 웹훅: 사용자가 카카오 쪽에서 앱 연결을 끊거나 카카오 계정을 지우면 카카오가 부른다.
+    헤더 Authorization: KakaoAK <어드민 키>, 값 app_id·user_id·referrer_type (GET 쿼리 또는 POST 폼).
+    로그인 정보만 지우고(탈퇴와 같음) 올린 곡은 관리 링크로 계속 관리된다. 카카오는 응답이 200이면 성공으로 본다."""
+    if not s.kakao_admin_key:
+        raise AppError("NOT_CONFIGURED", "웹훅이 설정되지 않았어요.", False, http_status=503)
+    if not hmac.compare_digest(request.headers.get("authorization", ""), f"KakaoAK {s.kakao_admin_key}"):
+        raise AppError("UNAUTHORIZED", "인증에 실패했어요.", False, http_status=401)
+    data = dict(request.query_params)
+    if request.method == "POST":
+        data |= {k: str(v) for k, v in (await request.form()).items()}
+    if s.kakao_app_id and data.get("app_id") != s.kakao_app_id:
+        raise AppError("WRONG_APP", "다른 앱의 요청이에요.", False, http_status=400)
+    uid = (data.get("user_id") or "").strip()
+    if not uid:
+        raise AppError("INVALID_REQUEST", "user_id가 없어요.", False, http_status=400)
+    removed = a.unlink_by_provider("kakao", uid)
+    log.info("카카오 연결 해제 웹훅: referrer=%s, 지움=%s", data.get("referrer_type"), removed)
+    return JSONResponse({"ok": True})
+
+
+@router.get("/auth/dev/login", include_in_schema=False)  # /auth/{provider}/login 보다 먼저 (dev가 provider로 잡히지 않게)
+def dev_login(name: str = Query("테스트 음악가", max_length=20), next: str | None = None,
+              s: Settings = Depends(settings)) -> RedirectResponse:
+    if not s.auth_dev_login:
+        raise AppError("NOT_FOUND", "없는 주소예요.", False, http_status=404)
+    return _finish(s, a.upsert_user("dev", name, name), a.safe_next(s, next))
+
+
+@router.get("/auth/{provider}/login", summary="카카오·구글 로그인 시작 (화면에서 이 주소로 이동)",
+            description="next: 로그인 뒤 돌아갈 주소. 이 서버의 경로(/studio 등) 또는 CORS_ORIGINS·AUTH_REDIRECT_ORIGINS에 "
+                        "있는 화면 주소만. 다른 주소의 화면이면 돌아갈 때 `#session=토큰`을 붙여 주고, 화면은 그 토큰을 "
+                        "Authorization: Bearer 로 보낸다.")
+def login(provider: Provider, next: str | None = Query(default=None, max_length=500),
+          s: Settings = Depends(settings)) -> RedirectResponse:
+    state, nonce = a.make_state(s, provider, a.safe_next(s, next))
+    resp = RedirectResponse(a.authorize_url(s, provider, state), status_code=303)
+    resp.set_cookie(a.STATE_COOKIE, nonce, max_age=a.STATE_TTL_SEC, httponly=True, secure=_cookie_secure(s),
+                    samesite="lax", path="/auth")
+    return resp
+
+
+@router.get("/auth/{provider}/callback", include_in_schema=False)
+def callback(provider: Provider, request: Request, code: str | None = None, state: str | None = None,
+             error: str | None = None, s: Settings = Depends(settings)) -> RedirectResponse:
+    if error or not code or not state:  # 사용자가 동의 화면에서 취소
+        return RedirectResponse("/studio#/login?cancelled=1", status_code=303)
+    next_url = a.read_state(s, state, provider, request.cookies.get(a.STATE_COOKIE))
+    uid, nick = a.fetch_profile(s, provider, code)
+    return _finish(s, a.upsert_user(provider, uid, nick), next_url)
+
+
+@router.get("/auth/me", response_model=Me, summary="로그인한 사용자 (아니면 401)")
+def me(user: dict = Depends(require_user)) -> Me:
+    return Me(**{k: user[k] for k in ("user_id", "provider", "nickname", "created_at")})
+
+
+@router.post("/auth/logout", response_model=dict, summary="로그아웃")
+def logout(request: Request) -> dict:
+    a.end_session(session_token(request))
+    resp = JSONResponse({"logged_out": True})
+    resp.delete_cookie(a.COOKIE, path="/")
+    return resp
+
+
+@router.delete("/auth/me", response_model=dict, summary="탈퇴 (로그인 정보 삭제 — 올린 곡은 관리 링크로 계속 관리)")
+def withdraw(user: dict = Depends(require_user)) -> dict:
+    a.delete_user(user["user_id"])
+    resp = JSONResponse({"deleted": True})
+    resp.delete_cookie(a.COOKIE, path="/")
+    return resp
+
+
+def _owner(request: Request, alias: str) -> tuple[str, tuple]:
+    """(10/16) 로그인했으면 내 계정 것, 안 했으면 이 브라우저(익명 ID 쿠키 aid)로 올렸고 아직 계정에 안 붙은 것.
+    aid는 추측할 수 없고 자바스크립트로 못 읽는 쿠키라 '그 브라우저 = 주인'으로 본다(/me/claim과 같은 기준). 둘 다 없으면 401."""
+    if user := current_user(request):
+        return f"{alias}.user_id = ?", (user["user_id"],)
+    aid = request.cookies.get(ANON_COOKIE) or getattr(request.state, "aid", None) or ""
+    if ANON_ID.match(aid):
+        return f"{alias}.user_id IS NULL AND {alias}.who = ?", (f"a:{aid}",)
+    raise AppError("LOGIN_REQUIRED", "로그인하면 어느 기기에서나 내 곡을 볼 수 있어요.", False, http_status=401)
+
+
+_ANON_NOTE = ("(10/16) 로그인하지 않아도 이 브라우저에서 올린 것을 돌려준다(쿠키 aid 기준 — 쿠키를 지우거나 다른 기기면 안 보임). "
+              "로그인하면 내 계정 것. 쿠키도 로그인도 없으면 401 LOGIN_REQUIRED.")
+
+
+@router.get("/me/jobs", response_model=list[MyJob], summary="내가 올린 작업 (보관 기간이 지난 작업은 삭제됨)",
+            description=_ANON_NOTE)
+def my_jobs(request: Request, s: Settings = Depends(settings)) -> list[MyJob]:
+    where, params = _owner(request, "j")
+    with db.connect() as conn:
+        rows = conn.execute("SELECT j.job_id, j.stage, j.created_at, j.demo, t.track_id FROM jobs j "
+                            f"LEFT JOIN tracks t ON t.job_id = j.job_id WHERE {where} ORDER BY j.created_at DESC",
+                            params).fetchall()
+    out = []
+    for r in rows:
+        jf = JobFiles(s.jobs_dir, r["job_id"])
+        if not jf.exists():
+            continue
+        song = jf.read_json(jf.song)
+        out.append(MyJob(job_id=r["job_id"], title=song.get("title", ""), artist=song.get("artist", ""),
+                         stage=r["stage"], stage_label=STAGE_LABELS.get(Stage(r["stage"]), r["stage"]),
+                         created_at=datetime.fromisoformat(r["created_at"]), track_id=r["track_id"],
+                         demo=bool(r["demo"])))
+    return out
+
+
+@router.delete("/me/jobs", response_model=dict, summary="(10/18 추가) 내 작업 모두 지우기 — 되돌릴 수 없음",
+               description=_ANON_NOTE + " GET /me/jobs에 나오는 작업을 모두 지운다(음원·결과물·기록). 만드는 중인 작업은 "
+                           "건너뛰고 skipped_busy로 알려 준다. 커뮤니티에 공개한 곡은 남는다(tracks_kept) — 관리 링크·'내 곡'에서 내린다.")
+def delete_my_jobs(request: Request, s: Settings = Depends(settings)) -> dict:
+    where, params = _owner(request, "j")
+    with db.connect() as conn:
+        rows = conn.execute("SELECT j.job_id, j.stage, t.track_id FROM jobs j LEFT JOIN tracks t ON t.job_id = j.job_id "
+                            f"WHERE {where}", params).fetchall()
+    done = [r for r in rows if r["stage"] not in ACTIVE_STAGES]
+    for r in done:
+        delete_job(s.jobs_dir, s.data_dir / "metrics_archive.jsonl", r["job_id"], "owner_all")
+    return {"deleted": len(done), "skipped_busy": len(rows) - len(done),
+            "tracks_kept": sum(1 for r in done if r["track_id"])}
+
+
+@router.get("/me/tracks", response_model=list[MyTrack], summary="내가 커뮤니티에 올린 곡 (관리 링크 포함)",
+            description=_ANON_NOTE + " 로그인 없이 공개한 사람이 관리 링크를 잃어버렸을 때 같은 브라우저에서 다시 찾는 데 쓴다.")
+def my_tracks(request: Request, s: Settings = Depends(settings)) -> list[MyTrack]:
+    where, params = _owner(request, "t")
+    with db.connect() as conn:
+        rows = [dict(r) for r in conn.execute(f"SELECT * FROM tracks t WHERE {where} ORDER BY created_at DESC", params)]
+    return [MyTrack(track_id=t["track_id"], title=t["title"], artist=t["artist"], status=t["status"],
+                    listen_mode=t["listen_mode"], plays=t["plays"], reactions=c.stats(t["track_id"])["reactions"],
+                    cover_url=f"/community/tracks/{t['track_id']}/cover?v={t['updated_at']}",
+                    manage_url=f"/community/manage?t={t['track_id']}#key={c.owner_key(s, t['track_id'])}",
+                    created_at=datetime.fromisoformat(t["created_at"])) for t in rows]
+
+
+class ClaimRequest(BaseModel):
+    job_ids: list[str] = Field(default_factory=list, max_length=100,
+                               description="이 브라우저가 기억한 작업 ID (로그인 전에 올린 것)")
+
+
+class ClaimResult(BaseModel):
+    jobs: int = Field(description="내 계정으로 옮긴 작업 수")
+    tracks: int = Field(description="내 계정으로 옮긴 공개 곡 수")
+
+
+@router.post("/me/claim", response_model=ClaimResult, summary="(10/16 추가) 로그인 전에 올린 작업·곡을 내 계정으로 가져오기",
+             description="job_ids(이 브라우저가 기억한 작업)와, 이 브라우저의 익명 ID(쿠키 aid)로 올린 작업·곡 중 아직 주인 계정이 "
+                         "없는 것을 내 계정에 연결한다. 작업 ID는 추측할 수 없는 값이라 '가진 브라우저 = 주인'으로 본다(작업 API와 같은 "
+                         "기준). 다른 계정에 이미 연결된 것은 건드리지 않는다. 그 작업으로 공개한 곡도 같이.")
+def claim(body: ClaimRequest, request: Request, user: dict = Depends(require_user)) -> ClaimResult:
+    ids = [j for j in dict.fromkeys(body.job_ids) if _JOB_ID.match(j)]
+    aid = request.cookies.get(ANON_COOKIE) or ""
+    who = f"a:{aid}" if ANON_ID.match(aid) else None
+    uid = user["user_id"]
+    with db.connect() as conn:
+        q = ",".join("?" * len(ids)) or "NULL"
+        n_jobs = conn.execute(f"UPDATE jobs SET user_id = ? WHERE user_id IS NULL AND (job_id IN ({q}) OR who = ?)",
+                              (uid, *ids, who)).rowcount
+        n_tracks = conn.execute(
+            f"UPDATE tracks SET user_id = ? WHERE user_id IS NULL AND (who = ? OR job_id IN "
+            f"(SELECT job_id FROM jobs WHERE user_id = ? AND job_id IN ({q})) OR job_id IN (SELECT job_id FROM jobs "
+            f"WHERE user_id = ? AND who = ?))", (uid, who, uid, *ids, uid, who)).rowcount
+    return ClaimResult(jobs=n_jobs, tracks=n_tracks)
+
+
+def link_job(job_id: str, user: dict | None) -> None:
+    if user:
+        with db.connect() as conn:
+            conn.execute("UPDATE jobs SET user_id = ? WHERE job_id = ?", (user["user_id"], job_id))
+
+
+def link_track(track_id: str, user: dict | None) -> None:
+    if user:
+        with db.connect() as conn:
+            conn.execute("UPDATE tracks SET user_id = ? WHERE track_id = ? AND user_id IS NULL",
+                         (user["user_id"], track_id))

@@ -1,0 +1,184 @@
+"""작업 폴더 data/jobs/<job_id>/ 의 경로와 기록 (ARCHITECTURE.md '작업 파일 구조').
+
+결과물은 이 폴더에 파일로, 단계 상태·지표(events)·동의 기록은 SQLite(app/db.py)에 남긴다.
+"""
+import json
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
+
+from ulid import ULID
+
+from app import db
+
+
+def new_job_id() -> str:
+    return str(ULID())
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+class JobFiles:
+    def __init__(self, jobs_dir: Path, job_id: str):
+        self.job_id = job_id
+        self.root = jobs_dir / job_id
+
+    # 입력
+    def find_original(self) -> Path | None:
+        found = sorted((self.root / "input").glob("original.*"))
+        return found[0] if found else None
+
+    @property
+    def analysis_mp3(self) -> Path:
+        return self.root / "input" / "analysis.mp3"
+
+    # 분석·노트
+    @property
+    def features(self) -> Path:
+        return self.root / "analysis" / "features.json"
+
+    @property
+    def listening(self) -> Path:
+        return self.root / "analysis" / "listening.json"
+
+    def note(self, version: int) -> Path:
+        return self.root / "note" / f"note_v{version}.json"
+
+    def latest_note_version(self) -> int | None:
+        vs = [int(p.stem.split("_v")[1]) for p in (self.root / "note").glob("note_v*.json")]
+        return max(vs) if vs else None
+
+    @property
+    def accepted(self) -> Path:
+        """수락한 노트 버전 (생성은 이 버전 기준)."""
+        return self.root / "note" / "accepted.json"
+
+    # 생성 결과
+    def cover_prompts(self, version: int) -> Path:
+        return self.root / "covers" / f"prompts_v{version}.json"
+
+    def cover(self, idx: int, version: int, suffix: str = "") -> Path:
+        """cover_{1..3}_v{n}.png / suffix "_3000" 업스케일 / "_title" 제목 오버레이."""
+        return self.root / "covers" / f"cover_{idx}_v{version}{suffix}.png"
+
+    def own_cover(self, version: int, suffix: str = "") -> Path:
+        """밴드가 직접 올린 사진 (정사각으로 잘라 3000px). item_id = cover-own."""
+        return self.root / "covers" / f"own_v{version}{suffix}.png"
+
+    @property
+    def selected_cover(self) -> Path:
+        """선택한 커버 {item_id, v, at} — 렌더링 기준."""
+        return self.root / "covers" / "selected.json"
+
+    def video(self, name: str) -> Path:
+        """short_{template}.mp4 / canvas.mp4"""
+        return self.root / "video" / f"{name}.mp4"
+
+    def channel_image(self, channel: str, ratio: str) -> Path:
+        return self.root / "channels" / channel / f"image_{ratio.replace(':', 'x')}.png"
+
+    def latest_version(self, path_for_version) -> int | None:
+        """path_for_version(v)가 있는 가장 큰 v (재생성으로 버전이 늘어나는 항목용)."""
+        v = None
+        for i in range(1, 100):
+            p = path_for_version(i)
+            if p is None or not p.exists():
+                break
+            v = i
+        return v
+
+    def channel_copy(self, channel: str, version: int) -> Path:
+        return self.root / "channels" / channel / f"copy_v{version}.json"
+
+    def pitch(self, lang: str, version: int) -> Path:
+        return self.root / "pitch" / f"pitch_{lang}_v{version}.json"
+
+    def cover_inspection(self, item_id: str, version: int) -> Path:
+        """고른 커버의 유통사 검수 결과 (Gemini) — 제출 전 검수에서 읽는다."""
+        return self.root / "covers" / f"inspect_{item_id}_v{version}.json"
+
+    def editorial(self, version: int) -> Path:
+        """Spotify 에디토리얼 피칭·국내 음원 사이트 소개글 (item_id = editorial)."""
+        return self.root / "editorial" / f"editorial_v{version}.json"
+
+    @property
+    def song(self) -> Path:
+        return self.root / "song.json"
+
+    # 기록
+    def write_json(self, path: Path, data) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        tmp.replace(path)  # 반쯤 쓴 파일이 남지 않게
+
+    def read_json(self, path: Path):
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def exists(self) -> bool:
+        with db.connect() as conn:
+            return conn.execute("SELECT 1 FROM jobs WHERE job_id = ?", (self.job_id,)).fetchone() is not None
+
+    def status(self) -> dict:
+        """{job_id, stage, step, error, created_at, updated_at} — 없는 작업이면 KeyError."""
+        with db.connect() as conn:
+            r = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (self.job_id,)).fetchone()
+        if r is None:
+            raise KeyError(self.job_id)
+        return {"job_id": r["job_id"], "stage": r["stage"], "step": r["step"],
+                "error": json.loads(r["error"]) if r["error"] else None,
+                "created_at": r["created_at"], "updated_at": r["updated_at"]}
+
+    def event(self, event: str, **payload) -> None:
+        """지표 자동 기록 (events 테이블)."""
+        with db.connect() as conn:
+            conn.execute("INSERT INTO events (job_id, ts, event, payload) VALUES (?, ?, ?, ?)",
+                         (self.job_id, now_iso(), event, json.dumps(payload, ensure_ascii=False)))
+
+    def events(self) -> list[dict]:
+        with db.connect() as conn:
+            rows = conn.execute("SELECT ts, event, payload FROM events WHERE job_id = ? ORDER BY id",
+                                (self.job_id,)).fetchall()
+        return [{"ts": r["ts"], "event": r["event"], **json.loads(r["payload"])} for r in rows]
+
+    def save_consent(self, record: dict) -> None:
+        with db.connect() as conn:
+            conn.execute("INSERT OR REPLACE INTO consents VALUES (?, ?)",
+                         (self.job_id, json.dumps(record, ensure_ascii=False)))
+
+    def fail(self, error: dict) -> None:
+        """실패 기록 — 진행 중이던 단계(step)를 남겨서 화면이 어느 단계에서 멈췄는지 보여줄 수 있게."""
+        self.set_status("failed", step=self.status()["step"], error=error)
+
+    def set_status(self, stage: str, *, step: str | None = None, error: dict | None = None) -> None:
+        now = now_iso()
+        err = json.dumps(error, ensure_ascii=False) if error else None
+        with db.connect() as conn:
+            conn.execute(
+                "INSERT INTO jobs (job_id, stage, step, error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(job_id) DO UPDATE SET "
+                "stage = excluded.stage, step = excluded.step, error = excluded.error, updated_at = excluded.updated_at",
+                (self.job_id, str(stage), step, err, now, now))
+
+
+# ---- 작업 지우기 (보관 기간 정리 scripts/cleanup.py 와 사용자의 직접 삭제 DELETE /jobs/{id} 가 함께 쓴다) ----
+
+FREE_TEXT = {"correction", "request", "message", "fields"}  # 지표 보관에서 빼는 값 (자유 입력·에러 원문)
+ACTIVE_STAGES = {"uploaded", "analyzing", "generating", "rendering"}  # 만드는 중 — 지우면 진행 중인 단계가 깨진다
+
+
+def delete_job(jobs_dir: Path, archive: Path, job_id: str, reason: str) -> None:
+    """작업 폴더(음원·결과물)와 DB 기록(상태·지표·동의)을 지운다. 결과보고서용 지표만 개인정보·자유 입력을 빼고
+    archive(jsonl)에 한 줄 남긴다. 커뮤니티에 공개한 곡은 data/community/ 에 따로 있어 남는다."""
+    jf = JobFiles(jobs_dir, job_id)
+    st = jf.status() if jf.exists() else {"stage": None}
+    events = [{k: v for k, v in e.items() if k not in FREE_TEXT} for e in jf.events()]
+    with archive.open("a", encoding="utf-8") as out:
+        out.write(json.dumps({"job_id": job_id, "final_stage": st["stage"], "deleted": reason, "events": events},
+                             ensure_ascii=False) + "\n")
+    with db.connect() as conn:
+        for table in ("events", "consents", "jobs"):
+            conn.execute(f"DELETE FROM {table} WHERE job_id = ?", (job_id,))
+    shutil.rmtree(jf.root, ignore_errors=True)
