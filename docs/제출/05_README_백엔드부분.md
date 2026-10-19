@@ -37,7 +37,7 @@ flowchart LR
     API --> DB[(SQLite · 파일)]
 ```
 
-자세한 구성: [`docs/제출/02_시스템아키텍처.md`](docs/제출/02_시스템아키텍처.md)
+자세한 구성: [`docs/제출/02_시스템아키텍처.md`](https://github.com/davidchoi0507/Codyssey_M2-1/blob/woniri/docs/%EC%A0%9C%EC%B6%9C/02_%EC%8B%9C%EC%8A%A4%ED%85%9C%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98.md)
 
 ## 실행 방법
 
@@ -68,16 +68,16 @@ npm run dev
 
 | 구분 | 주소 |
 | --- | --- |
-| 서비스 | (최종 Vercel 주소) |
+| 서비스 | https://codyssey-m2-1.vercel.app |
 | 백엔드 API | https://api.201.n-e.kr |
 | 시연 영상 | (링크) |
 
 ## 문서
 
-- 기능 요구 명세서 — [`docs/제출/01_기능요구명세서.md`](docs/제출/01_기능요구명세서.md)
-- 시스템 아키텍처 — [`docs/제출/02_시스템아키텍처.md`](docs/제출/02_시스템아키텍처.md)
-- 기술 스택 선정 이유 — [`docs/제출/03_기술스택_선정이유.md`](docs/제출/03_기술스택_선정이유.md)
-- 사용자 테스트 결과 — [`docs/제출/04_사용자테스트_결과.md`](docs/제출/04_사용자테스트_결과.md)
+- 기능 요구 명세서 — [`docs/제출/01_기능요구명세서.md`](https://github.com/davidchoi0507/Codyssey_M2-1/blob/woniri/docs/%EC%A0%9C%EC%B6%9C/01_%EA%B8%B0%EB%8A%A5%EC%9A%94%EA%B5%AC%EB%AA%85%EC%84%B8%EC%84%9C.md)
+- 시스템 아키텍처 — [`docs/제출/02_시스템아키텍처.md`](https://github.com/davidchoi0507/Codyssey_M2-1/blob/woniri/docs/%EC%A0%9C%EC%B6%9C/02_%EC%8B%9C%EC%8A%A4%ED%85%9C%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98.md)
+- 기술 스택 선정 이유 — [`docs/제출/03_기술스택_선정이유.md`](https://github.com/davidchoi0507/Codyssey_M2-1/blob/woniri/docs/%EC%A0%9C%EC%B6%9C/03_%EA%B8%B0%EC%88%A0%EC%8A%A4%ED%83%9D_%EC%84%A0%EC%A0%95%EC%9D%B4%EC%9C%A0.md)
+- 사용자 테스트 결과 — [`docs/제출/04_사용자테스트_결과.md`](https://github.com/davidchoi0507/Codyssey_M2-1/blob/woniri/docs/%EC%A0%9C%EC%B6%9C/04_%EC%82%AC%EC%9A%A9%EC%9E%90%ED%85%8C%EC%8A%A4%ED%8A%B8_%EA%B2%B0%EA%B3%BC.md)
 
 ## 팀원 역할 — 백엔드 칸
 
