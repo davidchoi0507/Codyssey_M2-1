@@ -43,6 +43,10 @@ app = FastAPI(
                 "에러는 항상 `{code, message, retryable}` 형식이고 message는 화면에 그대로 보여도 되는 한국어입니다.",
     version="0.1.0",
     lifespan=lifespan,
+    # 공개 서비스에서는 API 문서를 닫는다 (10/20 제출) — 엔드포인트 목록이 그대로 드러나지 않게
+    docs_url="/docs" if settings.api_docs_enabled else None,
+    redoc_url="/redoc" if settings.api_docs_enabled else None,
+    openapi_url="/openapi.json" if settings.api_docs_enabled else None,
 )
 # allow_credentials: 화면이 credentials: 'include'로 부르면 이 헤더가 있어야 브라우저가 응답을 읽는다 (10/18, Vercel 화면).
 # 허용 주소는 CORS_ORIGINS 목록으로만 정하므로 아무 사이트나 쿠키를 실어 부를 수는 없다
