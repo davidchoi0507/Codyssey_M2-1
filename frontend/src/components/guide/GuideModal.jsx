@@ -146,7 +146,7 @@ export default function GuideModal({ isOpen, onClose, onSelectDistributor, jobId
         <div className="flex items-center justify-between border-b border-zinc-200 dark:border-white/10 pb-4">
           <div className="flex items-center gap-2.5">
             <Compass className="w-5 h-5 text-indigo-600 dark:text-sky-400" />
-            <h3 className="font-extrabold text-lg text-zinc-900 dark:text-white">첫 발매 유통사 추천 & 발매 타임라인 가이드</h3>
+            <h3 className="font-extrabold text-base sm:text-lg text-zinc-900 dark:text-white tracking-tight break-keep">첫 발매 유통사 추천 & 타임라인 가이드</h3>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white font-bold text-lg p-1 rounded-lg">✕</button>
         </div>
@@ -160,23 +160,28 @@ export default function GuideModal({ isOpen, onClose, onSelectDistributor, jobId
           {/* Q1: 어디에 */}
           <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-white/5 space-y-2 text-xs">
             <span className="font-bold text-zinc-900 dark:text-white">Q1. 내 음악을 어디에 들려주고 싶나요?</span>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               {[
-                ['domestic', '국내 (멜론·지니)'],
-                ['global', '해외 (Spotify·Apple)'],
-                ['both', '국내 + 해외 둘 다'],
-              ].map(([val, label]) => (
+                ['domestic', '국내', '멜론 · 지니'],
+                ['global', '해외', 'Spotify · Apple'],
+                ['both', '국내 + 해외', '둘 다'],
+              ].map(([val, mainText, subText]) => (
                 <button
                   key={val}
                   type="button"
                   onClick={() => setWhere(val)}
-                  className={`py-2 px-3 rounded-lg border text-center transition-all ${
+                  className={`py-2 px-1 sm:px-2.5 rounded-lg border text-center transition-all flex flex-col items-center justify-center min-h-[54px] ${
                     where === val
                       ? 'bg-indigo-600 text-white border-indigo-600 font-bold shadow-sm'
                       : 'bg-white dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-white/10 hover:border-indigo-400'
                   }`}
                 >
-                  {label}
+                  <span className="font-bold text-xs sm:text-sm leading-tight">{mainText}</span>
+                  <span className={`text-[10px] sm:text-[11px] leading-tight mt-0.5 whitespace-nowrap tracking-tight ${
+                    where === val ? 'text-indigo-100' : 'text-zinc-400 dark:text-zinc-400'
+                  }`}>
+                    ({subText})
+                  </span>
                 </button>
               ))}
             </div>

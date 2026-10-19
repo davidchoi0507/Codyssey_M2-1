@@ -1559,7 +1559,7 @@ export default function Step1Upload({
                   type="button"
                   onClick={() => handleStartAnalysis(false)}
                   disabled={uploading || analyzing}
-                  className="w-full btn-primary flex items-center justify-center gap-2.5 py-4 text-base font-extrabold shadow-lg shadow-indigo-500/25 disabled:opacity-50"
+                  className="w-full btn-primary flex items-center justify-center gap-2 sm:gap-2.5 py-3.5 sm:py-4 px-3 sm:px-6 text-[15px] sm:text-base font-extrabold shadow-lg shadow-indigo-500/25 disabled:opacity-50"
                 >
                   {uploading ? (
                     <>
@@ -1573,8 +1573,8 @@ export default function Step1Upload({
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-5 h-5 text-amber-300" />
-                      <span>⚡ AI 분석 시작 & A&R 콘셉트 도출</span>
+                      <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 shrink-0" />
+                      <span className="whitespace-nowrap break-keep tracking-tight text-[15px] sm:text-base">AI 분석 시작 & A&R 콘셉트 도출</span>
                     </>
                   )}
                 </button>
