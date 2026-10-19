@@ -287,7 +287,7 @@ export default function Step1Upload({
       setAnalyzing(false);
       setExtractedWaveform(null);
     }
-  }, [jobData?.jobId]);
+  }, [jobData?.jobId, jobData?.title, jobData?.artist]);
 
   // Load recent jobs (D1)
   const loadRecentJobs = async () => {

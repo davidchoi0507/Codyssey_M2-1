@@ -18,11 +18,13 @@ import {
   Sparkles,
   Save,
   Volume2,
+  Upload,
+  ArrowRight,
 } from 'lucide-react';
 import { api, toFileUrl } from '../../services/api';
 import { copyToClipboard } from '../../utils/clipboard';
 
-export default function TrackManageView({ trackId, ownerKey, onClose, onGoToCommunity }) {
+export default function TrackManageView({ trackId, ownerKey, onClose, onGoToCommunity, onPrepareRelease }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [track, setTrack] = useState(null);
@@ -719,6 +721,49 @@ export default function TrackManageView({ trackId, ownerKey, onClose, onGoToComm
           >
             {copiedKey === 'manage-url' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copiedKey === 'manage-url' ? '주소 복사됨 ✓' : '관리 주소 복사'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Prepare Release from Community (Wonil's Request) */}
+      <div className="glass-panel p-6 rounded-3xl border border-indigo-200/80 dark:border-indigo-500/20 bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/30 dark:from-indigo-950/20 dark:via-zinc-900/40 dark:to-purple-950/10 space-y-3 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="font-extrabold text-base text-zinc-900 dark:text-white flex items-center gap-2">
+              <Upload className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <span>발매 준비하기</span>
+            </h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+              발매하려면 이 곡의 원본 파일(WAV)을 스튜디오에 올려 주세요. 지금 받은 반응은 그대로 남아요.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onPrepareRelease) {
+                onPrepareRelease(track);
+              } else {
+                try {
+                  sessionStorage.setItem(
+                    'balmaero_active_job_data',
+                    JSON.stringify({
+                      title: track?.title || '',
+                      artist: track?.artist || '',
+                      genre: track?.genre || '',
+                    })
+                  );
+                  sessionStorage.setItem('balmaero_active_step', '1');
+                  sessionStorage.setItem('balmaero_active_tab', 'studio');
+                } catch {}
+                window.location.href = '/?tab=studio';
+              }
+            }}
+            className="btn-primary text-xs px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-md flex-shrink-0"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>스튜디오에서 원본 올리기</span>
+            <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
           </button>
         </div>
       </div>

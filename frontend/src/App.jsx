@@ -325,6 +325,35 @@ export default function App() {
     } catch {}
   };
 
+  const handlePrepareReleaseForTrack = (track) => {
+    try {
+      sessionStorage.removeItem('balmaero_active_job_data');
+      sessionStorage.removeItem('balmaero_active_step');
+      sessionStorage.removeItem('balmaero_max_step');
+    } catch {}
+    const newJobData = {
+      ...INITIAL_JOB_DATA,
+      title: track?.title || '',
+      artist: track?.artist || '',
+      genre: track?.genre || '',
+      targetDistributor: jobData?.targetDistributor || 'distrokid',
+    };
+    setJobData(newJobData);
+    try {
+      sessionStorage.setItem('balmaero_active_job_data', JSON.stringify(newJobData));
+      sessionStorage.setItem('balmaero_active_step', '1');
+      sessionStorage.setItem('balmaero_max_step', '1');
+    } catch {}
+    if (manageInfo) {
+      window.history.pushState({ tab: 'studio' }, '', '/');
+      setManageInfo(null);
+    }
+    setShowJobPicker(false);
+    setActiveTab('studio');
+    setCurrentStep(1);
+    setMaxStepReached(1);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-[#f8fafc] dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 selection:bg-indigo-500/30 selection:text-indigo-600 dark:selection:text-indigo-200 relative overflow-x-hidden transition-colors duration-200">
       {/* 깔끔한 단색 / 은은한 미세 앰비언트 배경 (디스크 및 복잡한 선 제거) */}
@@ -350,6 +379,7 @@ export default function App() {
             ownerKey={manageInfo.ownerKey}
             onClose={() => handleTabChange('community')}
             onGoToCommunity={() => handleTabChange('community')}
+            onPrepareRelease={handlePrepareReleaseForTrack}
           />
         ) : (
           <>
