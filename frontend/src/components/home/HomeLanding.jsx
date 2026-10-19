@@ -80,13 +80,13 @@ export default function HomeLanding({
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-indigo-500/20 via-sky-500/15 to-purple-500/20 dark:from-indigo-600/25 dark:via-sky-400/15 dark:to-purple-600/25 rounded-full blur-3xl pointer-events-none -z-10" />
 
         {/* Top Floating Pill Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-white/10 shadow-sm backdrop-blur-md">
-          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-          <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+        <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-white/10 shadow-sm backdrop-blur-md max-w-full">
+          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
+          <span className="text-[11px] sm:text-xs font-bold text-zinc-700 dark:text-zinc-300 break-keep">
             인디 뮤지션을 위한 AI 원스톱 음원 발매 스튜디오
           </span>
-          <span className="text-zinc-300 dark:text-zinc-700">|</span>
-          <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+          <span className="text-zinc-300 dark:text-zinc-700 hidden sm:inline">|</span>
+          <span className="text-[11px] sm:text-xs font-semibold text-indigo-600 dark:text-indigo-400 whitespace-nowrap hidden sm:inline">
             Balmaero Studio
           </span>
         </div>
@@ -112,11 +112,11 @@ export default function HomeLanding({
           <button
             type="button"
             onClick={onGoToStudio}
-            className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white font-black text-base sm:text-lg shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-3 transition-all cursor-pointer group"
+            className="w-full sm:w-auto px-4 sm:px-8 py-3.5 sm:py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white font-black text-[15px] sm:text-lg shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2 sm:gap-3 transition-all cursor-pointer group"
           >
-            <Sparkles className="w-5 h-5 text-indigo-200 group-hover:rotate-12 transition-transform" />
-            <span>지금 무료로 발매 패키지 만들기</span>
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-200 group-hover:rotate-12 transition-transform shrink-0" />
+            <span className="whitespace-nowrap break-keep tracking-tight">지금 무료로 발매 패키지 만들기</span>
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform shrink-0" />
           </button>
 
           <button

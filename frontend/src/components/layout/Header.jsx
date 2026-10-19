@@ -23,16 +23,16 @@ export default function Header({ activeTab, setActiveTab, onOpenGuide, onOpenMe,
               <Disc3 className="w-5 h-5 text-indigo-600 dark:text-indigo-400 animate-spin" style={{ animationDuration: '8s' }} />
             </div>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-zinc-900 via-indigo-950 to-indigo-600 dark:from-white dark:via-zinc-200 dark:to-indigo-300 bg-clip-text text-transparent inline-block leading-normal py-0.5">
-                발매로 (Balmaero)
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-zinc-900 via-indigo-950 to-indigo-600 dark:from-white dark:via-zinc-200 dark:to-indigo-300 bg-clip-text text-transparent inline-block leading-normal pt-1 pb-0.5 whitespace-nowrap overflow-visible">
+                발매로 <span className="hidden sm:inline text-xs sm:text-sm font-bold text-indigo-400/90">(Balmaero)</span>
               </span>
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
+              <span className="text-[10px] sm:text-xs font-bold px-1.5 sm:px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 whitespace-nowrap">
                 STUDIO
               </span>
             </div>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">원스톱 음원 발매 패키징 & 피드백</p>
+            <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 font-medium truncate">원스톱 음원 발매 패키징 & 피드백</p>
           </div>
         </div>
 
@@ -101,7 +101,7 @@ export default function Header({ activeTab, setActiveTab, onOpenGuide, onOpenMe,
           {/* User Button */}
           <button
             onClick={handleGoMe}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-sm font-medium transition-all shadow-sm ${
+            className={`flex items-center gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl border text-xs sm:text-sm font-medium transition-all shadow-sm ${
               activeTab === 'me'
                 ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200'
                 : 'border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-zinc-900/80 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:border-indigo-500/40'
