@@ -515,7 +515,7 @@ def create_balmaero_presentation():
         
     team_data = [
         ("팀장 (David)", "Product Lead & Frontend", "발매로 기획 총괄, 4단계 UX 설계, React 프론트엔드 UI 구현 및 최적화", "React UI 코드, 발표 자료"),
-        ("원일", "Tech Lead & AI / Backend", "FastAPI 서버 전체, librosa+Gemini 오디오 엔진, LangChain 5종, 유통사 검사", "백엔드 API, AI 파이프라인, 제출문서 5종"),
+        ("이원일", "Tech Lead & AI / Backend", "FastAPI 서버 전체, librosa+Gemini 오디오 엔진, LangChain 5종, 유통사 검사", "백엔드 API, AI 파이프라인, 제출문서 5종"),
         ("이은희", "Service Policy & UX Research", "서비스 이용약관 및 개인정보 동의서(v1.2~1.6) 기획, 데이터 파기 규정 수립, 10/16 피드백", "개인정보 동의서(v1.6), 개선안 리포트"),
         ("신미영", "Industry Research & QA", "유통사(DistroKid/뮤즈플랫폼) 규격 조사, 실음원 테스트 진행 및 개선안 리포트(10/16 10건 + 개선안 8건)", "유통사 조사서, 실음원 테스트 리포트"),
         ("김지은", "Audio Dataset & Usability", "장르별 테스트용 음원 데이터 수집·정비, 실사용자 테스트 진행 지원 및 만족도 설문 집계", "테스트 음원셋, 설문 집계 데이터")
