@@ -9,7 +9,7 @@
 
 음악 창작자(인디 뮤지션, 학생, 1인 프로듀서)는 곡을 완성하고도 앨범 커버 디자인 외주 비용, A&R 기획서 부재, 유통사마다 상이한 메타데이터 규격 작성의 복잡함으로 인해 실제 발매 단계에서 심각한 병목을 겪습니다.
 
-**"발매로(Balmaero)"**는 음원 파일(`.mp3`, `.wav`)을 업로드하면, **[librosa DSP 정량 분석 + Gemini 3.8 Flash 오디오 감성 청취]**의 2-Track 하이브리드 오디오 엔진으로 사운드를 파싱하고, **LangChain 기반 Multi-Agent 시스템**이 협업하여 발매에 필요한 **[A&R 콘셉트 기획서 + 고화질 앨범 아트워크 3종 + 숏폼(15초) & Spotify Canvas(8초) 영상 + 발매 규격 검사 시트(CSV) + 원클릭 ZIP 릴리즈 팩]**을 일괄 완성하는 웹 플랫폼입니다. 또한, 발매 전 동료 창작자들의 실시간 피드백을 확인할 수 있는 **'들어봐' 커뮤니티 공간**을 제공합니다.
+**"발매로(Balmaero)"**는 음원 파일(`.mp3`, `.wav`)을 업로드하면, **[librosa DSP 정량 분석 + Gemini 3.8 Flash 오디오 감성 청취]**의 2-Track 하이브리드 오디오 엔진으로 사운드를 파싱하고, **LangChain 기반 Multi-Agent 시스템 (에이전트 5종)**이 협업하여 발매에 필요한 **[A&R 콘셉트 기획서 + 고화질 앨범 아트워크 3종 + 숏폼(15초) & Spotify Canvas(8초) 영상 + 발매 규격 검사 시트(CSV) + 원클릭 ZIP 릴리즈 팩]**을 일괄 완성하는 웹 플랫폼입니다. 또한, 발매 전 동료 창작자들의 실시간 피드백을 확인할 수 있는 **'들어봐' 커뮤니티 공간**을 제공합니다.
 
 ---
 
@@ -19,12 +19,11 @@
 
 | 이름 | 포지션 | 세부 담당 업무 | 주요 산출물 |
 | :---: | :--- | :--- | :--- |
-| **팀장 (David)** | Product Lead & UI/UX | • 발매로 기획 총괄 및 사용자 여정(4단계 워크플로우) 설계<br>• 다크 테마 UI/UX 디자인 시스템 구축 및 프론트엔드 코어 마크업<br>• 스프린트 리딩, 발표 자료(PPTX/PDF) 제작 및 Git 형상 관리 | Figma 원본, 프론트 레이아웃 커밋, 최종 발표 슬라이드 |
-| **원일** | Tech Lead & AI / Backend | • 서버 전체(FastAPI 비동기 아키텍처, Oracle Cloud VM 배포, DB)<br>• librosa + Gemini 3.8 Flash 하이브리드 오디오 엔진<br>• LangChain 에이전트 4종 및 gpt-image-2 / ffmpeg 영상 파이프라인<br>• 유통사 규격 검사, 권리 자가진단, '들어봐' 커뮤니티, 소리 지문 도용 방지 | 백엔드 API 서버, AI 파이프라인, 제출 문서 5종, 관리자 페이지 |
-| **팀원 2** | Frontend Lead | • React 반응형 UI 구현, A&R 리포트 인라인 실시간 편집기<br>• 모바일 뷰 텍스트 잘림 해결 및 터치 인터랙션 최적화<br>• 비동기 폴링 상태 관리 및 릴리즈 팩 다운로드 연동 | React 컴포넌트, 인라인 에디터 코드, 모바일 반응형 커밋 |
-| **팀원 3** | AI Workflow & Auxiliary | • gpt-image-2 프롬프트 엔지니어링 및 3000px 초고화질 업스케일러 연동<br>• 채널별 홍보 카피라이팅 프롬프트 튜닝 및 JSON 스키마 검증<br>• 비용 최적화(API 키 로테이션) 적용으로 커버 생성 시간 81초 단축 | 프롬프트 로그, 이미지 업스케일 모듈, 비디오 템플릿 YAML |
-| **팀원 4** | QA & Operations | • 실사용자 35인 테스트 총괄 및 설문 수집·분석 리포트 작성<br>• 장르별 음원 샘플 20종 메타데이터 데이터셋 구축<br>• QA 테스트케이스 작성, 50여 건의 이슈 트래킹 및 검증 | 사용자 테스트 결과 보고서, 테스트 데이터셋 JSON, QA 이슈보드 |
-
+| **팀장 (David)** | Product Lead & Frontend | • 발매로 서비스 기획 총괄 및 4단계 사용자 경험(UX) 설계<br>• React 프론트엔드 전체 UI 구현 및 모바일 반응형 최적화<br>• 발표 슬라이드(PPTX) 제작 및 프로젝트 릴리즈 관리 | React 프론트엔드 코드, UI 컴포넌트, 최종 발표 슬라이드 |
+| **원일** | Tech Lead & AI / Backend | • 서버 전체(FastAPI 비동기 아키텍처, Oracle Cloud VM 배포, DB)<br>• librosa + Gemini 3.8 Flash 하이브리드 오디오 엔진 구축<br>• LangChain 에이전트 5종 및 gpt-image-2 / ffmpeg 영상 파이프라인<br>• 유통사 규격 검사 엔진, 권리 자가진단, '들어봐' 커뮤니티 개발 | FastAPI 백엔드 API, AI 멀티에이전트 파이프라인, 제출 문서 5종 |
+| **이은희** | Service Policy & UX Research | • 서비스 이용약관 및 개인정보 수집·이용 동의서(v1.2~v1.6) 기획 및 법적 고지 조항 수립<br>• 커뮤니티 음원 권리 확인 조항 및 서비스 종료일(2026-10-31) 데이터 파기 규정 설계<br>• 사용자 피드백 수렴 및 UX 개선점 도출 (10/16 피드백 리포트) | 개인정보 수집이용 동의서(v1.6), 커뮤니티 운영 정책 문서, 개선안 리포트 |
+| **신미영** | Industry Research & QA Testing | • 국내외 주요 음원 유통사(DistroKid, 뮤즈플랫폼) 규격 및 웹 콘솔 입력 항목 현황 조사<br>• 실제 음원 업로드 테스트 진행 및 기능 개선안 리포트 작성 (피드백 33건 도출)<br>• 유통사 반려 방지 가이드라인 및 플랫폼 메타데이터 검증 항목 수립 | 유통사 입력항목 조사 보고서, 실음원 테스트 결과 및 개선안 리포트 |
+| **이지은** | Audio Dataset & Usability Evaluation | • 다양한 장르별(인디팝, 어쿠스틱, 힙합, 록 등) 테스트용 음원 데이터 수집 및 메타데이터 정비<br>• 배포 서비스 실사용자 테스트 진행 및 설문 데이터 수렴 지원<br>• A&R 리포트 감성 분석 일치도 검증 및 홍보 카피 사용성 평가 | 테스트 음원 데이터셋, 사용자 만족도 설문 집계 데이터 |
 ---
 
 ## 3. 기술 스택 (Tech Stack)
@@ -32,15 +31,15 @@
 | 영역 | 사용 기술 |
 | :--- | :--- |
 | **AI · 멀티모달** | **Google Gemini 3.8 Flash** (음원 청각 감성 분석, 3.7 ➔ 3.6 ➔ 3.5 Fallback 체인)<br>코디세이 API: **gpt-image-2** (커버 아트워크 생성), **gpt-5.4 / gpt-5.4-mini** (A&R 및 카피라이팅) |
-| **Agent Framework** | **LangChain** — A&R 기획, 비주얼 디렉터, 카피라이터, 피칭, 에디토리얼 에이전트 |
+| **Agent Framework** | **LangChain** — A&R 기획, 비주얼 디렉터, 카피라이터, 피칭, 에디토리얼 에이전트 (총 5종) |
 | **Audio & Media** | Python `librosa`, `soundfile`, `ffmpeg`, `Pillow`, `Chromaprint` (소리 지문) |
 | **Frontend** | React, Vite, Tailwind CSS, Web Audio API, Lucide Icons |
 | **Backend** | Python 3.12, FastAPI, Uvicorn, Pydantic, SQLite |
-| **Infra & DevOps** | **Oracle Cloud VM** (백엔드 API: `api.201.n-e.kr`, Caddy HTTPS, systemd)<br>**Vercel** (프론트엔드 CDN 배포), GitHub Actions |
+| **Infra & DevOps** | **Oracle Cloud VM** (백엔드 API: `api.201.n-e.kr`, Caddy HTTPS, systemd)<br>**Vercel** (프론트엔드 CDN 배포) |
 | **Auth & Security** | 카카오 · 구글 OAuth 2.0 (로그인 없이도 이용 가능한 체험 모드 지원) |
 
 ### 📌 필수 기술 요건 충족 내역
-1. **AI Agent**: LangChain 기반 에이전트 4종 협업 + 창작자가 직접 검토하고 수정·승인하는 인라인 인터페이스(Human-in-the-loop)
+1. **AI Agent**: LangChain 기반 에이전트 5종 협업 + 창작자가 직접 검토하고 수정·승인하는 인라인 인터페이스(Human-in-the-loop)
 2. **멀티모달 AI**: 음원 파일(`.mp3`, `.wav`)을 직접 듣고 해석하는 청각 멀티모달(Gemini) ➔ 텍스트(A&R) ➔ 이미지(커버) ➔ 비디오(숏폼/Canvas) 생성 파이프라인
 3. **자동화 워크플로우**: 음원 업로드 ➔ DSP 물리량 파싱 ➔ AI 감성 청취 ➔ 멀티에이전트 병렬 생성 ➔ ffmpeg 렌더링 ➔ 유통사 규격 자동 검사 및 ZIP 패키징
 
@@ -140,9 +139,9 @@ npm run dev
 * **핵심 지표**:
   * **업로드 ➔ A&R 노트 완성 시간**: 중앙값 **30초** (0.5분, 실패율 0%)
   * **노트를 직접 수정한 작업 비율**: **71% (5/7건)** ➔ *"AI가 먼저 듣고 사람이 고친다"*는 협업 설계 검증 완료
-  * **만족도 지표**: 전반 만족도, 재사용 의향, AI 해석 정확도 모두 **4.67 / 5.0**
+  * **만족도 지표**: 전반 만족도, 재사용 의향, AI 해석 정확도 모두 **4.67 / 5.0** (설문 응답 3명의 평균)
   * **홍보글 평가**: 설문 응답자 3명 전원 **"그대로 쓸 수 있다"** 응답
-* **피드백 기반 주요 개선 내역 (50여 건 반영)**:
+* **피드백 기반 주요 개선 내역**:
   1. **커버 생성 시간 단축**: 후보 6장 ➔ 3장 최적화 및 API 키 로테이션 적용 ➔ **체험 작업 실측 81초**로 단축
   2. **이탈 방지 UX 개편**: 노트를 받고 수락하기 전 멈추던 현상 해결을 위해 수정 안내, 연필 아이콘, 버전 안내 추가
   3. **예시곡 체험 모드**: 음원 파일이 없는 사용자도 즉시 전 과정을 둘러볼 수 있는 체험 모드 신설
@@ -165,10 +164,9 @@ npm run dev
 
 | 구분 | 링크 및 경로 |
 | :--- | :--- |
-| **배포 서비스 (Frontend)** | [Vercel 배포 URL](https://frontend-rho-seven-39.vercel.app/) *(실제 서비스 접속 가능)* |
+| **배포 서비스 (Frontend)** | [Vercel 배포 URL](https://codyssey-m2-1.vercel.app) *(실제 서비스 접속 가능)* |
 | **백엔드 API 서버** | [https://api.201.n-e.kr](https://api.201.n-e.kr) *(Oracle Cloud VM)* |
 | **발표 슬라이드 (PPTX)** | [`/balmaero_presentation.pptx`](balmaero_presentation.pptx) |
-| **발표 기획안 (PDF)** | [`/presentation_plan_and_storyline.pdf`](presentation_plan_and_storyline.pdf) |
 | **기능 요구 명세서 (FR/NFR)** | [`docs/제출/01_기능요구명세서.md`](docs/제출/01_기능요구명세서.md) |
 | **시스템 아키텍처 명세** | [`docs/제출/02_시스템아키텍처.md`](docs/제출/02_시스템아키텍처.md) |
 | **기술 스택 선정 이유** | [`docs/제출/03_기술스택_선정이유.md`](docs/제출/03_기술스택_선정이유.md) |
