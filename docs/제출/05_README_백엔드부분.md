@@ -79,12 +79,14 @@ npm run dev
 | 프론트엔드 웹 서비스 | https://codyssey-m2-1.vercel.app |
 | 백엔드 API 서버 | https://api.201.n-e.kr |
 | 백엔드 Swagger 문서 | https://api.201.n-e.kr/docs |
+| 시연 영상 (Google Drive) | [시연 영상 안내 및 링크](docs/제출/00_시연영상.md) |
 | GitHub 저장소 | https://github.com/davidchoi0507/Codyssey_M2-1 |
 
 ---
 
 ## 5. 관련 제출 문서 (Deliverables)
 
+- 서비스 시연 영상 안내 — [docs/제출/00_시연영상.md](docs/제출/00_시연영상.md)
 - 기능 요구 명세서 (FR/NFR) — [`docs/제출/01_기능요구명세서.md`](docs/제출/01_기능요구명세서.md)
 - 시스템 아키텍처 명세서 — [`docs/제출/02_시스템아키텍처.md`](docs/제출/02_시스템아키텍처.md)
 - 기술 스택 및 의사결정 기록 (ADR) — [`docs/제출/03_기술스택_선정이유.md`](docs/제출/03_기술스택_선정이유.md)
