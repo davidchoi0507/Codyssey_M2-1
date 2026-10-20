@@ -82,12 +82,12 @@ async def create(
         # 남의 곡 먼저 거르기 (10/16): AI 분석(Gemini 하루 한도) 전에 소리 지문으로 — 커뮤니티에 이미 공개된 곡과 같은
         # 녹음이면 거절, 알려진 곡(AcoustID)과 비슷하면 '직접 만든 곡이 맞아요' 확인을 받아야 분석 시작. 몇 초 걸림.
         ext = Path(file.filename or "").suffix.lower()
-        known = None
+        known = relink = None
         if ext in ALLOWED_EXT:
             check_magic(tmp_path, ext)
-            _, known = await run_in_threadpool(community.check_copy, s, tmp_path, ext,
-                                               user_id=user["user_id"] if user else None, who=who,
-                                               confirm_original=confirm_original)
+            _, known, relink = await run_in_threadpool(community.check_copy, s, tmp_path, ext,
+                                                       user_id=user["user_id"] if user else None, who=who,
+                                                       confirm_original=confirm_original, relink=True)
         song = {"title": title, "artist": artist, "genre": genre, "description": description, "lyrics": lyrics}
         consent = {"consent_original": consent_original, "consent_privacy": consent_privacy,
                    "consent_external_ai": consent_external_ai, "consent_showcase": consent_showcase,
@@ -99,6 +99,9 @@ async def create(
         jf.event("known_song_confirmed", score=known["score"])
         reports.notify(f"알려진 곡과 비슷하지만 올린 사람이 자작곡이라고 확인하고 분석을 시작했어요: '{artist} — {title}' ≈ "
                        f"'{known['artist']} — {known['title']}' (점수 {known['score']}, 작업 {jf.job_id})")
+    if relink and community.relink_job(relink, jf.job_id, s):
+        # (10/19) 커뮤니티에만 공개한 내 곡의 원본 → 그 곡에 이어 붙인다 (반응 유지, 공개하기는 설정 변경, 발매 정보는 곡에 반영)
+        jf.event("community_relinked", track_id=relink)
     record_client(jf.job_id, client, band, who)
     link_job(jf.job_id, user)  # 로그인했으면 '내 곡'에 (선택)
     r.start_analysis(jf)
