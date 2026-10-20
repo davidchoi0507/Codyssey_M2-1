@@ -996,7 +996,7 @@ export default function Step1Upload({
               className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/30 transition-all shadow-sm"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>⚡ 파일이 없으신가요? [체험용 샘플 곡 자동 채우기] 원클릭</span>
+              <span>파일이 없으신가요? [체험용 샘플 곡 자동 채우기] 원클릭</span>
             </button>
           </div>
         )}
@@ -1427,25 +1427,34 @@ export default function Step1Upload({
                 <button
                   type="button"
                   onClick={() => setShowOptionalMeta((prev) => !prev)}
-                  className="w-full px-4 py-3 flex items-center justify-between text-left text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100/60 dark:hover:bg-white/5 transition-colors"
+                  className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left transition-colors hover:bg-zinc-100/60 dark:hover:bg-white/5"
                 >
-                  <div className="flex items-center gap-2">
-                    {showOptionalMeta ? (
-                      <ChevronUp className="w-4 h-4 text-indigo-500" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-zinc-400" />
-                    )}
-                    <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-                      가사 및 추가 크레딧 입력하기 (선택)
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <span className="mt-0.5 shrink-0">
+                      {showOptionalMeta ? (
+                        <ChevronUp className="w-4 h-4 text-indigo-500" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-zinc-400" />
+                      )}
                     </span>
-                    {(featured || songwriter || producer || genre || lyrics) && (
-                      <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-xs font-extrabold">
-                        입력됨
-                      </span>
-                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                          가사 및 추가 크레딧 입력하기 (선택)
+                        </span>
+                        {(featured || songwriter || producer || genre || lyrics) && (
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-[11px] font-extrabold shrink-0">
+                            입력됨
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-zinc-400 font-normal mt-0.5 break-keep">
+                        {showOptionalMeta ? '클릭하여 입력창 접기' : '피처링 · 작곡가 · 프로듀서 · 장르 · 가사'}
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-xs text-zinc-400 font-normal">
-                    {showOptionalMeta ? '접기' : '피처링 · 작곡가 · 프로듀서 · 장르 · 가사'}
+                  <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 shrink-0">
+                    {showOptionalMeta ? '접기' : '열기'}
                   </span>
                 </button>
 

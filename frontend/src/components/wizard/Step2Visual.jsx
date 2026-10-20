@@ -910,11 +910,11 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
             </div>
 
             <div className="sm:col-span-9 space-y-3 min-w-0">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-zinc-500">
+              <div className="flex flex-wrap items-center justify-between gap-2.5">
+                <span className="text-xs font-bold text-zinc-500 shrink-0">
                   {PROMO_TABS.find((x) => x.id === promoTab)?.label} 홍보 본문
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => {
@@ -925,13 +925,13 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
                       }
                       setIsEditingText((prev) => ({ ...prev, [tabKey]: !isEditing }));
                     }}
-                    className="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 flex items-center gap-1 shadow-sm transition-colors"
+                    className="h-8 px-3 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 inline-flex items-center justify-center gap-1.5 shadow-sm transition-colors whitespace-nowrap"
                   >
                     <span>{isEditingText[promoTab] ? '수정 완료 ✓' : '✏️ 직접 수정'}</span>
                   </button>
 
                   {copiedKey === `body-${promoTab}` && (
-                    <span className="px-2.5 py-1 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
+                    <span className="h-8 px-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold inline-flex items-center">
                       복사했어요 ✓
                     </span>
                   )}
@@ -941,9 +941,9 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
                       const textToCopy = customTexts[promoTab] !== undefined ? customTexts[promoTab] : (activeChannel?.text || '');
                       handleCopy(textToCopy, `body-${promoTab}`, 'copied_channel', promoTab);
                     }}
-                    className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 shadow-sm"
+                    className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-sm transition-colors whitespace-nowrap"
                   >
-                    <Copy className="w-3 h-3" />
+                    <Copy className="w-3.5 h-3.5" />
                     <span>본문 복사</span>
                   </button>
                 </div>
@@ -1057,7 +1057,7 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
                 ))}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -1068,13 +1068,13 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
                     }
                     setIsEditingText((prev) => ({ ...prev, [pitchKey]: !isEditing }));
                   }}
-                  className="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 flex items-center gap-1 shadow-sm transition-colors"
+                  className="h-8 px-3 rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 inline-flex items-center justify-center gap-1.5 shadow-sm transition-colors whitespace-nowrap"
                 >
                   <span>{isEditingText[`pitch_${pitchLang}`] ? '수정 완료 ✓' : '✏️ 직접 수정'}</span>
                 </button>
 
                 {copiedKey === `pitch-${pitchLang}` && (
-                  <span className="px-2.5 py-1 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
+                  <span className="h-8 px-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold inline-flex items-center">
                     복사했어요 ✓
                   </span>
                 )}
@@ -1090,9 +1090,9 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
                       pitchLang
                     );
                   }}
-                  className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 shadow-sm"
+                  className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-sm transition-colors whitespace-nowrap"
                 >
-                  <Copy className="w-3 h-3" />
+                  <Copy className="w-3.5 h-3.5" />
                   <span>제목+본문 복사</span>
                 </button>
               </div>
@@ -1149,8 +1149,8 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-4 rounded-xl bg-zinc-50 dark:bg-[#121215] border border-zinc-200 dark:border-white/5 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 min-w-0">
                         Spotify 에디토리얼 피칭 (한국어 · 500자 이내)
                       </span>
                       <button
@@ -1158,7 +1158,7 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
                         onClick={() =>
                           handleCopy(activeEditorial.spotify_ko, 'ed-ko', 'copied_editorial', 'spotify_ko')
                         }
-                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1"
+                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 transition-colors"
                       >
                         <Copy className="w-3 h-3" />
                         <span>{copiedKey === 'ed-ko' ? '복사했어요 ✓' : '복사'}</span>
@@ -1170,8 +1170,8 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
                   </div>
 
                   <div className="p-4 rounded-xl bg-zinc-50 dark:bg-[#121215] border border-zinc-200 dark:border-white/5 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 min-w-0">
                         Spotify Editorial Pitch (English · ≤500 chars)
                       </span>
                       <button
@@ -1179,7 +1179,7 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
                         onClick={() =>
                           handleCopy(activeEditorial.spotify_en, 'ed-en', 'copied_editorial', 'spotify_en')
                         }
-                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1"
+                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 transition-colors"
                       >
                         <Copy className="w-3 h-3" />
                         <span>{copiedKey === 'ed-en' ? '복사했어요 ✓' : '복사'}</span>
@@ -1192,8 +1192,8 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
                 </div>
 
                 <div className="p-4 rounded-xl bg-zinc-50 dark:bg-[#121215] border border-zinc-200 dark:border-white/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 min-w-0">
                       국내 음원 사이트(멜론·지니·FLO) 앨범 소개글 초안
                     </span>
                     <button
@@ -1201,7 +1201,7 @@ export default function Step2Visual({ jobData, setJobData, onNextStep, onPrevSte
                       onClick={() =>
                         handleCopy(activeEditorial.dsp_intro_ko, 'ed-dsp', 'copied_editorial', 'dsp_intro_ko')
                       }
-                      className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1"
+                      className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 transition-colors"
                     >
                       <Copy className="w-3 h-3" />
                       <span>{copiedKey === 'ed-dsp' ? '복사했어요 ✓' : '복사'}</span>

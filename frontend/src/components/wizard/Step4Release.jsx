@@ -165,7 +165,7 @@ export default function Step4Release({ jobData, setJobData, onPrevStep, onGoToCo
     setPublishNotice(null);
 
     if (!pubConsent.rights || !pubConsent.public) {
-      setConsentError('아래 필수 동의 두 가지에 모두 체크해 주세요.');
+      setConsentError('필수 동의 두 가지에 모두 체크해 주세요.');
       consentBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
@@ -502,7 +502,7 @@ export default function Step4Release({ jobData, setJobData, onPrevStep, onGoToCo
                     handleCopy(isUnentered ? '' : field.value, idx);
                     api.logUsage(jobData?.jobId, 'copied_field', field.label.split(' (')[0]);
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors flex-shrink-0 shadow-sm"
+                  className="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors flex-shrink-0 whitespace-nowrap shadow-sm"
                 >
                   {copiedKey === idx ? (
                     <>
@@ -540,7 +540,7 @@ export default function Step4Release({ jobData, setJobData, onPrevStep, onGoToCo
             </p>
           </div>
 
-          {published ? (
+          {published && (
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -554,33 +554,12 @@ export default function Step4Release({ jobData, setJobData, onPrevStep, onGoToCo
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
             </div>
-          ) : (
-            <div className="flex flex-col sm:items-end gap-1.5">
-              <button
-                onClick={() => handlePublishToggle(false)}
-                disabled={publishing}
-                className="btn-primary text-xs px-5 py-2.5 shadow-sm disabled:opacity-50 font-bold"
-              >
-                {publishing ? '등록 중...' : '지금 커뮤니티에 등록하기'}
-              </button>
-              {consentError && (
-                <span className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>{consentError}</span>
-                </span>
-              )}
-              {publishNotice && (
-                <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
-                  {publishNotice}
-                </span>
-              )}
-            </div>
           )}
         </div>
 
         {/* 공개 전: 들려줄 범위·반응 공개·필수 동의 */}
-        {!published && !isDemo && (
-          <div className="pt-4 border-t border-zinc-200/80 dark:border-white/10 space-y-3 text-xs text-zinc-700 dark:text-zinc-300">
+        {!published && (
+          <div className="pt-4 border-t border-zinc-200/80 dark:border-white/10 space-y-4 text-xs text-zinc-700 dark:text-zinc-300">
             <div className="flex flex-wrap items-center gap-2">
               <b className="w-20">들려줄 범위</b>
               {[
@@ -645,7 +624,7 @@ export default function Step4Release({ jobData, setJobData, onPrevStep, onGoToCo
                   className="mt-0.5 rounded text-indigo-600"
                 />
                 <span className="font-medium">
-                  [필수] 만 14세 이상이고, 직접 만든 곡이거나 공개할 권리가 있어요
+                  [필수] 만 14세 이상이고, 직접 만든 곡이거나 공개할 권리가 있어요 {isDemo && <span className="text-indigo-500 font-bold">(체험 샘플 모드)</span>}
                 </span>
               </label>
 
@@ -664,6 +643,30 @@ export default function Step4Release({ jobData, setJobData, onPrevStep, onGoToCo
                   [필수] 커뮤니티에 공개하고, 내가 내리거나 서비스가 종료되는 2026-10-31까지 보관돼요. 듣는 사람들의 생생한 별점과 반응이 모여요. (발매 전 곡은 하이라이트 공개 권장)
                 </span>
               </label>
+            </div>
+
+            {/* 커뮤니티 등록 실행 버튼 & 상태 메시지 (동의 체크박스 바로 아래 배치) */}
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="min-w-0">
+                {consentError && (
+                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{consentError}</span>
+                  </span>
+                )}
+                {publishNotice && (
+                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                    {publishNotice}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => handlePublishToggle(false)}
+                disabled={publishing}
+                className="btn-primary text-xs px-6 py-2.5 shadow-md disabled:opacity-50 font-bold w-full sm:w-auto shrink-0"
+              >
+                {publishing ? '등록 중...' : '지금 커뮤니티에 등록하기'}
+              </button>
             </div>
 
             {knownMatch && (

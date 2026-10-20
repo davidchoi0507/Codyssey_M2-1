@@ -701,13 +701,13 @@ export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevSt
       {/* 2. D5-1: 권리 및 저작권 10문항 단계형 자가진단 카드 */}
       <div className="glass-panel rounded-2xl p-6 sm:p-7 space-y-5 border border-zinc-200/80 dark:border-white/10 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200/80 dark:border-white/10">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0"></span>
             <span className="text-base sm:text-lg font-extrabold text-zinc-900 dark:text-white">
               2. 권리 및 저작권 자가진단 (10문항 필수)
             </span>
             <span
-              className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+              className={`px-2.5 py-0.5 rounded-full text-xs font-bold border whitespace-nowrap shrink-0 ${
                 allRightsAnswered
                   ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
                   : 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30'
@@ -716,14 +716,14 @@ export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevSt
               {allRightsAnswered ? `자가진단 완료 ✓ (${answeredCount}/${totalQuestions})` : `답한 문항 ${answeredCount} / ${totalQuestions}`}
             </span>
             {savingRights && (
-              <span className="text-xs text-zinc-400 animate-pulse">저장 중...</span>
+              <span className="text-xs text-zinc-400 animate-pulse whitespace-nowrap shrink-0">저장 중...</span>
             )}
           </div>
 
           <button
             type="button"
             onClick={() => setRightsExpanded((prev) => !prev)}
-            className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+            className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 shrink-0 whitespace-nowrap"
           >
             <span>{rightsExpanded ? '접기' : '문항 다시 보기 / 수정'}</span>
             {rightsExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -788,7 +788,7 @@ export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevSt
         {rightsExpanded && currentQ && (
           <div className="space-y-5 pt-1">
             {/* 문항 번호 버튼 줄 */}
-            <div className="flex flex-wrap gap-1.5">
+            <div className="grid grid-cols-5 sm:flex sm:flex-wrap gap-1.5">
               {questions.map((q, idx) => {
                 const isAnswered = Boolean(answers[q.id]);
                 const isCurrent = idx === activeQIndex;
@@ -797,7 +797,7 @@ export default function Step3Inspect({ jobData, setJobData, onNextStep, onPrevSt
                     key={q.id}
                     type="button"
                     onClick={() => setActiveQIndex(idx)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
+                    className={`h-8 px-2 rounded-lg text-xs font-bold transition-all border inline-flex items-center justify-center ${
                       isCurrent
                         ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm scale-105'
                         : isAnswered
