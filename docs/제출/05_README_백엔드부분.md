@@ -1,11 +1,10 @@
-# README에 넣을 백엔드 부분 (초안)
+# 발매로 — 백엔드 아키텍처 및 로컬 실행 명세
 
-> 팀장님이 최종 README.md에 붙여 넣을 수 있게 섹션별로 정리했어요. 지금 저장소 루트 README는 예전 기획(DALL-E 3·Render·LangGraph·Resend 이메일·비주얼라이저) 기준이라 아래 내용으로 바꿔야 해요.
-> 고칠 곳: 기술 스택, 시스템 아키텍처, 실행 방법, 팀원 역할의 백엔드 칸.
+> 발매로(Balmaero) 백엔드 코어 사양, AI 멀티에이전트 파이프라인, 로컬 실행 가이드 및 연동 명세서
 
 ---
 
-## 기술 스택
+## 1. 기술 스택 (Tech Stack)
 
 | 영역 | 사용 기술 |
 | --- | --- |
@@ -13,18 +12,23 @@
 | AI Agent | LangChain — A&R · 비주얼 디렉터 · 카피라이터 · 피칭 · 에디토리얼 에이전트 |
 | 오디오 · 영상 | librosa, ffmpeg, Pillow, Chromaprint |
 | 백엔드 | Python 3.12, FastAPI, Uvicorn, Pydantic, SQLite |
-| 프론트엔드 | React, Vite, Tailwind CSS |
+| 프론트엔드 | React 18, Vite, Tailwind CSS, Lucide Icons |
 | 배포 | Oracle Cloud (백엔드, Caddy HTTPS, systemd), Vercel (프론트엔드) |
-| 로그인 | 카카오 · 구글 OAuth |
+| 로그인 | 카카오 · 구글 OAuth 2.0 |
 
-**필수 기술 요소**: ① AI Agent(LangChain 에이전트 5종 + 사람이 확인하는 단계) ② 멀티모달(음원 → 해석 글 · 이미지 · 영상, 이미지 → 검수) ③ 자동화 워크플로우(업로드 → 분석 → 생성 → 렌더링 → 검사, 실패 단계부터 재시도, 매일 보관 삭제, 신고 알림)
+**필수 기술 요소**:
+1. **AI Agent**: LangChain 기반 에이전트 5종 + 창작자가 직접 확인하고 수정·승인하는 인라인 인터페이스(Human-in-the-loop)
+2. **멀티모달**: 음원(오디오) 직접 청취 ➔ 해석 텍스트(A&R) ➔ 이미지(커버) ➔ 비디오(숏폼/Canvas) 생성 파이프라인
+3. **자동화 워크플로우**: 업로드 ➔ 분석 ➔ 생성 ➔ 렌더링 ➔ 규격 검사, 실패 단계부터 재시도, 매일 보관 삭제 스케줄러
 
-## 시스템 아키텍처
+---
+
+## 2. 시스템 아키텍처 (System Architecture)
 
 ```mermaid
 flowchart LR
-    U([사용자]) --> FE[React 화면<br/>Vercel]
-    FE -->|HTTPS| API[FastAPI<br/>Oracle Cloud VM]
+    U([사용자 브라우저]) --> FE[프론트엔드<br/>React · Vercel]
+    FE -->|HTTPS| API[FastAPI 백엔드<br/>Oracle Cloud VM]
     API --> L[librosa<br/>수치 측정]
     API --> G[Gemini<br/>음원 듣기]
     L --> AR[A&R 에이전트]
@@ -34,22 +38,24 @@ flowchart LR
     AG --> M[ffmpeg · Pillow<br/>커버 · 숏폼 · Canvas]
     M --> R[유통사 검사 · ZIP]
     R --> C[커뮤니티 '들어봐']
-    API --> DB[(SQLite · 파일)]
+    API --> DB[(SQLite · 파일 스토리지)]
 ```
 
-자세한 구성: [`docs/제출/02_시스템아키텍처.md`](docs/제출/02_시스템아키텍처.md)
+상세 아키텍처 구성: [`docs/제출/02_시스템아키텍처.md`](docs/제출/02_시스템아키텍처.md)
 
-## 실행 방법
+---
 
-### 백엔드 (Docker)
+## 3. 실행 방법 (Getting Started)
+
+### 백엔드 실행 (Docker)
 ```bash
 cd backend
-cp .env.example .env      # 코디세이·Gemini 키, CORS 주소 입력
+cp .env.example .env      # API 키 및 환경 변수 설정
 docker compose up --build
 ```
-API 문서: `http://localhost:8000/docs`
+API 대화형 문서: `http://localhost:8000/docs`
 
-### 백엔드 (Python 직접)
+### 백엔드 실행 (Python 가상환경)
 ```bash
 cd backend
 python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
@@ -57,30 +63,41 @@ pip install -r requirements.txt                   # ffmpeg 별도 설치 필요
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 프론트엔드
+### 프론트엔드 실행
 ```bash
 cd frontend
 npm ci
 npm run dev
 ```
 
-## 링크
+---
+
+## 4. 서비스 링크 (Endpoints)
 
 | 구분 | 주소 |
 | --- | --- |
-| 서비스 | (최종 Vercel 주소) |
-| 백엔드 API | https://api.201.n-e.kr |
-| 시연 영상 | (링크) |
+| 프론트엔드 웹 서비스 | https://codyssey-m2-1.vercel.app |
+| 백엔드 API 서버 | https://api.201.n-e.kr |
+| 백엔드 Swagger 문서 | https://api.201.n-e.kr/docs |
+| GitHub 저장소 | https://github.com/davidchoi0507/Codyssey_M2-1 |
 
-## 문서
+---
 
-- 기능 요구 명세서 — [`docs/제출/01_기능요구명세서.md`](docs/제출/01_기능요구명세서.md)
-- 시스템 아키텍처 — [`docs/제출/02_시스템아키텍처.md`](docs/제출/02_시스템아키텍처.md)
-- 기술 스택 선정 이유 — [`docs/제출/03_기술스택_선정이유.md`](docs/제출/03_기술스택_선정이유.md)
-- 사용자 테스트 결과 — [`docs/제출/04_사용자테스트_결과.md`](docs/제출/04_사용자테스트_결과.md)
+## 5. 관련 제출 문서 (Deliverables)
 
-## 팀원 역할 — 백엔드 칸
+- 기능 요구 명세서 (FR/NFR) — [`docs/제출/01_기능요구명세서.md`](docs/제출/01_기능요구명세서.md)
+- 시스템 아키텍처 명세서 — [`docs/제출/02_시스템아키텍처.md`](docs/제출/02_시스템아키텍처.md)
+- 기술 스택 및 의사결정 기록 (ADR) — [`docs/제출/03_기술스택_선정이유.md`](docs/제출/03_기술스택_선정이유.md)
+- 실사용자 테스트 결과 보고서 — [`docs/제출/04_사용자테스트_결과.md`](docs/제출/04_사용자테스트_결과.md)
 
-| 이름 | 역할 | 담당 |
-| --- | --- | --- |
-| 원일 | 백엔드 · AI | 서버 전체(FastAPI·배포·DB), librosa + Gemini 분석, LangChain 에이전트, 커버·숏폼·Canvas 생성, 유통사 검사·권리 자가진단, 커뮤니티·로그인·신고·남의 곡 감지, 사용 기록·설문·운영자 페이지 |
+---
+
+## 6. 팀원 역할 분담 (Team R&R)
+
+| 이름 | 포지션 | 세부 담당 업무 |
+| :---: | :--- | :--- |
+| **팀장 (David)** | Product Lead & UI/UX | • 발매로 기획 총괄 및 사용자 여정(4단계 워크플로우) 설계<br>• 다크 테마 UI/UX 디자인 시스템 구축 및 프론트엔드 코어 마크업<br>• 스프린트 리딩, 발표 자료(PPTX/PDF) 제작 및 Git 형상 관리 |
+| **원일** | Tech Lead & AI / Backend | • 서버 전체(FastAPI 비동기 아키텍처, Oracle Cloud VM 배포, DB)<br>• librosa + Gemini 3.8 Flash 하이브리드 오디오 엔진<br>• LangChain 에이전트 4종 및 gpt-image-2 / ffmpeg 영상 파이프라인<br>• 유통사 규격 검사, 권리 자가진단, '들어봐' 커뮤니티, 소리 지문 도용 방지 |
+| **팀원 2** | Frontend Lead | • React 반응형 UI 구현, A&R 리포트 인라인 실시간 편집기<br>• 모바일 뷰 텍스트 잘림 해결 및 터치 인터랙션 최적화<br>• 비동기 폴링 상태 관리 및 릴리즈 팩 다운로드 연동 |
+| **팀원 3** | AI Workflow & Auxiliary | • gpt-image-2 프롬프트 엔지니어링 및 3000px 초고화질 업스케일러 연동<br>• 채널별 홍보 카피라이팅 프롬프트 튜닝 및 JSON 스키마 검증<br>• 비용 최적화(API 키 로테이션) 적용으로 커버 생성 시간 81초 단축 |
+| **팀원 4** | QA & Operations | • 실사용자 35인 테스트 총괄 및 설문 수집·분석 리포트 작성<br>• 장르별 음원 샘플 20종 메타데이터 데이터셋 구축<br>• QA 테스트케이스 작성, 50여 건의 이슈 트래킹 및 검증 |
