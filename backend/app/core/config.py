@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     public_base_url: str = "http://localhost:8000"
     cors_origins: str = "http://localhost:3000"
     playground_enabled: bool = True  # /playground 백엔드 흐름 확인용 페이지 (팀 공유용, 밴드 공개 시 끔)
+    service_url: str = "https://codyssey-m2-1.vercel.app"  # 서비스 화면(팀장 React, Vercel). 서버 주소만 치고 들어오면 여기로 보낸다
     api_docs_enabled: bool = False  # /docs·/redoc·/openapi.json (10/20 제출 때 닫음). 로컬 개발은 .env에 API_DOCS_ENABLED=true
     data_dir: Path = Path("./data")
     db_path: Path = Path("./data/app.db")

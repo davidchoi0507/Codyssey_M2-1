@@ -153,7 +153,8 @@ def frontend(path: str) -> FileResponse:
 
 @app.get("/", include_in_schema=False)
 def root() -> RedirectResponse:
-    return RedirectResponse("/studio")
+    # 10/20 제출: 서버 주소로 들어온 사람은 예전 시험 화면(/studio)이 아니라 실제 서비스 화면으로
+    return RedirectResponse(settings.service_url)
 
 
 if settings.playground_enabled:
