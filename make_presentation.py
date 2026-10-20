@@ -314,7 +314,7 @@ def create_balmaero_presentation():
 
     add_card(s5, Inches(4.866), Inches(1.7), Inches(3.6), Inches(4.8),
              "2. Backend & Engine (API Layer)",
-             ["• 프레임워크: FastAPI (Python 3.10 비동기)",
+             ["• 프레임워크: FastAPI (Python 3.12 비동기)",
               "• 호스팅: Oracle Cloud VM (api.201.n-e.kr)",
               "• 코어 파이프라인:",
               "  - librosa DSP 물리량 추출 엔진",
@@ -407,10 +407,11 @@ def create_balmaero_presentation():
              title_color=COLOR_PRIMARY)
 
     add_card(s7, Inches(8.933), Inches(1.7), Inches(3.6), Inches(4.3),
-             "3. 카피라이터 & 피칭 에이전트",
-             ["• 승인된 콘셉트와 곡 소개를 바탕으로 홍보 텍스트 생성",
-              "• 인스타그램, 틱톡, 유튜브 채널별 최적화 카피",
-              "• 유통사 및 음악 웹진 피칭용 이메일 초안 작성"],
+             "3. 카피 · 피칭 · 에디토리얼 (총 5종)",
+             ["• 승인된 콘셉트와 곡 소개를 바탕으로 텍스트 자동화",
+              "• [카피라이터] 인스타·틱톡·스레드·X 맞춤 홍보 카피",
+              "• [피칭 & 에디토리얼] 영/한 피칭 메일 및 Spotify 피칭 문구",
+              "• 5종 에이전트가 단일 A&R 콘셉트를 공유하여 일관성 유지"],
              title_color=COLOR_PRIMARY)
 
     c7 = s7.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(6.15), Inches(11.733), Inches(0.65))
@@ -430,7 +431,7 @@ def create_balmaero_presentation():
         "“두 번째 핵심 기술은 LangChain 기반의 멀티에이전트 협업 구조입니다.\n"
         "단일 프롬프트에 모든 요청을 몰아넣으면 환각이 생기고 품질이 급격히 떨어집니다.\n"
         "발매로는 A&R 에이전트가 중심 콘셉트를 잡고, 창작자가 이를 수락하면,\n"
-        "비주얼 디렉터와 카피라이터 에이전트가 병렬로 작동하여 커버 아트, 숏폼 영상, 피칭 텍스트를 완성합니다.\n"
+        "비주얼 디렉터, 카피라이터, 피칭, 에디토리얼 등 총 5종의 전문 에이전트가 병렬로 작동하여 커버 아트, 숏폼 영상, 채널별 홍보문과 피칭 텍스트를 완성합니다.\n"
         "도구 호출을 지원하지 않는 환경에서도 JSON 스키마 파서를 통해 견고하게 데이터를 전달하도록 구현했습니다.”"
     )
 
@@ -495,12 +496,12 @@ def create_balmaero_presentation():
     
     table_shape = s9.shapes.add_table(rows, cols, left, top, width, height)
     table = table_shape.table
-    table.columns[0].width = Inches(1.6)
-    table.columns[1].width = Inches(2.3)
-    table.columns[2].width = Inches(4.8)
-    table.columns[3].width = Inches(3.033)
+    table.columns[0].width = Inches(1.5)
+    table.columns[1].width = Inches(2.4)
+    table.columns[2].width = Inches(5.1)
+    table.columns[3].width = Inches(2.733)
     
-    headers = ["구분", "담당자 / 포지션", "세부 담당 업무", "대표 산출물"]
+    headers = ["구분", "담당자 / 포지션", "세부 담당 업무 및 실기여", "주요 산출물"]
     for j, h in enumerate(headers):
         cell = table.cell(0, j)
         cell.text = h
@@ -513,11 +514,11 @@ def create_balmaero_presentation():
         p.font.color.rgb = COLOR_WHITE
         
     team_data = [
-        ("팀장 (본인)", "Product Lead & UI/UX", "발매로 기획 총괄, UI 디자인 시스템 구축, 프론트 마크업", "Figma 원본, 프론트 코어, 발표자료"),
-        ("팀원 1", "Tech Lead & AI/Backend", "FastAPI 비동기 아키텍처, librosa + Gemini 오디오 엔진", "백엔드 API, 오디오 파이프라인"),
-        ("팀원 2", "Frontend Lead", "React 반응형 UI, 인라인 에디터, 모바일 가독성 최적화", "React 컴포넌트, 인터랙션 코드"),
-        ("팀원 3", "AI Workflow Lead", "gpt-image-2 이미지 연동, ffmpeg 비디오 렌더러 구축", "이미지/영상 파이프라인, 프롬프트 로그"),
-        ("팀원 4", "QA & Operations", "실사용자 5인 테스트 총괄, 피드백 분석 보고서, 이슈 트래킹", "테스트 결과 보고서, QA 이슈보드")
+        ("팀장 (David)", "Product Lead & Frontend", "발매로 기획 총괄, 4단계 UX 설계, React 프론트엔드 UI 구현 및 최적화", "React UI 코드, 발표 자료"),
+        ("원일", "Tech Lead & AI / Backend", "FastAPI 서버 전체, librosa+Gemini 오디오 엔진, LangChain 5종, 유통사 검사", "백엔드 API, AI 파이프라인, 제출문서 5종"),
+        ("이은희", "Service Policy & UX Research", "서비스 이용약관 및 개인정보 동의서(v1.2~1.6) 기획, 데이터 파기 규정 수립, 10/16 피드백", "개인정보 동의서(v1.6), 개선안 리포트"),
+        ("신미영", "Industry Research & QA", "유통사(DistroKid/뮤즈플랫폼) 규격 조사, 실음원 테스트 진행 및 개선안 리포트(33건 도출)", "유통사 조사서, 실음원 테스트 리포트"),
+        ("이지은", "Audio Dataset & Usability", "장르별 테스트용 음원 데이터 수집·정비, 실사용자 테스트 진행 지원 및 만족도 설문 집계", "테스트 음원셋, 설문 집계 데이터")
     ]
     
     for i, row in enumerate(team_data):
@@ -554,7 +555,7 @@ def create_balmaero_presentation():
     p_git2.font.color.rgb = COLOR_TEXT_DARK
     
     p_git3 = c9_tf.add_paragraph()
-    p_git3.text = "• 이슈 트래킹: 50여 건의 사용자 피드백을 GitHub Issues로 등록하고 화면/백엔드 태그로 분담 처리"
+    p_git3.text = "• 피드백 반영: 실사용자 테스트에서 수렴된 개선 의견을 화면/백엔드 태그로 분담하여 신속하게 처리"
     p_git3.font.name = "Pretendard"
     p_git3.font.size = Pt(10.5)
     p_git3.font.color.rgb = COLOR_TEXT_DARK
@@ -562,9 +563,9 @@ def create_balmaero_presentation():
     s9.notes_slide.notes_text_frame.text = (
         "[08:00 - 08:45] 팀 협업 스크립트\n"
         "“팀 협업 및 형상 관리 내역입니다.\n"
-        "저희 5명은 기획/UI, 백엔드/AI, 프론트, 영상/이미지 워크플로우, QA/운영으로 역할을 엄격히 분담했습니다.\n"
+        "저희 5명은 기획/프론트엔드, AI/백엔드 코어 개발과 함께 서비스 정책·동의서 설계, 유통사 실무 규격 조사, 테스트 음원 수집 및 사용성 검증으로 역할을 전문적으로 분담했습니다.\n"
         "GitHub PR을 통해 상호 코드 리뷰를 거쳐 안전하게 머지했으며,\n"
-        "테스트 과정에서 쏟아진 50여 건의 피드백을 이슈로 등록하고 빠르게 조율하며 하나의 완성도 높은 제품으로 연결했습니다.”"
+        "테스트 과정에서 수렴된 피드백을 신속하게 조율하며 완성도 높은 제품으로 완성했습니다.”"
     )
 
     # ==========================================
@@ -575,7 +576,7 @@ def create_balmaero_presentation():
     
     add_card(s10, Inches(0.8), Inches(1.7), Inches(5.6), Inches(4.8),
              "🌐 외부 접근 가능한 실배포 환경",
-             ["• [프론트엔드 URL] Vercel CDN 배포 완료",
+             ["• [프론트엔드 URL] https://codyssey-m2-1.vercel.app",
               "• [백엔드 API URL] Oracle Cloud VM (api.201.n-e.kr)",
               "• 상시 가동 상태로 외부 누구나 즉시 접근 가능",
               "",
@@ -707,7 +708,7 @@ def create_balmaero_presentation():
     qp1.space_after = Pt(4)
     
     qp2 = qa_tf.add_paragraph()
-    qp2.text = "• 서비스 링크: Vercel 배포 URL  |  코드 저장소: GitHub (github.com/davidchoi0507/Codyssey_M2-1)"
+    qp2.text = "• 서비스 링크: https://codyssey-m2-1.vercel.app  |  코드 저장소: github.com/davidchoi0507/Codyssey_M2-1"
     qp2.font.name = "Pretendard"
     qp2.font.size = Pt(11)
     qp2.font.color.rgb = RGBColor(226, 232, 240)
